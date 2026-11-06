@@ -228,7 +228,7 @@ export function download(blob, name) {
 }
 
 /** 간단한 확인·입력 창. fields가 있으면 입력값 객체를, 없으면 true를 돌려준다(취소는 null). */
-export function dialog({ title, text, fields, ok = "확인", cancel = "취소", danger = false }) {
+export function dialog({ title, text, body, fields, ok = "확인", cancel = "취소", danger = false, wide = false }) {
   return new Promise((resolve) => {
     const inputs = (fields || []).map((f) =>
       h("label", { class: "field" }, h("span", null, f.label), h(f.multiline ? "textarea" : "input", { name: f.name, value: f.value || "", placeholder: f.placeholder || "", rows: f.multiline ? 3 : null }))
@@ -241,7 +241,7 @@ export function dialog({ title, text, fields, ok = "확인", cancel = "취소", 
     const submit = () => {
       if (!fields) return close(true);
       const out = {};
-      for (const el of back.querySelectorAll("input,textarea")) out[el.name] = el.value.trim();
+      for (const el of back.querySelectorAll("input[name],textarea[name]")) out[el.name] = el.value.trim();
       close(out);
     };
     const back = h(
@@ -249,9 +249,10 @@ export function dialog({ title, text, fields, ok = "확인", cancel = "취소", 
       { class: "modal-back", onclick: (e) => e.target === back && close(null) },
       h(
         "form",
-        { class: "modal", onsubmit: (e) => (e.preventDefault(), submit()) },
+        { class: "modal" + (wide ? " wide" : ""), onsubmit: (e) => (e.preventDefault(), submit()) },
         h("h3", null, title),
         text ? h("p", null, text) : null,
+        body ? h("div", { class: "modal-body" }, body) : null,
         inputs,
         h("div", { class: "modal-acts" }, cancel ? h("button", { type: "button", class: "btn ghost", onclick: () => close(null) }, cancel) : null, h("button", { type: "submit", class: "btn" + (danger ? " danger" : "") }, ok))
       )

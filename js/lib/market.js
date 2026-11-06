@@ -1,5 +1,5 @@
 // 공개 시세 조회(키 없음): 국내 종목·지수는 NAVER, 해외·환율·원자재는 Yahoo Finance. 서버의 /fetch 중계를 거친다.
-import { cached, fetchSite } from "../core.js";
+import { api, cached, fetchSite, store } from "../core.js";
 
 const NAVER_REF = "https://m.stock.naver.com/";
 const KR = /^[A-Z0-9]{6}\.(KS|KQ)$/;
@@ -351,3 +351,134 @@ export const UP = "var(--up)";
 export const DOWN = "var(--down)";
 export const tint = (change) => (change > 0 ? UP : change < 0 ? DOWN : "var(--muted)");
 export const signed = (v, digits = 0) => (v > 0 ? "▲" : v < 0 ? "▼" : "") + Math.abs(v).toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+// ---- 지표·종목 목록(앱과 같음) ----
+const ins = (symbol, name, currency, type) => ({ symbol, name, currency, type });
+export const KOREA_INDEXES = [ins("^KS11", "KOSPI", "KRW", "INDEX"), ins("^KQ11", "KOSDAQ", "KRW", "INDEX")];
+export const PANEL_CATALOG = [
+  ins("^GSPC", "S&P 500", "USD", "INDEX"), ins("^IXIC", "Nasdaq", "USD", "INDEX"), ins("KRW=X", "USD/KRW", "KRW", "FX"), ins("CL=F", "WTI", "USD", "EQUITY"),
+  ins("^TNX", "US 10Y", "USD", "RATE"), ins("GC=F", "Gold", "USD", "EQUITY"),
+  ins("^DJI", "Dow Jones", "USD", "INDEX"), ins("^SOX", "Philadelphia Semiconductor", "USD", "INDEX"), ins("^NDX", "Nasdaq 100", "USD", "INDEX"),
+  ins("^RUT", "Russell 2000", "USD", "INDEX"), ins("^VIX", "VIX", "USD", "INDEX"),
+  ins("^N225", "Nikkei 225", "USD", "INDEX"), ins("^HSI", "Hang Seng", "USD", "INDEX"), ins("000001.SS", "Shanghai Composite", "USD", "INDEX"),
+  ins("^TWII", "Taiwan Weighted", "USD", "INDEX"), ins("^STOXX50E", "Euro Stoxx 50", "USD", "INDEX"), ins("^GDAXI", "DAX", "USD", "INDEX"), ins("^FTSE", "FTSE 100", "USD", "INDEX"),
+  ins("DX-Y.NYB", "Dollar Index", "USD", "FX"), ins("JPY=X", "USD/JPY", "USD", "FX"), ins("EURKRW=X", "EUR/KRW", "KRW", "FX"), ins("CNYKRW=X", "CNY/KRW", "KRW", "FX"),
+  ins("^FVX", "US 5Y", "USD", "RATE"), ins("^TYX", "US 30Y", "USD", "RATE"),
+  ins("BZ=F", "Brent", "USD", "EQUITY"), ins("SI=F", "Silver", "USD", "EQUITY"), ins("HG=F", "Copper", "USD", "EQUITY"), ins("NG=F", "Natural Gas", "USD", "EQUITY"),
+  ins("BTC-USD", "Bitcoin", "USD", "EQUITY"), ins("ETH-USD", "Ethereum", "USD", "EQUITY"),
+];
+export const INDEX_CHOICES = [...KOREA_INDEXES, ...PANEL_CATALOG];
+const DEFAULT_MARKET_INDEXES = [...KOREA_INDEXES, ...PANEL_CATALOG.slice(0, 6)].map((x) => x.symbol);
+const BRIEFING_EXCLUDED = ["^GSPC", "CL=F", "^TNX", "^SOX"];
+export const DEFAULT_WATCH = [ins("005930.KS", "삼성전자", "KRW", "EQUITY"), ins("000660.KS", "SK하이닉스", "KRW", "EQUITY"), ins("069500.KS", "KODEX 200", "KRW", "ETF")];
+
+/** 증시 지표 선택 { market:[...], briefing:[...] } (이 브라우저에 저장). */
+export function indexSelection() {
+  const market = store.get("market.indexes", DEFAULT_MARKET_INDEXES);
+  const briefing = store.get("briefing.indexes", market.filter((s) => !BRIEFING_EXCLUDED.includes(s)));
+  return { market, briefing };
+}
+export function saveIndexSelection(sel) {
+  store.set("market.indexes", sel.market);
+  store.set("briefing.indexes", sel.briefing);
+}
+
+const grp = (v, d) => Number(v).toLocaleString("ko-KR", { minimumFractionDigits: d, maximumFractionDigits: d });
+const changeDigits = (it) => (it.type === "INDEX" || it.currency === "USD" || it.type === "FX" ? 2 : 0);
+export function priceText(it, v) {
+  if (it.type === "FX") return grp(v, 2) + (it.currency === "KRW" ? "원" : "");
+  if (it.type === "RATE") return grp(v, 3) + "%";
+  if (it.type === "INDEX") return grp(v, 2);
+  if (it.currency === "USD") return "$" + grp(v, 2);
+  return grp(v, 0) + "원";
+}
+const sgn = (v, d, suffix = "") => (v > 0 ? "▲" : v < 0 ? "▼" : "") + grp(Math.abs(v), d) + suffix;
+/** "▼92.30 (▼1.30%)" */
+export function deltaText(it, q) {
+  const ch = changeOf(q);
+  return ch == null ? null : `${sgn(ch, changeDigits(it))} (${sgn(percentOf(q) ?? 0, 2, "%")})`;
+}
+
+// ---- 국내 금융 통계(한국은행 ECOS, 서버 /stats) ----
+const sd = (id, name, group) => ({ id, name, group });
+export const STAT_CATALOG = [
+  sd("base-rate", "한국은행 기준금리", "금리·채권"), sd("call-1d", "콜금리(1일)", "금리·채권"), sd("cd-91", "CD 91일", "금리·채권"), sd("cp-91", "CP 91일", "금리·채권"),
+  sd("ktb-1y", "국고채 1년", "금리·채권"), sd("ktb-2y", "국고채 2년", "금리·채권"), sd("ktb-3y", "국고채 3년", "금리·채권"), sd("ktb-5y", "국고채 5년", "금리·채권"),
+  sd("ktb-10y", "국고채 10년", "금리·채권"), sd("ktb-20y", "국고채 20년", "금리·채권"), sd("ktb-30y", "국고채 30년", "금리·채권"),
+  sd("corp-aa", "회사채 3년 AA-", "금리·채권"), sd("corp-bbb", "회사채 3년 BBB-", "금리·채권"), sd("loan-rate", "예금은행 대출금리", "금리·채권"),
+  sd("mortgage-rate", "예금은행 주택담보대출금리", "금리·채권"),
+  sd("household-credit", "가계신용 잔액", "가계·은행 건전성"), sd("household-credit-loan", "가계대출 잔액(분기)", "가계·은행 건전성"),
+  sd("bank-household-loan", "은행 가계대출 잔액", "가계·은행 건전성"), sd("deposit-household-loan", "예금취급기관 가계대출", "가계·은행 건전성"),
+  sd("bank-mortgage", "은행 주택관련대출", "가계·은행 건전성"), sd("bank-delinquency", "은행 가계대출 연체율", "가계·은행 건전성"),
+  sd("bank-delinquency-corp", "은행 기업대출 연체율", "가계·은행 건전성"), sd("fx-reserves", "외환보유액", "대외"),
+];
+const DEFAULT_MARKET_STATS = ["base-rate", "ktb-3y", "ktb-10y", "cd-91", "corp-aa", "household-credit", "bank-household-loan", "bank-delinquency", "loan-rate", "fx-reserves"];
+const DEFAULT_BRIEFING_STATS = ["ktb-3y", "corp-aa"];
+export function statSelection() {
+  return { market: store.get("market.stats", DEFAULT_MARKET_STATS), briefing: store.get("briefing.stats", DEFAULT_BRIEFING_STATS) };
+}
+export function saveStatSelection(sel) {
+  store.set("market.stats", sel.market);
+  store.set("briefing.stats", sel.briefing);
+}
+/** { items:[{id,name,unit,value,previous,period}], missing, reasons } */
+export function loadStats(ids) {
+  if (!ids.length) return Promise.resolve({ items: [], missing: [], reasons: {} });
+  return cached("stats:" + ids.join(","), 600_000, async () => {
+    const r = await api("/stats", { ids: ids.join(",") });
+    return { items: (r.items || []).filter((x) => Number.isFinite(x.value)), missing: r.missing || [], reasons: r.reasons || {} };
+  });
+}
+export const groupOf = (id) => STAT_CATALOG.find((s) => s.id === id)?.group || "기타";
+export function periodLabel(p) {
+  if (/^\d{8}$/.test(p)) return `${p.slice(4, 6)}/${p.slice(6)}`;
+  if (/^\d{6}$/.test(p)) return `${p.slice(0, 4)}.${p.slice(4)}`;
+  if (/^\d{4}Q[1-4]$/.test(p)) return `${p.slice(0, 4)} ${p.slice(-1)}분기`;
+  return p || "";
+}
+export function statText(it, v) {
+  const rate = it.unit === "%";
+  const d = rate ? 2 : it.unit === "조원" ? 1 : Math.abs(v) >= 1000 ? 0 : 1;
+  return grp(v, d) + (rate ? "%" : it.unit ? " " + it.unit : "");
+}
+export function statDelta(it) {
+  if (it.previous == null) return null;
+  const ch = it.value - it.previous;
+  const rate = it.unit === "%";
+  const d = rate ? 2 : it.unit === "조원" ? 2 : Math.abs(it.value) >= 1000 ? 0 : 1;
+  const pc = !rate && it.previous ? ` (${sgn(((it.value - it.previous) / Math.abs(it.previous)) * 100, 2, "%")})` : "";
+  return sgn(ch, d) + (rate ? "%p" : "") + pc;
+}
+
+// ---- 자본시장 통계(금융투자협회 FreeSIS, 키 없음) ----
+const KOFIA_LISTS = { 펀드: ["fundList1", "fundList2", "fundList3", "fundList4", "fundList5"], 자금동향: ["fundTrendList1", "fundTrendList2", "fundTrendList3"] };
+const knum = (v) => (typeof v === "number" ? v : Number.isFinite(Number(String(v ?? "").replace(/,/g, "").trim())) && String(v ?? "").trim() ? Number(String(v).replace(/,/g, "")) : null);
+export function loadKofia() {
+  return cached("kofia", 600_000, async () => {
+    const { text } = await fetchSite("https://freesis.kofia.or.kr/alootStatsAll/STATTOT0600000900BO.do", {
+      method: "POST",
+      contentType: "application/json; charset=UTF-8",
+      body: JSON.stringify({ data: { userId: "GUEST", searchLog: "메인", serviceId: "STATTOT0600000900" } }),
+      referer: "https://freesis.kofia.or.kr/stat/FreeSIS.do?parentDivId=MSIS02000000000000&serviceId=MSIS02010000000000",
+    });
+    const root = JSON.parse(text);
+    const groups = [];
+    for (const [title, lists] of Object.entries(KOFIA_LISTS)) {
+      const sections = new Map();
+      for (const ln of lists) {
+        for (const r of root[ln] || []) {
+          const parts = String(r.TMPV14 || "").split(">");
+          const value = String(r.TMPV4 || "").trim();
+          if (parts.length < 3 || !value) continue;
+          const clean = (s) => s.replace(/\s*\n\s*/g, " ").trim();
+          const st = parts[1].trim();
+          if (!sections.has(st)) sections.set(st, { title: st, asOf: String(r.TMPV3 || "").trim(), unit: String(r.TMPV5 || "").trim(), items: [] });
+          sections.get(st).items.push({ key: parts.map(clean).join(">"), name: clean(parts.slice(2).join(">")), value, change: knum(r.TMPV6), changeText: String(r.TMPV6 || "").trim() || "0" });
+        }
+      }
+      if (sections.size) groups.push({ title, sections: [...sections.values()] });
+    }
+    if (!groups.length) throw new Error("금융투자협회 응답에 자료가 없습니다");
+    return groups;
+  });
+}

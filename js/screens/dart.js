@@ -506,7 +506,7 @@ function pickRange(fromYm, toYm) {
   b.addEventListener("change", () => fix(b));
   return dialog({
     title: "기간 선택",
-    text: h("div", { class: "stack" }, h("label", { class: "field" }, "시작", a), h("label", { class: "field" }, "종료", b), note),
+    body: h("div", { class: "stack" }, h("label", { class: "field" }, "시작", a), h("label", { class: "field" }, "종료", b), note),
     ok: "적용",
   }).then((ok) => (ok ? [+a.value, +b.value] : null));
 }
