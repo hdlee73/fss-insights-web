@@ -1,0 +1,231 @@
+// 앱 뼈대: 왼쪽 메뉴(접기·펼치기, 휴대폰은 서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
+// 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
+import { APP_VERSION, h, icon, store, toast } from "./core.js";
+
+// 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서. 뉴스 검색은 웹 범위가 아니다.
+export const MENU = [
+  [null, [
+    ["briefing", "오늘의 브리핑", "sun"],
+    ["market", "금융시장 동향", "trending-up"],
+    ["fisis", "금융회사 주요 현황", "building-2"],
+    ["sanction", "금융회사 제재현황", "gavel"],
+    ["dart", "기업 개황 및 공시(DART)", "building"],
+    ["law", "스마트 법령검색", "scale"],
+  ]],
+  ["자료", [
+    ["press", "보도자료", "file-text"],
+    ["regulatory", "유권해석·비조치의견서·행정지도", "badge-check"],
+    ["research", "금융관련 리포트", "book-open"],
+    ["library", "참고 자료실", "folder-open"],
+  ]],
+  ["더보기", [
+    ["sites", "주요사이트", "globe"],
+    ["alerts", "알림", "bell"],
+    ["info", "앱 정보", "info"],
+  ]],
+];
+const ROUTES = Object.fromEntries(MENU.flatMap(([, items]) => items.map(([id, label, ic]) => [id, { label, icon: ic }])));
+
+const loaders = {
+  briefing: () => import("./screens/briefing.js"),
+  market: () => import("./screens/market.js"),
+  fisis: () => import("./screens/fisis.js"),
+  sanction: () => import("./screens/sanction.js"),
+  dart: () => import("./screens/dart.js"),
+  law: () => import("./screens/law.js"),
+  press: () => import("./screens/releases.js"),
+  research: () => import("./screens/releases.js"),
+  regulatory: () => import("./screens/regulatory.js"),
+  library: () => import("./screens/library.js"),
+  sites: () => import("./screens/sites.js"),
+  alerts: () => import("./screens/alerts.js"),
+  info: () => import("./screens/info.js"),
+};
+
+/** 현재 주소(#/press?agency=FSS)를 { id, params }로 읽는다. */
+export function currentRoute() {
+  const raw = location.hash.replace(/^#\/?/, "");
+  const [path, qs] = raw.split("?");
+  const id = ROUTES[path] ? path : "briefing";
+  return { id, params: Object.fromEntries(new URLSearchParams(qs || "")) };
+}
+
+/** 다른 화면(또는 같은 화면의 다른 상태)으로 이동. replace면 기록을 늘리지 않는다. */
+export function go(id, params = {}, { replace = false } = {}) {
+  const qs = new URLSearchParams(Object.entries(params).filter(([, v]) => v != null && v !== "")).toString();
+  const hash = `#/${id}${qs ? "?" + qs : ""}`;
+  if (hash === location.hash) return render();
+  if (replace) {
+    history.replaceState(null, "", hash);
+    render();
+  } else location.hash = hash;
+}
+
+const side = document.getElementById("side");
+const main = document.getElementById("content");
+const titleEl = document.getElementById("title");
+const subEl = document.getElementById("sub");
+const actionsEl = document.getElementById("top-actions");
+const mobile = matchMedia("(max-width: 860px)");
+
+function buildMenu() {
+  side.replaceChildren(
+    h("div", { class: "brand" },
+      h("img", { class: "logo", src: "icons/icon-192.png", alt: "" }),
+      h("div", { class: "brand-t" }, h("b", null, "FSS Insights"), h("small", null, "웹 버전")),
+      h("button", { class: "ib collapse", type: "button", title: "메뉴 접기", "aria-label": "메뉴 접기", onclick: toggleCollapse }, icon("panel-left"))),
+    h("nav", { class: "menu" },
+      MENU.map(([head, items]) => h("div", { class: "sec" },
+        head ? h("div", { class: "sh" }, head) : null,
+        items.map(([id, label, ic]) => h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
+          if (!document.body.classList.contains("drawer")) return;
+          e.preventDefault();
+          closeDrawer(() => (location.hash = `#/${id}`));
+        } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true })))))),
+    h("div", { class: "sidefoot" }, `v${APP_VERSION} · 이현덕 with Claude`)
+  );
+}
+
+function toggleCollapse() {
+  const collapsed = !document.body.classList.contains("collapsed");
+  document.body.classList.toggle("collapsed", collapsed);
+  store.set("menuCollapsed", collapsed);
+}
+// 휴대폰 서랍은 기록을 하나 남겨, 열린 상태에서 뒤로가기를 하면 화면 이동 대신 서랍만 닫힌다.
+let afterClose = null;
+function openDrawer() {
+  if (document.body.classList.contains("drawer")) return;
+  document.body.classList.add("drawer");
+  history.pushState({ drawer: true }, "", location.hash);
+}
+function closeDrawer(then) {
+  if (!document.body.classList.contains("drawer")) return then?.();
+  document.body.classList.remove("drawer");
+  if (history.state?.drawer) {
+    afterClose = then || null;
+    history.back();
+  } else then?.();
+}
+addEventListener("popstate", () => {
+  document.body.classList.remove("drawer");
+  const next = afterClose;
+  afterClose = null;
+  next?.();
+});
+
+/** 메뉴 옆 숫자 배지(알림 화면이 새 글 수를 표시). */
+export function setBadge(id, count) {
+  const el = side.querySelector(`.mi[data-id="${id}"] .badge`);
+  if (!el) return;
+  el.hidden = !count;
+  el.textContent = count > 99 ? "99+" : String(count || "");
+}
+
+let renderSeq = 0;
+let currentScreen = null;
+
+/** 화면 제목줄. 각 화면이 부른다. */
+export function setHeader(title, sub = "", actions = []) {
+  titleEl.textContent = title;
+  subEl.textContent = sub;
+  actionsEl.replaceChildren(...actions.filter(Boolean));
+  document.title = `${title} · FSS Insights`;
+}
+
+async function render() {
+  const seq = ++renderSeq;
+  const { id, params } = currentRoute();
+  for (const a of side.querySelectorAll(".mi")) a.classList.toggle("on", a.dataset.id === id);
+  const route = ROUTES[id];
+  setHeader(route.label);
+  try {
+    currentScreen?.leave?.();
+  } catch {}
+  let mod;
+  try {
+    mod = await loaders[id]();
+  } catch (e) {
+    main.replaceChildren(h("div", { class: "state err" }, "화면을 불러오지 못했습니다. 새로고침해 주세요."));
+    return;
+  }
+  if (seq !== renderSeq) return;
+  const root = h("div", { class: "screen screen-" + id });
+  main.replaceChildren(root);
+  main.scrollTop = 0;
+  currentScreen = mod;
+  try {
+    await mod.render(root, params, { id, go: (p, opts) => go(id, p, opts), alive: () => seq === renderSeq });
+  } catch (e) {
+    console.error(e);
+    if (seq === renderSeq) root.replaceChildren(h("div", { class: "state err" }, "화면 오류: " + (e.message || e)));
+  }
+}
+
+// ---- 업데이트(서비스 워커) ----
+// 새 버전이 올라오면 서비스 워커가 미리 받아 두고, 화면 위에 "새 버전" 띠를 띄운다. 누르면 바로 적용, 그냥 두면 다음 실행 때 적용.
+let waitingWorker = null;
+export function updateReady() {
+  return !!waitingWorker;
+}
+export function applyUpdate() {
+  if (waitingWorker) waitingWorker.postMessage("skipWaiting");
+  else location.reload();
+}
+export async function checkForUpdate() {
+  const reg = await navigator.serviceWorker?.getRegistration();
+  if (!reg) return false;
+  await reg.update();
+  return !!(reg.waiting || reg.installing);
+}
+function showUpdateBar(worker) {
+  waitingWorker = worker;
+  document.getElementById("update-bar")?.remove();
+  document.body.append(
+    h("div", { id: "update-bar" }, icon("refresh-cw"), h("span", null, "새 버전이 준비되었습니다."), h("button", { class: "btn sm", type: "button", onclick: applyUpdate }, "지금 적용"))
+  );
+}
+function registerWorker() {
+  if (!("serviceWorker" in navigator) || location.protocol === "file:") return;
+  // 개발 중(localhost)에는 저장본 때문에 고친 파일이 안 보이지 않도록 ?sw=1 일 때만 켠다.
+  if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname) && !location.search.includes("sw=1")) return;
+  navigator.serviceWorker.register("sw.js").then((reg) => {
+    if (reg.waiting && navigator.serviceWorker.controller) showUpdateBar(reg.waiting);
+    reg.addEventListener("updatefound", () => {
+      const w = reg.installing;
+      w?.addEventListener("statechange", () => {
+        if (w.state === "installed" && navigator.serviceWorker.controller) showUpdateBar(w);
+      });
+    });
+    // 켜 둔 채로 오래 쓰는 경우를 위해 1시간마다 새 버전을 확인한다.
+    setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
+  });
+  let reloading = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloading) return;
+    reloading = true;
+    location.reload();
+  });
+}
+
+// ---- 시작 ----
+buildMenu();
+document.body.classList.toggle("collapsed", !!store.get("menuCollapsed", false));
+document.getElementById("hamb").addEventListener("click", () => (mobile.matches ? openDrawer() : toggleCollapse()));
+document.getElementById("scrim").addEventListener("click", () => closeDrawer());
+addEventListener("hashchange", render);
+addEventListener("keydown", (e) => e.key === "Escape" && closeDrawer());
+mobile.addEventListener("change", () => closeDrawer());
+// 휴대폰: 화면 왼쪽 가장자리에서 오른쪽으로 밀면 메뉴가 열린다(앱과 같은 동작).
+let touchX = null;
+addEventListener("touchstart", (e) => (touchX = e.touches[0].clientX < 24 ? e.touches[0].clientX : null), { passive: true });
+addEventListener("touchmove", (e) => {
+  if (touchX != null && e.touches[0].clientX - touchX > 60) {
+    openDrawer();
+    touchX = null;
+  }
+}, { passive: true });
+addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 저장된 화면만 볼 수 있습니다."));
+if (!location.hash) history.replaceState(null, "", "#/briefing");
+render();
+registerWorker();
+import("./alerts-check.js").then((m) => m.checkInBackground()).catch(() => {});
