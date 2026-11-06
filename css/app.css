@@ -247,7 +247,8 @@ select.sel { padding: 6px 8px; font-size: 13px; }
 /* ---- 휴대폰: 메뉴는 서랍(☰ 또는 왼쪽 가장자리 밀기) ---- */
 @media (max-width: 860px) {
   body { --side-w: 280px; }
-  .side { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); box-shadow: 10px 0 30px #0004; }
+  .side { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); }
+  body.drawer .side { box-shadow: 10px 0 30px #0004; }
   body.collapsed .side .brand-t, body.collapsed .side .mi span:not(.i), body.collapsed .side .sh, body.collapsed .side .sidefoot { display: revert; }
   body.collapsed .mi { justify-content: flex-start; padding: 8px 12px; }
   body.collapsed .brand { flex-direction: row; }
@@ -285,3 +286,21 @@ dl.kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 16px; ma
 dl.kv dt { color: var(--muted); }
 dl.kv dd { margin: 0; }
 dl.kv a { color: var(--acc-fg); }
+
+/* 금융회사 주요 현황 */
+.co-row { cursor: pointer; align-items: center; }
+.co-row:hover { background: #f8fafe; }
+.avatar { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; background: var(--acc-soft); color: var(--acc-fg); font-weight: 700; flex: none; }
+.co-row .acts input { width: 18px; height: 18px; cursor: pointer; }
+.period { margin: 10px 0 4px; display: flex; flex-direction: column; gap: 6px; }
+.period .row-gap { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 2px; }
+.bal .kpi { min-height: 0; }
+.bal .kpi b { text-align: right; font-size: 18px; }
+.kpi.hl { background: var(--acc-soft); border-color: #c9dbf8; }
+.share-bar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; margin: 10px 0 4px; }
+.share-bar span:first-child { background: #8fb4f2; }
+.share-bar span:last-child { background: var(--acc); }
+.tbl td.neg { color: var(--danger); }
+.tbl tr.bold td { font-weight: 700; }
+.tbl .sel { background: var(--acc-soft); font-weight: 700; color: var(--acc-fg); }
+.tbl.cmp th.num { text-align: right; }
