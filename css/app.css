@@ -389,3 +389,31 @@ svg.trend.small { height: auto; }
   .tiles.wide2 .tile .px { font-size: 17px; }
   .kofia-cols { grid-template-columns: 1fr; }
 }
+
+/* 제재현황 */
+.sx { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; }
+.sx-head { display: flex; align-items: center; gap: 10px; }
+.sx-head > div { flex: 1; min-width: 0; }
+.sx-head b { font-size: 14.5px; }
+.sx-act { font-size: 13px; }
+.sx-act span { color: #b4233a; font-weight: 700; margin-right: 8px; }
+.sx-items { margin: 4px 0 0 18px; padding: 0; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 2px; }
+.sx-items li.hit { font-weight: 700; }
+.sx-items a { color: var(--acc); text-decoration: underline; text-underline-offset: 2px; }
+.infobox { background: var(--acc-soft); border: 1px solid #c9dbf8; border-radius: var(--r); padding: 12px 14px; display: flex; flex-direction: column; gap: 4px; }
+.bars { display: flex; flex-direction: column; gap: 2px; }
+.bar-row { display: flex; align-items: center; gap: 8px; padding: 3px 2px; border-radius: 6px; font-size: 12.5px; }
+.bar-row.click { cursor: pointer; }
+.bar-row.click:hover { background: #f4f7fd; }
+.bar-row .bl { width: 168px; flex: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar-row .bt { flex: 1; height: 12px; }
+.bar-row .bt i { display: block; height: 100%; border-radius: 6px; background: #4c7fd6; min-width: 2px; }
+.bar-row .bv { width: 48px; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.bar-row .ib { width: 26px; height: 26px; }
+.ybars { display: flex; align-items: flex-end; gap: 4px; height: 150px; }
+.ybars button { flex: 1; height: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; border: 0; background: none; cursor: pointer; padding: 0; font: inherit; }
+.ybars i { width: 70%; background: #4c7fd6; border-radius: 4px 4px 0 0; min-height: 2px; }
+.ybars button:hover i { background: var(--acc); }
+.ybars .n { font-size: 10px; color: var(--muted); }
+.ybars .y { font-size: 10.5px; color: var(--muted); margin-top: 3px; }
+@media (max-width: 860px) { .bar-row .bl { width: 110px; } }
