@@ -205,8 +205,11 @@ function registerWorker() {
     // 켜 둔 채로 오래 쓰는 경우를 위해 1시간마다 새 버전을 확인한다.
     setInterval(() => reg.update().catch(() => {}), 60 * 60 * 1000);
   });
+  // 처음 설치할 때(이전 서비스 워커가 없을 때)는 새로고침하지 않는다. 새 버전으로 바뀔 때만 다시 연다.
+  let hasController = !!navigator.serviceWorker.controller;
   let reloading = false;
   navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (!hasController) return void (hasController = true);
     if (reloading) return;
     reloading = true;
     location.reload();
