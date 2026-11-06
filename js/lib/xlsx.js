@@ -17,7 +17,8 @@ function crc32(bytes) {
   return (c ^ 0xffffffff) >>> 0;
 }
 
-function zip(files) {
+/** [이름, 글] 목록을 압축 없는 zip Blob으로 */
+export function zip(files, type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet") {
   const parts = [];
   const central = [];
   let offset = 0;
@@ -55,7 +56,7 @@ function zip(files) {
   end.setUint16(10, files.length, true);
   end.setUint32(12, cdSize, true);
   end.setUint32(16, offset, true);
-  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  return new Blob([...parts, ...central, new Uint8Array(end.buffer)], { type });
 }
 
 const esc = (s) => String(s).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
