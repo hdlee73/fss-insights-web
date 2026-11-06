@@ -1,6 +1,6 @@
 // 앱 뼈대: 왼쪽 메뉴(접기·펼치기, 휴대폰은 서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
-import { APP_VERSION, h, icon, store, toast } from "./core.js";
+import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, h, icon, store, toast } from "./core.js";
 
 // 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서. 뉴스 검색은 웹 범위가 아니다.
 export const MENU = [
@@ -82,7 +82,7 @@ function buildMenu() {
           e.preventDefault();
           closeDrawer(() => (location.hash = `#/${id}`));
         } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true })))))),
-    h("div", { class: "sidefoot" }, `v${APP_VERSION} · 이현덕 with Claude`)
+    h("div", { class: "sidefoot" }, h("div", { class: "unofficial" }, "금융감독원 공식 사이트가 아닙니다"), `v${APP_VERSION} · 이현덕 with Claude`)
   );
 }
 
@@ -237,6 +237,11 @@ addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. �
 if (!location.hash) history.replaceState(null, "", "#/briefing");
 render();
 registerWorker();
+// 처음 접속할 때 한 번: 비공식 사이트 안내. '확인'을 눌러야 다시 뜨지 않는다.
+if (!store.get("disclaimer.ok")) {
+  dialog({ title: "안내", body: h("div", { class: "stack" }, h("p", null, h("b", null, DISCLAIMER_SHORT)), h("p", { class: "note" }, DISCLAIMER_DETAIL)), ok: "확인", cancel: null })
+    .then((ok) => ok && store.set("disclaimer.ok", true));
+}
 import("./alerts-check.js").then((m) => m.checkInBackground()).catch(() => {});
 // 익명 사용 통계: 시작할 때와 다시 볼 때 하루 한 번 보낸다.
 const sendUsage = () => import("./usage.js").then((u) => u.sendIfNeeded()).catch(() => {});

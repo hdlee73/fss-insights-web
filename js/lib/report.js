@@ -2,7 +2,7 @@
 // doc 모양은 hwpx.js의 hwpxReport 설명을 따른다. 저장 범위는 sections의 id로 고른다.
 import { APP_NAME, APP_VERSION, dialog, download, errorText, h, toast } from "../core.js";
 
-export const footerLine = () => `${APP_NAME} v${APP_VERSION} · 만든이: 이현덕 with Claude (hdlee73@gmail.com)`;
+export const footerLine = () => `${APP_NAME} v${APP_VERSION} · 만든이: 이현덕 with Claude (hdlee73@gmail.com) · 금융감독원 공식 자료가 아닙니다`;
 const safeName = (s) => String(s).replace(/[\\/:*?"<>|\s]+/g, "_");
 
 /**

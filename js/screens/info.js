@@ -1,6 +1,6 @@
 // 앱 정보: 이름·버전, 만든이, 업데이트(자동), 설치 방법, 기본 사용법, 자료 출처.
 import { applyUpdate, checkForUpdate, setHeader, updateReady } from "../app.js";
-import { APP_NAME, APP_VERSION, card, h, icon, store, toast } from "../core.js";
+import { APP_NAME, APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, card, h, icon, store, toast } from "../core.js";
 
 let installEvent = null;
 addEventListener("beforeinstallprompt", (e) => {
@@ -57,6 +57,9 @@ export async function render(root) {
             h("dt", null, "이메일"), h("dd", null, h("a", { href: "mailto:hdlee73@gmail.com" }, "hdlee73@gmail.com")),
             h("dt", null, "홈페이지"), h("dd", null, h("a", { href: "https://hdlee73.github.io/Home/", target: "_blank", rel: "noopener" }, "https://hdlee73.github.io/Home/")),
             h("dt", null, "안드로이드 앱"), h("dd", null, h("a", { href: "https://github.com/hdlee73/FSS_insights/releases/latest", target: "_blank", rel: "noopener" }, "최신 APK 받기")))),
+        card("면책 안내", "alert-triangle", h("div", { class: "stack" },
+          h("p", null, h("b", null, DISCLAIMER_SHORT)),
+          h("p", { class: "note" }, DISCLAIMER_DETAIL))),
         card("업데이트 정보", "refresh-cw", h("div", { class: "stack" },
           h("p", null, "새 버전이 배포되면 웹 앱이 자동으로 받아 두고 화면 아래에 ‘새 버전이 준비되었습니다’를 띄웁니다. ‘지금 적용’을 누르거나, 다음에 열 때 자동으로 바뀝니다."),
           h("div", { class: "row-gap" }, updateBtn, updateLine))),
