@@ -65,6 +65,7 @@ export async function render(root) {
           installed ? null : h("div", null, installBtn))),
         card("개인정보와 저장", "info", h("div", { class: "stack note" },
           h("p", null, "키워드·저장함·관심종목·주요사이트 같은 설정은 이 브라우저에만 저장되고 서버로 보내지 않습니다. 브라우저의 사이트 데이터를 지우면 함께 지워집니다."),
+          h("p", null, "이용 현황 파악을 위해 Google 애널리틱스가 메뉴 조회 기록(어떤 메뉴를 열었는지, 기기·지역 같은 일반 정보)을 쿠키와 함께 수집합니다. 검색어나 입력한 내용은 보내지 않습니다. 아래 스위치를 끄면 멈춥니다."),
           h("label", { class: "row-gap" },
             (() => {
               const cb = h("input", { type: "checkbox" });
@@ -72,7 +73,7 @@ export async function render(root) {
               cb.addEventListener("change", () => import("../usage.js").then((u) => u.setEnabled(cb.checked)));
               return cb;
             })(),
-            "익명 사용 통계 보내기(하루 한 번 무작위 번호·버전·메뉴별 이용 횟수만)")))),
+            "익명 사용 통계 보내기(하루 한 번 무작위 번호·버전·메뉴별 이용 횟수, 그리고 Google 애널리틱스의 메뉴 조회 기록)")))),
       h("div", { class: "col" },
         card("기본 사용법", "book-open", h("div", { class: "prose" }, GUIDE.map(([t, d]) => [h("h4", null, t), h("p", null, d)]))),
         card("자료 출처", "globe", h("p", { class: "prose note" }, "금융감독원·금융위원회·한국은행 등 각 기관 웹사이트, 국가법령정보 공동활용 Open API, DART Open API, 금융통계정보시스템(FISIS), 한국은행 ECOS, 네이버 증권 시세를 읽어 제목·요약·링크만 보여 줍니다. 원문 저작권은 각 기관에 있습니다."))))
