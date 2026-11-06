@@ -69,7 +69,7 @@ export async function render(root) {
             (() => {
               const cb = h("input", { type: "checkbox" });
               cb.checked = store.get("usageStats", true);
-              cb.addEventListener("change", () => store.set("usageStats", cb.checked));
+              cb.addEventListener("change", () => import("../usage.js").then((u) => u.setEnabled(cb.checked)));
               return cb;
             })(),
             "익명 사용 통계 보내기(하루 한 번 무작위 번호·버전·메뉴별 이용 횟수만)")))),
