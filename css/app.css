@@ -598,3 +598,35 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .br-hero h2 { font-size: 20px; }
   .br-weather .em { font-size: 28px; }
 }
+
+/* ---- 뉴스검색 ---- */
+.news-panel { margin-bottom: 14px; }
+.news-panel .search { margin-bottom: 10px; }
+.chip-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; align-items: center; }
+.chip-row::-webkit-scrollbar { display: none; }
+.chip-row .sep { width: 1px; height: 18px; background: var(--line); flex: none; margin: 0 4px; }
+.news-cond { justify-content: space-between; margin-top: 8px; }
+.news-filter { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
+.news-filter .note { margin: 0; line-height: 1.55; }
+.news-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 2px 8px; }
+.news-head .nh-t { flex: 1; min-width: 0; cursor: pointer; }
+.news-head h3 { font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-head small { font-size: 12px; color: var(--muted); }
+.news-head > .note { flex-basis: 100%; margin: 2px 0 0; }
+.news-day { font-size: 12.5px; font-weight: 700; color: var(--muted); padding: 12px 4px 4px; }
+.news-day:first-child { padding-top: 2px; }
+.news-day + .item { border-top: 0; }
+.news-item .m.src { margin: 0 0 4px; }
+.news-item .sum { font-size: 13px; color: var(--muted); margin-top: 4px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.news-item .kw { font-size: 11.5px; color: var(--acc-fg); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.news-item .t { display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.news-more { display: flex; justify-content: center; padding: 12px 0; }
+.news-more:empty { display: none; }
+.trend-row { align-items: center; cursor: pointer; }
+.trend-row .t { font-weight: 700; }
+.trend-row .m.err { color: #b42828; }
+.spark { width: 92px; height: 36px; flex: none; }
+.spark rect { fill: var(--muted); opacity: .3; }
+.spark rect.last { opacity: 1; }
+.spark rect.last { fill: var(--acc); }
+.spark rect.surge { fill: var(--warm, #e8772e); }

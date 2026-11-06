@@ -2,10 +2,11 @@
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
 import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, h, icon, store, toast } from "./core.js";
 
-// 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서. 뉴스 검색은 웹 범위가 아니다.
+// 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서.
 export const MENU = [
   [null, [
     ["briefing", "오늘의 브리핑", "sun"],
+    ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향", "trending-up"],
     ["fisis", "금융회사 주요 현황", "building-2"],
     ["sanction", "금융회사 제재현황", "gavel"],
@@ -28,6 +29,7 @@ const ROUTES = Object.fromEntries(MENU.flatMap(([, items]) => items.map(([id, la
 
 const loaders = {
   briefing: () => import("./screens/briefing.js"),
+  news: () => import("./screens/news.js"),
   market: () => import("./screens/market.js"),
   fisis: () => import("./screens/fisis.js"),
   sanction: () => import("./screens/sanction.js"),

@@ -67,7 +67,7 @@ function settingsView(root, ctx) {
     perm === "default" ? h("button", { type: "button", class: "btn sm", style: { marginTop: "8px" }, onclick: async () => (await Notification.requestPermission(), ctx.go({ view: "settings" }, { replace: true })) }, "알림 허용") : null,
     h("p", { class: "note", style: { marginTop: "6px" } }, "웹은 열려 있는 동안(설치한 웹 앱 포함) 30분마다, 그리고 다시 볼 때 확인합니다. 창을 닫으면 확인하지 않습니다."));
 
-  // 키워드: 금감원·금융위 보도자료 제목
+  // 키워드: 최근 24시간 뉴스 + 금감원·금융위 보도자료 제목
   const kwList = h("div", { class: "lw-chips" });
   const drawKw = () => {
     const kws = store.get("alerts.keywords", []);
@@ -87,7 +87,7 @@ function settingsView(root, ctx) {
   drawKw();
   const kwCard = h("section", { class: "card" },
     h("div", { class: "ch" }, icon("search"), h("h3", null, "키워드 알림")),
-    h("p", { class: "note" }, "금융감독원·금융위원회 보도자료 제목에 키워드가 들어 있으면 알립니다. ‘|’는 또는, ‘-낱말’은 제외입니다."),
+    h("p", { class: "note" }, "최근 24시간 뉴스(뉴스검색과 같은 방식)와 금융감독원·금융위원회 보도자료 제목에 키워드가 들어 있으면 알립니다. ‘|’는 또는, ‘-낱말’은 제외입니다."),
     h("div", { class: "search", style: { margin: "8px 0" } }, kwInput, h("button", { type: "button", class: "btn sm", onclick: addKw }, "추가")),
     kwList);
 
