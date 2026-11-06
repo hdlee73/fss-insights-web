@@ -94,6 +94,8 @@ export async function render(root, params, ctx) {
     filterToggle.lastChild.replaceWith(icon(filterOpen ? "chevron-left" : "chevron-down"));
   } }, "필터", icon(filterOpen ? "chevron-left" : "chevron-down"));
   root.append(h("section", { class: "card news-panel" }, form, chips,
+    h("p", { class: "note news-hint" }, "위 키워드는 자주 보는 검색어입니다. ",
+      h("button", { class: "link-more", type: "button", onclick: () => openSettings(ctx) }, "설정"), "에서 원하는 키워드를 10개까지 등록할 수 있어요."),
     h("div", { class: "row-gap news-cond" }, h("span", { class: "note" }, `${N.scopeLabel(s.scope)} · ${N.rangeLabel(s.range)}`), filterToggle), filterBody));
 
   // 결과
