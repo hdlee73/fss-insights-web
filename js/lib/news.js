@@ -312,6 +312,7 @@ function trendOf(keyword, daily, capped) {
   const today = daily[daily.length - 1] || 0;
   const prev = daily.slice(0, -1);
   const avg = prev.length ? prev.reduce((a, b) => a + b, 0) / prev.length : 0;
-  return { keyword, daily, capped, today, avg, total: daily.reduce((a, b) => a + b, 0), // 100건이 모두 오늘 기사라 지난 날 수를 알 수 없으면 '급증'으로 보지 않는다.
+  // 100건이 모두 오늘 기사라 지난 날 수를 알 수 없으면 '급증'으로 보지 않는다.
+  return { keyword, daily, capped, today, avg, total: daily.reduce((a, b) => a + b, 0),
     surge: today >= 5 && today >= 2 * Math.max(avg, 1) && !(capped && prev.every((v) => v === 0)) };
 }
