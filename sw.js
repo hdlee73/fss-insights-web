@@ -15,6 +15,8 @@ const SHELL = [
   "js/alerts-check.js",
   "js/lib/htmllist.js",
   "js/lib/agencies.js",
+  "js/lib/market.js",
+  "js/lib/regulatory.js",
   "js/screens/briefing.js",
   "js/screens/market.js",
   "js/screens/fisis.js",
