@@ -258,9 +258,12 @@ select.sel { padding: 6px 8px; font-size: 13px; }
   body.drawer .side { transform: none; }
   body.drawer .scrim { display: block; position: fixed; inset: 0; background: #0b132488; z-index: 25; }
   .top .hamb { display: inline-grid; margin-left: -6px; }
-  .top { padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); }
+  .top { padding: 10px 14px; padding-top: max(10px, env(safe-area-inset-top)); padding-left: max(14px, env(safe-area-inset-left)); padding-right: max(14px, env(safe-area-inset-right)); }
+  /* 아이폰 사파리는 16px보다 작은 입력창을 누르면 화면을 확대하므로 16px로 맞춘다. */
+  input:not([type=checkbox]):not([type=radio]), select, textarea, select.sel { font-size: 16px; }
+  .side { padding-top: max(12px, env(safe-area-inset-top)); padding-bottom: env(safe-area-inset-bottom); }
   .top h1 { font-size: 17px; }
-  .content { padding: 14px 14px 40px; }
+  .content { padding: 14px max(14px, env(safe-area-inset-right)) calc(40px + env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
   .grid2, .grid3 { grid-template-columns: 1fr; }
   .top-acts .pill .lbl { display: none; }
   .kpis { grid-template-columns: 1fr 1fr; gap: 10px; }
