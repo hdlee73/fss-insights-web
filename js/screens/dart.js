@@ -192,7 +192,7 @@ async function detail(root, params, ctx) {
   let c = watchList().find((x) => x.corp === corp) || { corp, name: params.name || corp, stock: "", cls: "" };
   markSeen(corp);
   const star = () => starButton(c);
-  setHeader(c.name, "기업 개황 및 공시(DART)", [h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록"))]);
+  setHeader(c.name, "기업 개황 및 공시(DART)", [h("button", { class: "pill", type: "button", onclick: () => window.history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록"))]);
   const tagLine = h("div", { class: "row-gap", style: { marginBottom: "10px" } });
   const stockBox = h("div");
   const tab = Math.min(TABS.length - 1, +(params.tab || 0));
@@ -202,7 +202,8 @@ async function detail(root, params, ctx) {
   const drawTop = () => {
     setHeader(c.name, "기업 개황 및 공시(DART)", [
       star(),
-      h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
+      h("button", { class: "pill", type: "button", title: "PDF·한글로 저장", onclick: () => saveCompany(c) }, icon("download"), h("span", { class: "lbl" }, "저장")),
+      h("button", { class: "pill", type: "button", onclick: () => window.history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
     ]);
     tagLine.replaceChildren(...[marketTag(clsOf(c)), c.stock ? h("span", { class: "note" }, c.stock) : null].filter(Boolean));
   };
@@ -509,4 +510,93 @@ function pickRange(fromYm, toYm) {
     body: h("div", { class: "stack" }, h("label", { class: "field" }, "시작", a), h("label", { class: "field" }, "종료", b), note),
     ok: "적용",
   }).then((ok) => (ok ? [+a.value, +b.value] : null));
+}
+
+// ---- PDF·한글 저장: 기업개황·최대주주·재무손익 ----
+async function saveCompany(c) {
+  const { saveReport } = await import("../lib/report.js");
+  await saveReport({
+    title: `${c.name} 저장`,
+    parts: [
+      { id: "info", label: "기업개황" },
+      { id: "holders", label: "최대주주 현황" },
+      { id: "finance", label: "재무손익 (재무상태·손익·추이·주당 지표)" },
+    ],
+    build: (ids) => companyDoc(ids, c),
+  });
+}
+
+async function companyDoc(ids, c) {
+  const sections = [];
+  const ci = await company(c.corp).catch(() => null);
+  const name = ci?.name || c.name;
+  if (ids.has("info")) {
+    sections.push({
+      title: "기업개황",
+      blocks: ci
+        ? [{ kv: [
+            ["회사명", ci.name], ["영문명", ci.nameEn], ["종목코드", ci.stock || "-"], ["시장", (MARKET[ci.cls || "E"] || MARKET.E)[0]],
+            ["대표이사", ci.ceo], ["법인등록번호", ci.corpNo], ["사업자등록번호", ci.bizNo], ["설립일", dateText(ci.established)],
+            ["결산월", ci.accountMonth ? ci.accountMonth + "월" : ""], ["업종코드", ci.industryCode], ["주소", ci.address], ["전화", ci.phone],
+            ["홈페이지", ci.homepage], ["IR", ci.ir],
+          ] }]
+        : [{ text: "기업개황을 불러오지 못했습니다.", gray: true }],
+    });
+  }
+  if (ids.has("holders")) {
+    const hd = await holders(c.corp);
+    const cell = (s) => (s?.ratio != null ? `${s.ratio.toFixed(2)}%` + (s.shares != null ? `\n${grouped(s.shares)}주` : "") : "-");
+    sections.push({
+      title: "최대주주 현황",
+      note: hd.items?.length ? `${hd.basis} 기준 · 최대주주 및 특수관계인 합계: 보통주 ${pct(hd.totalCommon, 2)}${hd.totalPref != null ? ` · 우선주 ${pct(hd.totalPref, 2)}` : ""}` : "",
+      blocks: hd.items?.length
+        ? [{ table: { head: ["주주", "관계", "보통주", "우선주"], weights: [2.2, 1.4, 1.2, 1.2], num: (i) => i >= 2,
+            rows: hd.items.map((x) => [x.name, x.relation && x.relation !== "-" ? x.relation : "", cell(x.common), cell(x.pref)]) } }]
+        : [{ text: "최근 정기보고서에서 최대주주 현황을 찾지 못했습니다.", gray: true }],
+    });
+  }
+  if (ids.has("finance")) {
+    const [f, closes] = await Promise.all([finance(c.corp), (ci?.stock || c.stock)?.length === 6 ? yearEndCloses(ci?.stock || c.stock).catch(() => ({})) : {}]);
+    const blocks = [];
+    if (!f.balance?.length && !f.income?.length) blocks.push({ text: f.note || "재무 자료를 찾지 못했습니다.", gray: true });
+    else {
+      blocks.push({ heading: `재무상태 비교 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.balance.map((b) => b.label)], rows: [
+        ["자산총계", ...f.balance.map((b) => eok(b.assets))],
+        ["부채총계", ...f.balance.map((b) => eok(b.liab))],
+        ["자본총계", ...f.balance.map((b) => eok(b.equity))],
+        ["부채비율", ...f.balance.map((b) => pct(b.equity && b.liab != null ? (b.liab / b.equity) * 100 : null))],
+      ] } });
+      blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...f.income.map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
+        ["매출액", ...f.income.map((x) => eok(x.revenue))],
+        ["영업이익", ...f.income.map((x) => eok(x.op))],
+        ["당기순이익", ...f.income.map((x) => eok(x.net))],
+      ], bold: (i) => i === 2 } });
+      if (f.trend?.length >= 2) blocks.push({ heading: `최근 ${f.trend.length}개년 추이 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.trend.map((t) => `${t.year}년`)], rows: [
+        ["매출액", ...f.trend.map((t) => eok(t.revenue))],
+        ["영업이익", ...f.trend.map((t) => eok(t.op))],
+        ["당기순이익", ...f.trend.map((t) => eok(t.net))],
+        ...(f.trend.some((t) => t.debt != null) ? [["부채비율", ...f.trend.map((t) => pct(t.debt))]] : []),
+      ] } });
+      const years = (f.trend || []).map((t) => t.year).filter((y) => f.eps?.[y] != null).slice(-4);
+      if (years.length) {
+        const rows = [["EPS(원)", ...years.map((y) => grouped(f.eps[y]))]];
+        if (Object.keys(closes).length) {
+          rows.push(["연말 종가(원)", ...years.map((y) => grouped(closes[y]))]);
+          rows.push(["PER(배)", ...years.map((y) => (closes[y] && f.eps[y] > 0 ? (closes[y] / f.eps[y]).toFixed(2) : "-"))]);
+        }
+        blocks.push({ heading: "주당·배수 지표" }, { table: { head: ["구분", ...years.map((y) => `${y}년`)], rows } },
+          { text: "PER = 연말 종가 ÷ EPS로 직접 계산한 추정치입니다. 적자(EPS 0 이하)는 -로 표시합니다.", gray: true });
+      }
+      blocks.push({ text: "부채비율 = 부채총계 ÷ 자본총계. 금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다.", gray: true });
+    }
+    sections.push({ title: "재무손익", blocks });
+  }
+  return {
+    title: name,
+    subtitle: "기업 개황 및 공시(DART)",
+    fileName: `${name}_기업개황`,
+    meta: [[ci?.stock ? `종목코드 ${ci.stock}` : null, ci ? (MARKET[ci.cls || "E"] || MARKET.E)[0] : null, `출력: ${new Date().toLocaleDateString("ko-KR")}`].filter(Boolean).join("   ·   ")],
+    sections,
+    footer: ["출처: 금융감독원 전자공시시스템(DART) 기업개황·최대주주 현황·주요계정. 연말 종가는 시세 제공처 기준입니다."],
+  };
 }

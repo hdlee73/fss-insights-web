@@ -192,7 +192,10 @@ async function detail(root, params, ctx, sector) {
   const sectorLabel = SECTORS.find(([c]) => c === sector)[1];
   const all = await companies(sector).catch(() => []);
   const co = all.find((c) => c.code === params.co) || { code: params.co, name: params.name || params.co };
-  setHeader(co.name, `${sectorLabel} · ${SOURCE}`, [h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록"))]);
+  setHeader(co.name, `${sectorLabel} · ${SOURCE}`, [
+    h("button", { class: "pill", type: "button", title: "PDF·한글로 저장", onclick: () => saveCompany(sector, sectorLabel, co, params) }, icon("download"), h("span", { class: "lbl" }, "저장")),
+    h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
+  ]);
   const tab = +(params.tab || 0);
   root.append(tabs(["재무현황", "주요경영지표", "최근 제재내역"], tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
   const body = h("div");
@@ -313,4 +316,109 @@ async function compare(root, params, ctx, sector) {
   root.append(...section("손익현황 (누적)", "단위: 억원", ["revenue", "opinc", "netincome"].map((k) => row(FINANCE_LABELS[k] + " (누적)", k + "_cum", false))));
   if (RATIO_ROWS[sector]) root.append(...section("주요경영지표", "단위: %", RATIO_ROWS[sector].map(([k, l]) => row(l, k, true))));
   root.append(h("p", { class: "note", style: { marginTop: "10px" } }, "각 회사의 FISIS 최근 시점 기준입니다. 시점이 다르면 위의 기준 시점을 확인하세요."));
+}
+
+// ---- PDF·한글 저장: 재무현황·주요경영지표·최근 제재내역 ----
+async function saveCompany(sector, sectorLabel, co, params) {
+  const { saveReport } = await import("../lib/report.js");
+  await saveReport({
+    title: `${co.name} 저장`,
+    parts: [
+      { id: "fin", label: "재무현황 (별도·연결)" },
+      { id: "ratio", label: RATIO_ROWS[sector] ? "주요경영지표 (최근 8개 시점)" : "주요경영지표 (이 권역은 제공 안 함)", checked: !!RATIO_ROWS[sector] },
+      { id: "sanction", label: "최근 제재내역 (2011년 이후 금감원 제재공시)" },
+    ],
+    build: (ids) => companyDoc(ids, sector, sectorLabel, co, params),
+  });
+}
+
+async function companyDoc(ids, sector, sectorLabel, co, params) {
+  const profile = await profileOf(sector, co.code);
+  const sections = [];
+  const term = termLabel(profile.term) || "기준";
+  if (ids.has("fin")) {
+    const funds = group(profile, "fund");
+    const allFin = group(profile, "fin").filter((m) => m.basis);
+    const month = (() => {
+      const ms = monthsOf([...allFin, ...funds]);
+      return ms.includes(params.fm) ? params.fm : ms[0];
+    })();
+    const blocks = [];
+    const card = sector === "C";
+    const current = { H: "당반기", Y: "당기" }[profile.term] || "당분기";
+    for (const basis of BASES) {
+      const fin = allFin.filter((m) => m.basis === basis);
+      if (!fin.length) {
+        if (basis === "연결") blocks.push({ text: "연결 재무제표: 금융통계정보시스템에 연결 재무정보가 없습니다.", gray: true });
+        continue;
+      }
+      const metric = (k) => fin.find((m) => m.key === k);
+      const liab = at(metric("liab"), month)?.value, eq = at(metric("equity"), month)?.value;
+      const bal = ["assets", "liab", "equity"].map((k) => [FINANCE_LABELS[k], amountOnly(metric(k), month) ?? "-"]);
+      if (liab > 0 && eq > 0) bal.push(["부채비율(부채÷자기자본)", ((liab / eq) * 100).toFixed(1) + "%"]);
+      blocks.push({ heading: `재무상태 (${basis}) · 단위 억원` }, { table: { head: ["항목", "금액"], rows: bal, weights: [2, 1] } });
+      const keys = card ? CARD_PL_KEYS : DEFAULT_PL_KEYS;
+      blocks.push({ heading: `손익현황 (${basis}) · 단위 억원` }, {
+        table: {
+          head: ["항목", current, "누적"],
+          rows: keys.map((k) => [(card ? CARD_PL_LABELS[k] : null) || FINANCE_LABELS[k], amountOnly(metric(k), month) ?? "-", amountOnly(metric(k + "_cum"), month) ?? "-"]),
+          bold: (i) => keys[i] === "netincome",
+        },
+      });
+    }
+    if (funds.length) blocks.push({ heading: "펀드 설정원본 · 순자산" }, { table: { head: ["항목", "금액"], rows: funds.map((m) => [m.label, at(m, month)?.value != null ? valueText(at(m, month).value, m.unit) : "-"]), weights: [2, 1] } });
+    if (!blocks.length) blocks.push({ text: "재무 자료가 없습니다.", gray: true });
+    sections.push({ title: "재무현황", note: `기준 시점: ${month ? monthLabel(month) : "-"} (${term})`, blocks });
+  }
+  if (ids.has("ratio")) {
+    const rows = RATIO_ROWS[sector];
+    const ratios = group(profile, "ratio");
+    const months = monthsOf(ratios);
+    const start = Math.max(0, months.indexOf(params.rm));
+    const shown = months.slice(start, start + 8).reverse();
+    sections.push({
+      title: "주요경영지표",
+      note: "단위: %",
+      blocks: rows && shown.length
+        ? [{ table: { head: ["지표", ...shown.map(monthLabel)], weights: [2.2, ...shown.map(() => 1)], rows: rows.map(([k, label]) => {
+            const m = ratios.find((x) => x.key === k);
+            return [label, ...shown.map((mo) => {
+              const v = at(m, mo)?.value;
+              return v != null && m ? valueText(v, m.unit).replace(/%$/, "") : "-";
+            })];
+          }) } }]
+        : [{ text: "이 권역은 주요경영지표를 제공하지 않거나 자료가 없습니다.", gray: true }],
+    });
+  }
+  if (ids.has("sanction")) {
+    const S = await import("../lib/sanctions.js");
+    const data = await S.loadSanctions();
+    const cases = S.casesOf(data, co.name);
+    const blocks = [];
+    if (!cases.length) blocks.push({ text: `${data.fromYear}년 이후 금감원 제재공시에서 ‘${co.name}’ 이름으로 된 공시를 찾지 못했습니다.`, gray: true });
+    cases.forEach((c, i) => {
+      blocks.push({ heading: `${i + 1}. ${c.company} · ${String(c.date || "").replace(/-/g, ".")}${c.dept ? " · " + c.dept : ""}` });
+      const acts = [];
+      const inst = S.actionLine(c.inst);
+      if (inst) acts.push(["기관", inst]);
+      if (!c.inst && c.fine + c.penalty > 0) acts.push(["금전", [c.fine > 0 ? `과태료 ${S.won(c.fine)}` : null, c.penalty > 0 ? `과징금 ${S.won(c.penalty)}` : null].filter(Boolean).join(", ")]);
+      const ex = S.actionLine(c.exec);
+      if (ex) acts.push(["임원", ex]);
+      const sf = S.actionLine(c.staff);
+      if (sf) acts.push(["직원", sf]);
+      if (acts.length) blocks.push({ kv: acts });
+      if (c.items.length) blocks.push({ text: c.items.map((it, j) => `${j + 1}) ${it.category ? `[${it.category}] ` : ""}${it.title}${it.laws.length ? ` (${it.laws.join(", ")})` : ""}`).join("\n"), indent: 1 });
+      else blocks.push({ text: S.whyText(c), gray: true, indent: 1 });
+      if (c.viewUrl) blocks.push({ text: "원문: " + c.viewUrl, gray: true, indent: 1 });
+    });
+    sections.push({ title: "최근 제재내역", note: `${data.fromYear}년 이후 금감원 제재공시 ${cases.length}건 · 회사명으로 맞춘 참고 자료이니 업무에는 원문을 확인하세요.`, blocks });
+  }
+  return {
+    title: co.name,
+    subtitle: "금융회사 주요 현황",
+    fileName: `${co.name}_금융회사현황`,
+    meta: [`권역: ${sectorLabel}   ·   출력: ${new Date().toLocaleDateString("ko-KR")}`],
+    sections,
+    footer: [`${SOURCE}. ${NOTICE}`, ids.has("sanction") ? "제재내역 출처: 금융감독원 금융회사 제재공시" : ""],
+  };
 }

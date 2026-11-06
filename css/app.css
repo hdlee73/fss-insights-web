@@ -541,6 +541,15 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc .lw-cmp th { position: static; min-width: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-doc .lw-cmp td { min-width: 0; width: auto; }
   .print-doc .lw-cmp thead { display: table-header-group; }
+  .print-doc .rp-kv, .print-doc .rp-tbl { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9pt; }
+  .print-doc .rp-kv th, .print-doc .rp-kv td, .print-doc .rp-tbl th, .print-doc .rp-tbl td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+  .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-doc .rp-tbl th { background: #1f3a68; color: #fff; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-doc .rp-tbl .num { text-align: right; white-space: nowrap; }
+  .print-doc .rp-tbl th.num { text-align: center; }
+  .print-doc .rp-tbl tr.b td { font-weight: 700; }
+  .print-doc .rp-tbl thead { display: table-header-group; }
+  .print-doc .rp-tbl tr { break-inside: avoid; }
 }
 
 /* ---- 참고 자료실 ---- */

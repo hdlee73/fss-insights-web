@@ -249,3 +249,81 @@ export async function hwpx(tree, opt) {
   ];
   return zip(files, "application/hwp+zip");
 }
+
+// ---- 일반 보고서(회사 정보 등) ----
+// doc = { title, subtitle, meta:[문자열], sections:[{ title, note, blocks:[{kv:[[항목,값]]} | {table:{head, rows, weights, num}} | {text, gray}] }], footer:[문자열] }
+const P_RIGHT = 28;
+function reportTable(b, t, pageW) {
+  const n = t.head.length;
+  const weights = t.weights || t.head.map((_, i) => (i === 0 ? 1.6 : 1));
+  const total = weights.reduce((s, w) => s + w, 0);
+  const full = pageW - MARGIN * 2 - 100;
+  const widths = weights.map((w) => Math.floor((full * w) / total));
+  const cellChar = 2, pad = 300, lineH = sizeOf(cellChar) * LINE_FACTOR;
+  const isNum = (c) => (t.num ? t.num(c) : c > 0);
+  const linesOf = (v, c) => String(v ?? "").split("\n").flatMap((l) => wrap(l, (widths[c] - pad * 2) * 0.93, sizeOf(cellChar)));
+  const rowH = (row, head) => Math.max(head ? 1200 : 0, Math.floor(Math.max(...row.map((v, c) => linesOf(v, c).length)) * lineH + pad * 2));
+  const heights = [rowH(t.head, true), ...t.rows.map((r) => rowH(r))];
+  const sb = [];
+  sb.push(`<hp:tbl id="${b.next()}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${t.rows.length + 1}" colCnt="${n}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">`);
+  sb.push(`<hp:sz width="${widths.reduce((s, w) => s + w, 0)}" widthRelTo="ABSOLUTE" height="${heights.reduce((s, x) => s + x, 0)}" heightRelTo="ABSOLUTE" protect="0"/>`);
+  sb.push(`<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`);
+  sb.push(`<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="${pad}" right="${pad}" top="${pad}" bottom="${pad}"/>`);
+  [t.head, ...t.rows].forEach((row, r) => {
+    sb.push("<hp:tr>");
+    row.forEach((v, c) => {
+      const head = r === 0;
+      const char = head ? C_HDR : t.bold?.(r - 1) ? C_CELL_BOLD : cellChar;
+      const para = head ? P_CENTER : isNum(c) ? P_RIGHT : pIndent(0);
+      sb.push(`<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${head ? 4 : 3}">`);
+      sb.push(`<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">`);
+      String(v ?? "").split("\n").forEach((l) => sb.push(pXml(b.next(), l, char, para)));
+      sb.push("</hp:subList>");
+      sb.push(`<hp:cellAddr colAddr="${c}" rowAddr="${r}"/><hp:cellSpan colSpan="1" rowSpan="1"/><hp:cellSz width="${widths[c]}" height="${heights[r]}"/><hp:cellMargin left="${pad}" right="${pad}" top="${pad}" bottom="${pad}"/></hp:tc>`);
+    });
+    sb.push("</hp:tr>");
+  });
+  sb.push("</hp:tbl>");
+  b.raw(`<hp:p id="${b.next()}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">${sb.join("")}<hp:t/></hp:run></hp:p>`);
+}
+
+/** 일반 보고서 → HWPX Blob */
+export async function hwpxReport(doc) {
+  const [pw, ph] = PAPERS.A4;
+  const pageW = pw * 100, pageH = ph * 100;
+  const b = new Body(pageW - MARGIN * 2);
+  const today = new Date().toISOString().slice(0, 10);
+  b.p(doc.title, C_TITLE);
+  if (doc.subtitle) b.p(doc.subtitle, C_SUBTITLE);
+  (doc.meta || []).forEach((m) => b.p(m, C_META));
+  for (const s of doc.sections) {
+    b.p("");
+    b.p(s.title, C_SECTION);
+    if (s.note) b.p(s.note, C_META);
+    for (const blk of s.blocks) {
+      if (blk.kv) reportTable(b, { head: ["항목", "내용"], rows: blk.kv.filter(([, v]) => v), weights: [1, 3], num: () => false }, pageW);
+      else if (blk.table) reportTable(b, blk.table, pageW);
+      else if (blk.heading) b.p(blk.heading, C_ITEM_BOLD);
+      else if (blk.text != null) lines(blk.text).forEach((l) => b.p(l, blk.gray ? C_GRAY : C_BODY, blk.indent || 0));
+    }
+  }
+  b.p("");
+  (doc.footer || []).filter((l) => l && l.trim()).forEach((l) => b.p(l, C_FOOT));
+
+  const first = (await res("first_paragraph.xml")).replace("{{LANDSCAPE}}", "WIDELY").replace("{{WIDTH}}", pageW).replace("{{HEIGHT}}", pageH).replaceAll("{{MARGIN}}", MARGIN);
+  const section = (await res("section_head.xml")) + first + b.sb.join("") + "</hs:sec>";
+  const title = doc.subtitle ? `${doc.title} - ${doc.subtitle}` : doc.title;
+  const hpf = (await res("content.hpf")).replaceAll("{{TITLE}}", esc(title)).replaceAll("{{DATE}}", today);
+  return zip([
+    ["mimetype", "application/hwp+zip"],
+    ["version.xml", await res("version.xml")],
+    ["settings.xml", await res("settings.xml")],
+    ["META-INF/container.xml", await res("container.xml")],
+    ["META-INF/manifest.xml", await res("manifest.xml")],
+    ["META-INF/container.rdf", await res("container.rdf")],
+    ["Contents/content.hpf", hpf],
+    ["Contents/header.xml", await res("header.xml")],
+    ["Contents/section0.xml", section],
+    ["Preview/PrvText.txt", title],
+  ], "application/hwp+zip");
+}
