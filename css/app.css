@@ -605,7 +605,9 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
 .chip-row { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; align-items: center; }
 .chip-row::-webkit-scrollbar { display: none; }
 .chip-row .sep { width: 1px; height: 18px; background: var(--line); flex: none; margin: 0 4px; }
-.news-cond { justify-content: space-between; margin-top: 8px; }
+.news-hint { margin: 8px 0 0; }
+.news-hint .link-more { font-size: inherit; padding: 0; font-weight: 600; }
+.news-cond { justify-content: space-between; margin-top: 6px; }
 .news-filter { margin-top: 6px; display: flex; flex-direction: column; gap: 8px; }
 .news-filter .note { margin: 0; line-height: 1.55; }
 .news-head { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 4px 2px 8px; }
