@@ -217,8 +217,12 @@ async function naverFirst(query, range, start, size, note) {
     return page;
   } catch (e) {
     if (start > 1) throw e;
+    // Google도 안 되면 원래(네이버) 오류를 보여 준다.
+    const page = await google(query, range).catch(() => {
+      throw e;
+    });
     note.fallback ||= `Google 뉴스 (네이버 오류로 대체: ${String(e.message || e).slice(0, 80)})`;
-    return google(query, range);
+    return page;
   }
 }
 const noteText = (note) => note.fallback || (note.naver ? "네이버 뉴스" : "Google 뉴스");
@@ -308,5 +312,6 @@ function trendOf(keyword, daily, capped) {
   const today = daily[daily.length - 1] || 0;
   const prev = daily.slice(0, -1);
   const avg = prev.length ? prev.reduce((a, b) => a + b, 0) / prev.length : 0;
-  return { keyword, daily, capped, today, avg, total: daily.reduce((a, b) => a + b, 0), surge: today >= 5 && today >= 2 * Math.max(avg, 1) };
+  return { keyword, daily, capped, today, avg, total: daily.reduce((a, b) => a + b, 0), // 100건이 모두 오늘 기사라 지난 날 수를 알 수 없으면 '급증'으로 보지 않는다.
+    surge: today >= 5 && today >= 2 * Math.max(avg, 1) && !(capped && prev.every((v) => v === 0)) };
 }
