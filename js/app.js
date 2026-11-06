@@ -132,13 +132,18 @@ export function setHeader(title, sub = "", actions = []) {
   document.title = `${title} · FSS Insights`;
 }
 
+let lastCountedId = null;
 async function render() {
   const seq = ++renderSeq;
   const { id, params } = currentRoute();
   for (const a of side.querySelectorAll(".mi")) a.classList.toggle("on", a.dataset.id === id);
   const route = ROUTES[id];
   setHeader(route.label);
-  import("./usage.js").then((u) => u.recordMenu(route.label)).catch(() => {});
+  // 같은 화면 안에서 탭·조건만 바뀐 경우는 세지 않는다.
+  if (id !== lastCountedId) {
+    lastCountedId = id;
+    import("./usage.js").then((u) => (u.recordMenu(route.label), u.pageView(id, route.label))).catch(() => {});
+  }
   try {
     currentScreen?.leave?.();
   } catch {}

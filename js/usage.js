@@ -31,6 +31,7 @@ export function recordMenu(label) {
 export function setEnabled(on) {
   store.set("usageStats", !!on);
   if (!on) store.set("usage.pending", {});
+  window["ga-disable-G-FL8LM4E0Y1"] = !on;
 }
 
 let sending = false;
@@ -58,4 +59,33 @@ export async function sendIfNeeded() {
   } finally {
     sending = false;
   }
+}
+
+// ---- Google 애널리틱스(GA4) ----
+// 메뉴 이동은 주소의 # 뒤만 바뀌므로 자동 페이지 조회 대신 화면마다 page_view를 직접 보낸다.
+// 검색어 같은 화면 조건(# 뒤 ? 이하)은 보내지 않고 메뉴 경로만 보낸다. 통계 스위치를 끄면 GA도 멈춘다.
+const GA_ID = "G-FL8LM4E0Y1";
+let gaReady = false;
+function gtag() {
+  (window.dataLayer = window.dataLayer || []).push(arguments);
+}
+function loadGa() {
+  if (gaReady) return true;
+  if (!enabled() || !/^https:$/.test(location.protocol) || !location.hostname.endsWith("github.io")) return false;
+  window[`ga-disable-${GA_ID}`] = false;
+  window.gtag = gtag;
+  gtag("js", new Date());
+  gtag("config", GA_ID, { send_page_view: false });
+  const s = document.createElement("script");
+  s.async = true;
+  s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+  document.head.append(s);
+  gaReady = true;
+  return true;
+}
+/** 화면을 열 때마다 GA에 페이지 조회를 남긴다. */
+export function pageView(id, label) {
+  if (!loadGa() || !enabled()) return;
+  const base = location.origin + location.pathname.replace(/[^/]*$/, "");
+  gtag("event", "page_view", { page_title: label, page_location: base + id, page_path: location.pathname.replace(/[^/]*$/, "") + id });
 }
