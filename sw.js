@@ -86,3 +86,16 @@ self.addEventListener("fetch", (e) => {
   }
   // 서버(Worker)·기관 사이트 요청은 저장하지 않고 그대로 보낸다.
 });
+
+// 알림을 누르면 열린 창을 앞으로 가져오거나 새로 연다.
+self.addEventListener("notificationclick", (e) => {
+  e.notification.close();
+  const url = new URL(e.notification.data?.url || "#/alerts", self.registration.scope).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      const w = list.find((c) => c.url.startsWith(self.registration.scope));
+      if (w) return w.focus().then(() => w.navigate(url));
+      return self.clients.openWindow(url);
+    })
+  );
+});

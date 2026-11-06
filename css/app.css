@@ -542,3 +542,22 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc .lw-cmp td { min-width: 0; width: auto; }
   .print-doc .lw-cmp thead { display: table-header-group; }
 }
+
+/* ---- 참고 자료실 ---- */
+.lib-contact { display: block; font-size: 10.5px; margin: 6px 4px 0; }
+.lib-crumbs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 12px 2px 8px; font-weight: 700; font-size: 13px; color: var(--muted); }
+.lib-crumbs .on { color: var(--acc); }
+.lib-tags { margin-bottom: 10px; }
+.lib-item { align-items: center; }
+.lib-ic { display: grid; place-items: center; width: 40px; height: 40px; border-radius: 10px; background: var(--acc-soft); color: var(--acc); flex: none; }
+.lib-ic.folder { background: var(--warn-soft); color: var(--warm); }
+.lib-ic .i { width: 22px; height: 22px; }
+.lib-desc { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* ---- 알림 ---- */
+.al-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 0 12px; }
+.al-grid { grid-template-columns: 1fr 1fr; }
+.item.unread .t { font-weight: 700; }
+.item .t .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--warm); margin-right: 6px; vertical-align: middle; }
+.lw-opt input[type=time] { border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; background: var(--card); }
+@media (max-width: 860px) { .al-grid { grid-template-columns: 1fr; } }
