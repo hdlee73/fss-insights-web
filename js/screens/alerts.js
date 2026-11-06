@@ -26,7 +26,7 @@ function newsView(root, ctx) {
     const items = inbox();
     const s = settings();
     const anyOn = s.keywords.length || s.agencies.length || s.library || s.briefing;
-    label.replaceChildren(h("span", null, items.length ? `최근 ${items.length}건 · 안 읽음 ${items.filter((x) => !x.read).length}건` : "새 소식"),
+    label.replaceChildren(...[h("span", null, items.length ? `최근 ${items.length}건 · 안 읽음 ${items.filter((x) => !x.read).length}건` : "새 소식"),
       h("div", { class: "acts" },
         iconButton("refresh-cw", "지금 확인", async () => {
           toast("새 글을 확인하는 중…");
@@ -35,7 +35,7 @@ function newsView(root, ctx) {
           draw();
         }),
         items.length ? h("button", { type: "button", class: "link-more", onclick: () => (markAllRead(), draw()) }, "모두 읽음") : null,
-        items.length ? h("button", { type: "button", class: "link-more", onclick: async () => (await dialog({ title: "새 소식 지우기", text: "모아 둔 새 소식을 모두 지웁니다.", ok: "지우기", danger: true })) && (clearInbox(), draw()) }, "지우기") : null));
+        items.length ? h("button", { type: "button", class: "link-more", onclick: async () => (await dialog({ title: "새 소식 지우기", text: "모아 둔 새 소식을 모두 지웁니다.", ok: "지우기", danger: true })) && (clearInbox(), draw()) }, "지우기") : null)].filter(Boolean));
     if (!items.length) {
       list.replaceChildren(message(anyOn ? "아직 새 소식이 없습니다. 웹이 열려 있는 동안 30분마다 확인합니다." : "켜 둔 알림이 없습니다. ‘알림 설정’에서 키워드나 기관을 골라 주세요.", anyOn ? {} : { action: "알림 설정", onAction: () => ctx.go({ view: "settings" }) }));
       return;

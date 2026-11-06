@@ -220,9 +220,9 @@ export async function drawStats(box, ids, { compact = false } = {}) {
     return h("div", { class: "sc" }, h("div", { class: "nm" }, it.name), h("div", { class: "pd" }, periodLabel(it.period) + " 기준"),
       h("b", null, statText(it, it.value)), h("div", { class: "dl", style: { color: tint(ch) } }, statDelta(it) || "직전 값 —"));
   };
-  box.replaceChildren(
+  box.replaceChildren(...[
     visible.length ? h("div", { class: "stats" }, [...groups].map(([g, rows]) => [compact ? null : h("div", { class: "g" }, g), h("div", { class: "cells" }, rows.map(cell))])) : h("p", { class: "note card" }, "통계를 서버에서 받지 못했습니다."),
-    absent.length && visible.length ? h("p", { class: "note", style: { color: "var(--danger)", marginTop: "6px" } }, "받지 못한 통계: " + absent.map((d) => d.name + (r.reasons[d.id] ? ` [${r.reasons[d.id]}]` : "")).join("; ")) : null);
+    absent.length && visible.length ? h("p", { class: "note", style: { color: "var(--danger)", marginTop: "6px" } }, "받지 못한 통계: " + absent.map((d) => d.name + (r.reasons[d.id] ? ` [${r.reasons[d.id]}]` : "")).join("; ")) : null].filter(Boolean));
 }
 
 async function drawKofia(box) {

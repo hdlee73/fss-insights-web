@@ -127,7 +127,7 @@ async function home(root, params, ctx) {
       prices.append(k);
       quote(sym).then((qq) => {
         const ch = changeOf(qq);
-        k.replaceChildren(h("small", null, c.name), h("b", null, grouped(qq.price)), ch != null ? h("div", { class: "chg", style: { color: tint(ch) } }, `${signed(ch)} (${percentOf(qq) > 0 ? "+" : ""}${percentOf(qq).toFixed(2)}%)`) : null);
+        k.replaceChildren(...[h("small", null, c.name), h("b", null, grouped(qq.price)), ch != null ? h("div", { class: "chg", style: { color: tint(ch) } }, `${signed(ch)} (${percentOf(qq) > 0 ? "+" : ""}${percentOf(qq).toFixed(2)}%)`) : null].filter(Boolean));
       }).catch(() => k.replaceChildren(h("small", null, c.name), h("b", null, "-"), h("div", { class: "note" }, "시세 없음")));
     }
     if (!prices.children.length) prices.append(h("p", { class: "note" }, "상장사가 없어 표시할 주가가 없습니다."));
@@ -204,7 +204,7 @@ async function detail(root, params, ctx) {
       star(),
       h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
     ]);
-    tagLine.replaceChildren(marketTag(clsOf(c)), c.stock ? h("span", { class: "note" }, c.stock) : null);
+    tagLine.replaceChildren(...[marketTag(clsOf(c)), c.stock ? h("span", { class: "note" }, c.stock) : null].filter(Boolean));
   };
   drawTop();
 
