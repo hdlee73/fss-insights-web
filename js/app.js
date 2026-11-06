@@ -138,6 +138,7 @@ async function render() {
   for (const a of side.querySelectorAll(".mi")) a.classList.toggle("on", a.dataset.id === id);
   const route = ROUTES[id];
   setHeader(route.label);
+  import("./usage.js").then((u) => u.recordMenu(route.label)).catch(() => {});
   try {
     currentScreen?.leave?.();
   } catch {}
@@ -229,3 +230,7 @@ if (!location.hash) history.replaceState(null, "", "#/briefing");
 render();
 registerWorker();
 import("./alerts-check.js").then((m) => m.checkInBackground()).catch(() => {});
+// 익명 사용 통계: 시작할 때와 다시 볼 때 하루 한 번 보낸다.
+const sendUsage = () => import("./usage.js").then((u) => u.sendIfNeeded()).catch(() => {});
+setTimeout(sendUsage, 3000);
+document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && sendUsage());
