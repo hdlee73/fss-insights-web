@@ -641,7 +641,7 @@ function splitChild(c, lawNo) {
   const pieces = [];
   for (const p of paras) {
     const a = anchorOf(flatItem(p).map((x) => x.text).join("\n"), LAW_PREFIX, lawNo);
-    if (!a && pieces.length) pieces.at(-1).paras.push(p);
+    if (!a && pieces.length) pieces[pieces.length - 1].paras.push(p);
     else pieces.push({ paras: [p], anchor: a || c.anchor || EMPTY });
   }
   if (new Set(pieces.map((p) => pathKey(p.anchor))).size < 2) return [c];
@@ -655,7 +655,7 @@ function splitChild(c, lawNo) {
   };
   return pieces.map((pc, i) => {
     const nums = pc.paras.map((x) => x.path.paragraph).filter((x) => x != null);
-    const part = nums.length === 1 ? `제${nums[0]}항` : `제${nums[0]}항~제${nums.at(-1)}항`;
+    const part = nums.length === 1 ? `제${nums[0]}항` : `제${nums[0]}항~제${nums[nums.length - 1]}항`;
     const body = pc.paras.map((p) => flatItem(p).map((x) => x.text).join("\n")).join("\n");
     const content = i === 0 && parsed.lead.trim() ? parsed.lead + "\n" + body : body;
     return { ...c, id: `${c.id}#${nums[0]}`, article: c.article.withContent(content), children: c.children.filter((ch) => pieceOf(ch) === i), anchor: pc.anchor, part };

@@ -33,8 +33,8 @@ export async function render(root, params, ctx) {
   const small = chosen.filter((x) => !wide.includes(x));
   const tiles = [];
   const mk = h("div");
-  if (wide.length) mk.append(h("div", { class: "tiles wide2" }, wide.map((it) => (tiles.push(indexTile(it, { wide: true, showInvestors: true })), tiles.at(-1).el))));
-  if (small.length) mk.append(h("div", { class: "tiles" }, small.map((it) => (tiles.push(indexTile(it)), tiles.at(-1).el))));
+  if (wide.length) mk.append(h("div", { class: "tiles wide2" }, wide.map((it) => (tiles.push(indexTile(it, { wide: true, showInvestors: true })), tiles[tiles.length - 1].el))));
+  if (small.length) mk.append(h("div", { class: "tiles" }, small.map((it) => (tiles.push(indexTile(it)), tiles[tiles.length - 1].el))));
   if (!chosen.length) mk.append(h("p", { class: "note card" }, "브리핑에 표시할 지표가 없습니다. 금융시장 동향의 ‘지표 선택’에서 고르세요."));
   root.append(section("시장 지표", "한눈에 보는 오늘 시장", "market", mk));
   tiles.forEach((t) => t.update());
