@@ -2,7 +2,13 @@
 import { ICONS } from "./icons.js";
 
 export const APP_NAME = "FSS Insights 웹";
-export const APP_VERSION = "1.0.6";
+// 면책 안내(앱 DisclaimerDialog.kt와 같은 문구)
+export const DISCLAIMER_SHORT = "이 웹사이트는 금융감독원의 공식 사이트가 아닙니다. 이용에 참고하시기 바랍니다.";
+export const DISCLAIMER_DETAIL =
+  "FSS Insights는 개인이 만든 비공식 서비스이며 금융감독원 등 어떤 기관과도 제휴·위탁 관계가 없습니다. " +
+  "화면에 표시되는 보도자료, 통계, 법령 등은 외부 출처의 공개 자료를 모아 보여주는 것으로, 정확성과 최신성을 보장하지 않습니다. " +
+  "중요한 판단에는 반드시 원문과 공식 자료를 확인하시기 바랍니다.";
+export const APP_VERSION = "1.0.7";
 
 // 서버(Cloudflare Worker). 앱과 같은 서버를 쓰고, 웹 주소(Origin)로 들어온 요청만 토큰 없이 받는다.
 const DEFAULT_SERVER = "https://news-proxy.hdlee73.workers.dev";

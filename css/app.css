@@ -82,6 +82,7 @@ h1, h2, h3, h4, p { margin: 0; }
 .mi.on { background: var(--side-on); color: #fff; font-weight: 600; box-shadow: inset 3px 0 0 var(--side-accent); }
 .mi .badge { margin-left: auto; font-style: normal; font-size: 11px; background: var(--warm); color: #14213d; font-weight: 700; border-radius: 10px; padding: 0 7px; }
 .sidefoot { margin-top: auto; font-size: 11px; opacity: .45; padding: 12px 12px 4px; }
+.sidefoot .unofficial { margin-bottom: 2px; }
 
 body.collapsed { --side-w: 64px; }
 body.collapsed .side .brand-t, body.collapsed .side .mi span:not(.i), body.collapsed .side .sh, body.collapsed .side .sidefoot, body.collapsed .mi .badge { display: none; }

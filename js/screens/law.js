@@ -511,7 +511,7 @@ new MutationObserver(() => document.querySelectorAll(".lw-cmp:not([data-aligned]
 
 // ------------------------------------------------------------------ 저장(PDF·한글)
 
-const footerLine = () => `${APP_NAME} v${APP_VERSION} · 만든이: 이현덕 with Claude (hdlee73@gmail.com)`;
+const footerLine = () => `${APP_NAME} v${APP_VERSION} · 만든이: 이현덕 with Claude (hdlee73@gmail.com) · 금융감독원 공식 자료가 아닙니다`;
 const fileName = (tree, ext) => `${tree.law.name}_${L.queryTarget(tree.query)}`.replace(/[\\/:*?"<>|\s]+/g, "_") + "." + ext;
 
 async function saveOptions(tree) {
