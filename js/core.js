@@ -2,7 +2,7 @@
 import { ICONS } from "./icons.js";
 
 export const APP_NAME = "FSS Insights 웹";
-export const APP_VERSION = "1.0.3";
+export const APP_VERSION = "1.0.4";
 
 // 서버(Cloudflare Worker). 앱과 같은 서버를 쓰고, 웹 주소(Origin)로 들어온 요청만 토큰 없이 받는다.
 const DEFAULT_SERVER = "https://news-proxy.hdlee73.workers.dev";

@@ -62,30 +62,30 @@ export async function sendIfNeeded() {
 }
 
 // ---- Google 애널리틱스(GA4) ----
-// 메뉴 이동은 주소의 # 뒤만 바뀌므로 자동 페이지 조회 대신 화면마다 page_view를 직접 보낸다.
-// 검색어 같은 화면 조건(# 뒤 ? 이하)은 보내지 않고 메뉴 경로만 보낸다. 통계 스위치를 끄면 GA도 멈춘다.
+// 메뉴 이동은 주소의 # 뒤만 바뀌어 GA가 구분하지 못하므로, 메뉴마다 경로(/fss-insights-web/law 등)를 넣어 page_view를 직접 보낸다.
+// GA는 처음 불러올 때 /fss-insights-web/ 로 page_view를 스스로 한 번 보낸다(끌 수 없음). 보고서에서 이 경로는 '접속', 나머지는 '메뉴 조회'로 보면 된다.
+// 검색어 같은 화면 조건(# 뒤 ? 이하)은 보내지 않는다. 통계 스위치를 끄면 GA도 멈춘다.
 const GA_ID = "G-FL8LM4E0Y1";
 let gaReady = false;
 function gtag() {
   (window.dataLayer = window.dataLayer || []).push(arguments);
 }
-function loadGa() {
-  if (gaReady) return true;
-  if (!enabled() || !/^https:$/.test(location.protocol) || !location.hostname.endsWith("github.io")) return false;
-  window[`ga-disable-${GA_ID}`] = false;
-  window.gtag = gtag;
-  gtag("js", new Date());
-  gtag("config", GA_ID, { send_page_view: false });
-  const s = document.createElement("script");
-  s.async = true;
-  s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
-  document.head.append(s);
-  gaReady = true;
-  return true;
-}
-/** 화면을 열 때마다 GA에 페이지 조회를 남긴다. */
+const basePath = () => location.pathname.replace(/[^/]*$/, "");
+const pageOf = (id, label) => ({ page_title: label, page_location: location.origin + basePath() + id, page_path: basePath() + id });
+
+/** 화면을 열 때마다 GA에 페이지 조회를 남긴다(github.io에서만). */
 export function pageView(id, label) {
-  if (!loadGa() || !enabled()) return;
-  const base = location.origin + location.pathname.replace(/[^/]*$/, "");
-  gtag("event", "page_view", { page_title: label, page_location: base + id, page_path: location.pathname.replace(/[^/]*$/, "") + id });
+  if (!enabled() || location.protocol !== "https:" || !location.hostname.endsWith("github.io")) return;
+  if (!gaReady) {
+    gaReady = true;
+    window[`ga-disable-${GA_ID}`] = false;
+    window.gtag = gtag;
+    gtag("js", new Date());
+    gtag("config", GA_ID);
+    const s = document.createElement("script");
+    s.async = true;
+    s.src = `https://www.googletagmanager.com/gtag/js?id=${GA_ID}`;
+    document.head.append(s);
+  }
+  gtag("event", "page_view", pageOf(id, label));
 }
