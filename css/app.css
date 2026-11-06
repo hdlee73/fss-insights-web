@@ -246,12 +246,14 @@ select.sel { padding: 6px 8px; font-size: 13px; }
 
 /* ---- 휴대폰: 메뉴는 서랍(☰ 또는 왼쪽 가장자리 밀기) ---- */
 @media (max-width: 860px) {
-  body { --side-w: 280px; }
+  body, body.collapsed { --side-w: 280px; }
   .side { position: fixed; inset: 0 auto 0 0; transform: translateX(-100%); }
   body.drawer .side { box-shadow: 10px 0 30px #0004; }
   body.collapsed .side .brand-t, body.collapsed .side .mi span:not(.i), body.collapsed .side .sh, body.collapsed .side .sidefoot { display: revert; }
   body.collapsed .mi { justify-content: flex-start; padding: 8px 12px; }
   body.collapsed .brand { flex-direction: row; }
+  body.collapsed .mi .badge { display: revert; }
+  body.collapsed .sec + .sec { border-top: 0; padding-top: 0; }
   .collapse { display: none; }
   body.drawer .side { transform: none; }
   body.drawer .scrim { display: block; position: fixed; inset: 0; background: #0b132488; z-index: 25; }

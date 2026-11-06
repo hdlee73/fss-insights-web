@@ -89,7 +89,6 @@ function buildMenu() {
 function toggleCollapse() {
   const collapsed = !document.body.classList.contains("collapsed");
   document.body.classList.toggle("collapsed", collapsed);
-  store.set("menuCollapsed", collapsed);
 }
 // 휴대폰 서랍은 기록을 하나 남겨, 열린 상태에서 뒤로가기를 하면 화면 이동 대신 서랍만 닫힌다.
 let afterClose = null;
@@ -218,7 +217,8 @@ function registerWorker() {
 
 // ---- 시작 ----
 buildMenu();
-document.body.classList.toggle("collapsed", !!store.get("menuCollapsed", false));
+// 접속할 때는 항상 메뉴를 펼친 상태로 시작한다(접기는 그때그때만).
+document.body.classList.remove("collapsed");
 document.getElementById("hamb").addEventListener("click", () => (mobile.matches ? openDrawer() : toggleCollapse()));
 document.getElementById("scrim").addEventListener("click", () => closeDrawer());
 addEventListener("hashchange", render);
