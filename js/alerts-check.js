@@ -1,6 +1,6 @@
 // 알림 확인: 앱(웹)이 열려 있는 동안 30분마다, 그리고 다시 볼 때 새 글을 확인해 '새 소식'에 모으고
 // 메뉴 배지와 브라우저 알림(허락한 경우)으로 알린다. 웹은 닫혀 있을 때 확인하지 못한다(앱과 다른 점).
-// - 키워드: 금융감독원·금융위원회 보도자료 제목에 키워드가 들어 있으면
+// - 키워드: 최근 24시간 뉴스(앱과 같은 검색), 금융감독원·금융위원회 보도자료 제목에 키워드가 들어 있으면
 // - 새 자료: 고른 기관의 보도자료·금융리포트가 새로 올라오면
 // - 참고 자료실: 새 파일이 올라오면
 // - 오늘의 브리핑: 매일 정한 시각 이후 처음 확인할 때 한 번
@@ -92,8 +92,16 @@ async function run(force) {
     const kind = a ? (a.group === "PRESS" ? "보도자료" : "금융리포트") : "새 자료";
     diff("m." + id, items && items.map((x) => ({ title: x.title, link: x.link, source: x.label }))).forEach((x) => found.push({ ...x, kind }));
   }
+  const news = s.keywords.length ? await import("./lib/news.js") : null;
   for (const k of s.keywords) {
-    const hits = ["FSS", "FSC"].flatMap((id) => (lists.get(id) || []).filter((x) => titleHas(x.title, k)).map((x) => ({ title: x.title, link: x.link, source: x.label })));
+    // 뉴스: 검색식(OR·제외어 등)을 그대로 쓰고, 언론 범위는 뉴스검색 설정을 따른다.
+    const newsHits = await news.search(k.replace(/\s*\|\s*/g, " OR "), { ...news.settings(), range: "DAY" })
+      .then((p) => p.articles.map((a) => ({ title: a.title, link: a.link, source: a.source })))
+      .catch(() => null);
+    const pressHits = ["FSS", "FSC"].flatMap((id) => (lists.get(id) || []).filter((x) => titleHas(x.title, k)).map((x) => ({ title: x.title, link: x.link, source: x.label })));
+    // 뉴스는 따로 기억한다(처음 켤 때 묵은 기사가 한꺼번에 울리지 않게).
+    diff("kn." + k, newsHits).forEach((x) => found.push({ ...x, kind: `키워드 ‘${k}’ 뉴스` }));
+    const hits = pressHits;
     const ok = ["FSS", "FSC"].some((id) => lists.get(id));
     diff("k." + k, ok ? hits : null).forEach((x) => found.push({ ...x, kind: `키워드 ‘${k}’` }));
   }

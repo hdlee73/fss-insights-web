@@ -1,20 +1,23 @@
-// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 금융당국 보도자료, 이번 주 금융리포트.
-// (앱의 '최근 기사'는 뉴스 검색을 웹에서 빼기로 해 넣지 않았다.)
+// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
 import { cached, forget, h, icon, iconButton, store } from "../core.js";
 import { INDEX_CHOICES, KOREA_INDEXES, indexSelection, statSelection } from "../lib/market.js";
 import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
 import { drawStats, indexTile } from "./market.js";
 import { releaseRow } from "./releases.js";
+import { articleRow, loadHome } from "./news.js";
+import { isMajor } from "../lib/news.js";
 
 const PRESS = ["FSS", "FSC"];
 const PRESS_COUNT = 5;
+const ARTICLE_COUNT = 5;
 const RESEARCH_PER_AGENCY = 3;
 
 export async function render(root, params, ctx) {
   setHeader("오늘의 브리핑", "한눈에 보는 오늘 시장과 금융당국 소식", [iconButton("refresh-cw", "새로고침", () => {
     forget("rel:");
     forget("weather");
+    forget("news:");
     ctx.go({}, { replace: true });
   })]);
   const hero = h("section", { class: "br-hero" });
@@ -50,6 +53,15 @@ export async function render(root, params, ctx) {
     root.append(section("주요 금융 통계", "한국은행 ECOS", "market", box));
     drawStats(box, statIds, { compact: true });
   }
+
+  // 최근 기사: 맞춤 뉴스 중 30대 언론 기사만, 가장 최근 순으로
+  const newsBox = h("div", { class: "card list" }, h("div", { class: "note" }, "불러오는 중…"));
+  root.append(section("최근 기사", "30대 언론 · 최신순", "news", newsBox));
+  loadHome().then((page) => {
+    if (!ctx.alive()) return;
+    const top = page.articles.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, ARTICLE_COUNT);
+    newsBox.replaceChildren(...(top.length ? top.map((a) => articleRow(a, { compact: true })) : [h("div", { class: "note" }, "30대 언론의 최근 기사가 없습니다.")]));
+  }).catch(() => ctx.alive() && newsBox.replaceChildren(h("div", { class: "note" }, "기사를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
 
   // 최근 금융당국 보도자료(금감원·금융위 + 직접 추가한 기관)
   const pressBox = h("div", { class: "card list" }, h("div", { class: "note" }, "불러오는 중…"));
