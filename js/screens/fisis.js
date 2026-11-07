@@ -192,7 +192,7 @@ async function detail(root, params, ctx, sector) {
   const sectorLabel = SECTORS.find(([c]) => c === sector)[1];
   const all = await companies(sector).catch(() => []);
   const co = all.find((c) => c.code === params.co) || { code: params.co, name: params.name || params.co };
-  setHeader(co.name, `${sectorLabel} · ${SOURCE}`, [
+  setHeader(co.name, `${sectorLabel} · ${SOURCE}${sector === "F" || sector === "G" ? ", 금융투자협회(FreeSIS)" : ""}`, [
     h("button", { class: "pill", type: "button", title: "PDF·한글로 저장", onclick: () => saveCompany(sector, sectorLabel, co, params) }, icon("download"), h("span", { class: "lbl" }, "저장")),
     h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
   ]);

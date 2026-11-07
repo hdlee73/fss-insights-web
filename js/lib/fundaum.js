@@ -96,6 +96,6 @@ export async function fundAumPane(box, company) {
       h("thead", null, h("tr", null, h("th", null, ""), heads.map(([l, d]) => h("th", { class: "num" }, l, h("div", { class: "note" }, dateLabel(d)))))),
       h("tbody", null, row("공모", c.pub), row("사모", c.pri), row("합계", total, true)))),
     h("p", { class: "note", style: { marginTop: "12px" } },
-      "금융투자협회 종합통계 포털 ‘회사별설정규모’(펀드, 순자산총액, 투자지역 전체, 기금 포함) 기준입니다. 최직근 분기말·연말은 그 일자의 값입니다. " +
+      "자료출처: 금융투자협회(FreeSIS) 종합통계 포털 ‘회사별설정규모’(펀드, 순자산총액, 투자지역 전체). 기관전용 사모펀드는 제외한 값이며 단위는 억원입니다. 최직근 분기말·연말은 그 일자의 값입니다. " +
       `자료를 매일 자동으로 모아 보여 주므로 원문과 다를 수 있습니다. 갱신: ${String(data.generatedAt).slice(0, 16).replace("T", " ")}`));
 }
