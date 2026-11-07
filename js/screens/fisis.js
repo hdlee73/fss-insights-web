@@ -10,7 +10,7 @@ const FIRST_MONTH = "202401";
 const BASES = ["별도", "연결"];
 
 export const SECTORS = [
-  ["F", "증권"], ["G", "운용"], ["A", "은행"], ["H", "생보"], ["I", "손보"], ["C", "카드"], ["E", "저축은행"], ["M", "부신사"],
+  ["F", "증권"], ["G", "운용"], ["A", "은행"], ["H", "생보"], ["I", "손보"], ["C", "카드"], ["E", "저축은행"], ["M", "부신사"], ["L", "금융지주"],
 ];
 const CARD_PL_LABELS = { revenue: "수익합계", expense: "비용합계", netincome: "당기순이익(손실)" };
 const DEFAULT_PL_KEYS = ["revenue", "expense", "opinc", "netincome"];
