@@ -401,6 +401,8 @@ svg.trend.small { height: auto; }
 .sx-head { display: flex; align-items: center; gap: 10px; }
 .sx-head > div { flex: 1; min-width: 0; }
 .sx-head b { font-size: 14.5px; }
+.sx-h { font-size: 12.5px; font-weight: 800; color: var(--acc); margin-top: 6px; }
+.sx-h2 { margin-top: 8px; }
 .sx-act { font-size: 13px; }
 .sx-act span { color: #b4233a; font-weight: 700; margin-right: 8px; }
 .sx-items { margin: 4px 0 0 18px; padding: 0; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 2px; }
