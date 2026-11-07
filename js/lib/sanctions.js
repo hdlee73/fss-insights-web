@@ -2,7 +2,7 @@
 // 앱의 SanctionData.kt·SanctionExport.kt를 옮겼다. 받은 자료는 브라우저 캐시에 12시간 보관한다.
 import { xlsx } from "./xlsx.js";
 
-export const DATA_URL = "https://raw.githubusercontent.com/hdlee73/FSS_insights/sanction-data/sanctions.json";
+export const DATA_URL = "https://raw.githubusercontent.com/hdlee73/FSS_insights/sanction-data/sanctions.json?r=2"; // r: 자료 형식이 바뀔 때 올려 예전에 저장한 캐시를 버린다
 export const FIRST_YEAR = 2011;
 // FISIS 금융권역을 준용한다(금융지주·부신사=부동산신탁사 포함). 유사투자자문업자는 기타.
 export const SECTORS = ["은행", "금융지주", "보험", "증권", "운용", "자문일임", "부신사", "저축은행", "상호금융", "여신전문", "대부", "기타"];
