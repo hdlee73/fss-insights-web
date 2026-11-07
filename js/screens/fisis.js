@@ -192,17 +192,24 @@ async function detail(root, params, ctx, sector) {
   const sectorLabel = SECTORS.find(([c]) => c === sector)[1];
   const all = await companies(sector).catch(() => []);
   const co = all.find((c) => c.code === params.co) || { code: params.co, name: params.name || params.co };
-  setHeader(co.name, `${sectorLabel} · ${SOURCE}`, [
+  setHeader(co.name, `${sectorLabel} · ${SOURCE}${sector === "F" || sector === "G" ? ", 금융투자협회(FreeSIS)" : ""}`, [
     h("button", { class: "pill", type: "button", title: "PDF·한글로 저장", onclick: () => saveCompany(sector, sectorLabel, co, params) }, icon("download"), h("span", { class: "lbl" }, "저장")),
     h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
   ]);
-  const tab = +(params.tab || 0);
-  root.append(tabs(["재무현황", "주요경영지표", "최근 제재내역"], tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
+  // 증권사·운용사는 금융투자협회의 펀드 순자산 탭을 더한다.
+  const tabNames = ["재무현황", "주요경영지표", ...(sector === "F" || sector === "G" ? ["펀드 순자산"] : []), "최근 제재내역"];
+  const tab = Math.min(+(params.tab || 0), tabNames.length - 1);
+  const tabName = tabNames[tab];
+  root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
   const body = h("div");
   root.append(body);
-  if (tab === 2) {
+  if (tabName === "최근 제재내역") {
     const m = await import("./sanction.js");
     return m.companyPane(body, co.name);
+  }
+  if (tabName === "펀드 순자산") {
+    const m = await import("../lib/fundaum.js");
+    return m.fundAumPane(body, co.name);
   }
   body.append(loading("경영정보를 불러오는 중…"));
   let profile;
