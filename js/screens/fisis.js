@@ -10,7 +10,7 @@ const FIRST_MONTH = "202401";
 const BASES = ["별도", "연결"];
 
 export const SECTORS = [
-  ["F", "증권"], ["G", "운용"], ["A", "은행"], ["H", "생보"], ["I", "손보"], ["C", "카드"], ["E", "저축은행"],
+  ["F", "증권"], ["G", "운용"], ["A", "은행"], ["H", "생보"], ["I", "손보"], ["C", "카드"], ["E", "저축은행"], ["M", "부신사"], ["L", "금융지주"],
 ];
 const CARD_PL_LABELS = { revenue: "수익합계", expense: "비용합계", netincome: "당기순이익(손실)" };
 const DEFAULT_PL_KEYS = ["revenue", "expense", "opinc", "netincome"];
@@ -406,7 +406,10 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
       if (ex) acts.push(["임원", ex]);
       const sf = S.actionLine(c.staff);
       if (sf) acts.push(["직원", sf]);
+      blocks.push({ text: "[조치내용]", indent: 1 });
       if (acts.length) blocks.push({ kv: acts });
+      else blocks.push({ text: "표시할 조치내용이 없습니다. 원문을 확인해 주세요.", gray: true, indent: 1 });
+      blocks.push({ text: "[지적사항]", indent: 1 });
       if (c.items.length) blocks.push({ text: c.items.map((it, j) => `${j + 1}) ${it.category ? `[${it.category}] ` : ""}${it.title}${it.laws.length ? ` (${it.laws.join(", ")})` : ""}`).join("\n"), indent: 1 });
       else blocks.push({ text: S.whyText(c), gray: true, indent: 1 });
       if (c.viewUrl) blocks.push({ text: "원문: " + c.viewUrl, gray: true, indent: 1 });
