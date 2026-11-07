@@ -92,7 +92,7 @@ export async function fundAumPane(box, company) {
   const total = [0, 1, 2].map((i) => c.pub[i] + c.pri[i]);
   box.replaceChildren(
     h("div", { class: "section-label" }, "펀드 순자산총액 · 단위 억원"),
-    h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+    h("div", { class: "tbl-wrap" }, h("table", { class: "tbl fund" },
       h("thead", null, h("tr", null, h("th", null, ""), heads.map(([l, d]) => h("th", { class: "num" }, l, h("div", { class: "note" }, dateLabel(d)))))),
       h("tbody", null, row("공모", c.pub), row("사모", c.pri), row("합계", total, true)))),
     h("p", { class: "note", style: { marginTop: "12px" } },
