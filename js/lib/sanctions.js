@@ -17,14 +17,14 @@ const CACHE = "fss-data";
 
 export const NOTICE = "2011년 이후 금융감독원 '금융회사 제재공시'의 공개 문서를 자동으로 읽어 정리한 참고용 자료입니다. " +
   "원문과 다르거나 누락·오분류가 있을 수 있으며, 권역은 회사명·담당부서로 추정했습니다. " +
-  "과태료·과징금은 공시(건) 단위 금액이며, 2013년 이전 일부 공시는 형식이 달라 지적사항이 미분류로 나올 수 있습니다. 업무에 인용할 때는 반드시 금감원 원문을 확인하세요.";
+  "과태료·과징금은 공시(건) 단위 금액이며, 스캔 이미지 문서는 글자 인식(OCR)으로 읽어 일부 숫자·법조문이 다를 수 있고, 읽지 못한 공시는 해당 통계에 반영되지 않습니다. 업무에 인용할 때는 반드시 금감원 원문을 확인하세요.";
 
-const WHY_SHORT = { missing: "금감원 사이트에 첨부 파일 없음(사이트 오류)", download: "첨부 문서 내려받기 실패", nofile: "첨부 문서 없음", scan: "스캔 이미지 문서", format: "문서 형식 자동 인식 불가" };
+const WHY_SHORT = { missing: "금감원 사이트에 첨부 파일 없음(사이트 오류)", download: "첨부 문서 내려받기 실패", nofile: "첨부 문서 없음", scan: "스캔 문서(글자 인식 불가)", format: "문서 형식 자동 인식 불가" };
 const WHY_TEXT = {
   missing: "금감원 공시 사이트에서 첨부 문서가 열리지 않아(‘해당 파일이 존재하지 않습니다’ 오류) 지적사항을 읽지 못했습니다. 사이트가 고치면 자동으로 채워집니다.",
   download: "금감원 사이트에서 첨부 문서를 받지 못했습니다(일시 오류). 다음 갱신 때 다시 읽습니다.",
   nofile: "공시에 첨부 문서가 없어 지적사항을 읽지 못했습니다.",
-  scan: "첨부 문서가 스캔 이미지라 글자를 읽을 수 없습니다.",
+  scan: "첨부 문서가 흐린 스캔 이미지라 글자 인식(OCR)으로도 읽지 못했습니다. 이 공시는 지적사항·법률·조항 통계에 반영되지 않습니다.",
 };
 export const whyShort = (c) => WHY_SHORT[c.why] || "원문 참조";
 export const whyText = (c) => (WHY_TEXT[c.why] || "문서 형식이 달라 지적사항을 자동으로 나누지 못했습니다.") + " 원문보기로 확인해 주세요.";
@@ -41,7 +41,7 @@ function parse(o) {
       instKinds: c.instK || [], execKinds: c.execK || [], staffKinds: c.staffK || [],
       fine: +c.fine || 0, penalty: +c.penalty || 0,
       items: (c.items || []).map((it) => ({ title: s(it.t), category: s(it.cat) || null, laws: it.laws || [] })),
-      parsed: !!c.ok, why: s(c.why) || null,
+      parsed: !!c.ok, why: s(c.why) || null, ocr: !!c.ocr, amountUnknown: c.amt === "?",
     });
   }
   const years = [...new Set(cases.map((c) => c.year))].sort((a, b) => b - a);
@@ -196,7 +196,21 @@ export function summarize(rows, data, f) {
     topLawNames: count(laws.map((l) => (l.lastIndexOf(" 제") > 0 ? l.slice(0, l.lastIndexOf(" 제")) : l))).slice(0, 10),
     topCompanies: count(cases.map((c) => c.company)).slice(0, 10),
     topMoney: cases.filter((c) => c.fine + c.penalty > 0).sort((a, b) => b.fine + b.penalty - (a.fine + a.penalty)).slice(0, 10),
+    unparsedCount: cases.filter((c) => !c.items.length).length,
+    noActionCount: cases.filter((c) => !c.inst && !c.exec && !c.staff).length,
+    ocrCount: cases.filter((c) => c.ocr).length,
+    amountUnknownCount: cases.filter((c) => c.amountUnknown).length,
   };
+}
+
+/** 통계에 다 반영되지 않은 공시가 있을 때 보여 줄 안내(없으면 null). */
+export function coverageNote(s) {
+  const p = [];
+  if (s.unparsedCount > 0) p.push(`지적사항을 읽지 못한 ${s.unparsedCount}건은 지적사항·위반 법률·조항 통계에 반영되지 않았습니다(공시 건수·권역·회사 통계에는 포함)`);
+  if (s.noActionCount > 0) p.push(`조치 내용을 읽지 못한 ${s.noActionCount}건은 조치 종류·금전제재 통계에서 빠졌습니다`);
+  if (s.amountUnknownCount > 0) p.push(`스캔 문서의 과태료·과징금 금액을 확실히 읽지 못한 ${s.amountUnknownCount}건은 금전제재 금액 합계에서 빠졌습니다`);
+  if (s.ocrCount > 0) p.push(`스캔 문서를 글자 인식(OCR)으로 읽은 ${s.ocrCount}건은 숫자·법조문이 원문과 다를 수 있습니다`);
+  return p.length ? p.join(". ") + ". 정확한 내용은 원문보기로 확인하세요." : null;
 }
 
 /** 원 → "17억 3,050만원" */
@@ -235,7 +249,7 @@ export function exportXlsx(rows, s, scope, generatedAt) {
   block("위반 조항 상위(지적 건수)", s.topLaws);
   block("제재 공시가 많은 회사", s.topCompanies);
   block("금전제재 상위(원)", s.topMoney.map((c) => [`${c.company} (${c.date})`, c.fine + c.penalty]));
-  st.push(["유의사항", NOTICE]);
+  st.push(["미반영 안내", coverageNote(s) || "모든 공시를 읽었습니다."], ["유의사항", NOTICE]);
   return xlsx([
     { name: "세부내역", header: ["권역", "회사명", "조치요구일", "지적제목", "기관 조치", "임원 조치", "직원 조치", "위반 법률·조항", "담당부서"], rows: detail, widths: [9, 24, 11, 48, 32, 32, 32, 40, 16], merges },
     { name: "통계", header: ["항목", "값"], rows: st, widths: [46, 60] },

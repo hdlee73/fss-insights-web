@@ -3,7 +3,7 @@
 import { go, setHeader } from "../app.js";
 import { dialog, download, errorText, h, icon, iconButton, loading, message, openUrl, tabs, toast } from "../core.js";
 import {
-  FIELDS, PERIODS, SECTORS, NOTICE, actionLine, casesFromRows, casesOf, exportXlsx, filterRows, loadSanctions, periodLabel, periodRange, presetOf, scopeLabel, summarize, whyText, won,
+  FIELDS, PERIODS, SECTORS, NOTICE, actionLine, casesFromRows, casesOf, coverageNote, exportXlsx, filterRows, loadSanctions, periodLabel, periodRange, presetOf, scopeLabel, summarize, whyText, won,
 } from "../lib/sanctions.js";
 
 const PAGE = 40;
@@ -27,6 +27,7 @@ function caseCard(c, matched = new Set()) {
     h("div", { class: "sx-h" }, "[조치내용]"),
     acts.length ? acts.map(([l, t]) => h("div", { class: "sx-act" }, h("span", null, l), t)) : h("p", { class: "note" }, "표시할 조치내용이 없습니다. 원문보기로 확인해 주세요."),
     h("div", { class: "sx-h sx-h2" }, "[지적사항]"),
+    c.ocr && c.items.length ? h("p", { class: "note", style: { color: "#b26a00" } }, "스캔 문서를 글자 인식(OCR)으로 읽었습니다. 숫자·법조문이 원문과 다를 수 있으니 원문보기로 확인하세요.") : null,
     c.items.length
       ? h("ol", { class: "sx-items" }, c.items.map((it) => h("li", { class: matched.has(it) ? "hit" : "" },
         it.category ? `[${it.category}] ` : "", it.title,
@@ -174,6 +175,7 @@ export async function render(root, params, ctx) {
         h("b", null, `${data.fromYear}년 이후 금감원 제재공시 기준`),
         h("div", { class: "note" }, `범위: ${scopeLabel(filter, data)} · 자료 기준 ${data.generatedAt.slice(0, 16).replace("T", " ")}`),
         h("div", { class: "note", style: { marginTop: "4px" } }, NOTICE)),
+      coverageNote(s) ? h("div", { class: "infobox", style: { background: "#fff4e0", color: "#6b4300", marginTop: "10px" } }, h("b", null, "통계 미반영 안내"), h("div", { class: "note", style: { color: "#6b4300" } }, coverageNote(s))) : null,
       h("div", { class: "kpis", style: { margin: "12px 0" } }, kpi("공시", s.caseCount.toLocaleString("ko-KR") + "건"), kpi("지적사항", s.itemCount.toLocaleString("ko-KR") + "건"),
         kpi("금전제재 합계", won(s.fine + s.penalty)), kpi("과태료", won(s.fine)), kpi("과징금", won(s.penalty))),
       h("div", { class: "grid2" },
