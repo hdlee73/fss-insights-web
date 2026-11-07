@@ -203,6 +203,8 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tbl th, .tbl td { padding: 7px 8px; border-bottom: 1px solid var(--line2); text-align: left; vertical-align: top; }
 .tbl th { font-size: 12px; color: var(--muted); font-weight: 600; background: #f8fafc; position: sticky; top: 0; }
 .tbl td.num, .tbl th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tbl.fund th, .tbl.fund td { padding: 9px 6px; }
+.tbl.fund td.num, .tbl.fund th.num { white-space: normal; }
 .tbl tr.click { cursor: pointer; }
 .tbl tr.click:hover td { background: #f6f9ff; }
 .tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--r); background: var(--card); }
@@ -401,6 +403,8 @@ svg.trend.small { height: auto; }
 .sx-head { display: flex; align-items: center; gap: 10px; }
 .sx-head > div { flex: 1; min-width: 0; }
 .sx-head b { font-size: 14.5px; }
+.sx-h { font-size: 12.5px; font-weight: 800; color: var(--acc); margin-top: 6px; }
+.sx-h2 { margin-top: 8px; }
 .sx-act { font-size: 13px; }
 .sx-act span { color: #b4233a; font-weight: 700; margin-right: 8px; }
 .sx-items { margin: 4px 0 0 18px; padding: 0; font-size: 13px; line-height: 1.55; display: flex; flex-direction: column; gap: 2px; }

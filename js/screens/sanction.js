@@ -24,7 +24,9 @@ function caseCard(c, matched = new Set()) {
     h("div", { class: "sx-head" },
       h("div", null, h("b", null, c.company), h("div", { class: "note" }, [c.sector, dot(c.date), c.dept].filter(Boolean).join(" · "))),
       h("button", { class: "btn ghost sm", type: "button", onclick: () => openUrl(c.viewUrl) }, "원문보기")),
-    acts.map(([l, t]) => h("div", { class: "sx-act" }, h("span", null, l), t)),
+    h("div", { class: "sx-h" }, "[조치내용]"),
+    acts.length ? acts.map(([l, t]) => h("div", { class: "sx-act" }, h("span", null, l), t)) : h("p", { class: "note" }, "표시할 조치내용이 없습니다. 원문보기로 확인해 주세요."),
+    h("div", { class: "sx-h sx-h2" }, "[지적사항]"),
     c.items.length
       ? h("ol", { class: "sx-items" }, c.items.map((it) => h("li", { class: matched.has(it) ? "hit" : "" },
         it.category ? `[${it.category}] ` : "", it.title,
