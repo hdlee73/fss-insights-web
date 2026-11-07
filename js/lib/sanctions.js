@@ -41,7 +41,7 @@ function parse(o) {
       instKinds: c.instK || [], execKinds: c.execK || [], staffKinds: c.staffK || [],
       fine: +c.fine || 0, penalty: +c.penalty || 0,
       items: (c.items || []).map((it) => ({ title: s(it.t), category: s(it.cat) || null, laws: it.laws || [] })),
-      parsed: !!c.ok, why: s(c.why) || null, ocr: !!c.ocr,
+      parsed: !!c.ok, why: s(c.why) || null, ocr: !!c.ocr, amountUnknown: c.amt === "?",
     });
   }
   const years = [...new Set(cases.map((c) => c.year))].sort((a, b) => b - a);
@@ -199,6 +199,7 @@ export function summarize(rows, data, f) {
     unparsedCount: cases.filter((c) => !c.items.length).length,
     noActionCount: cases.filter((c) => !c.inst && !c.exec && !c.staff).length,
     ocrCount: cases.filter((c) => c.ocr).length,
+    amountUnknownCount: cases.filter((c) => c.amountUnknown).length,
   };
 }
 
@@ -207,6 +208,7 @@ export function coverageNote(s) {
   const p = [];
   if (s.unparsedCount > 0) p.push(`지적사항을 읽지 못한 ${s.unparsedCount}건은 지적사항·위반 법률·조항 통계에 반영되지 않았습니다(공시 건수·권역·회사 통계에는 포함)`);
   if (s.noActionCount > 0) p.push(`조치 내용을 읽지 못한 ${s.noActionCount}건은 조치 종류·금전제재 통계에서 빠졌습니다`);
+  if (s.amountUnknownCount > 0) p.push(`스캔 문서의 과태료·과징금 금액을 확실히 읽지 못한 ${s.amountUnknownCount}건은 금전제재 금액 합계에서 빠졌습니다`);
   if (s.ocrCount > 0) p.push(`스캔 문서를 글자 인식(OCR)으로 읽은 ${s.ocrCount}건은 숫자·법조문이 원문과 다를 수 있습니다`);
   return p.length ? p.join(". ") + ". 정확한 내용은 원문보기로 확인하세요." : null;
 }
