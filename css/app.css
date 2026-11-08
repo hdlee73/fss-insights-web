@@ -636,3 +636,33 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
 .spark rect.last { opacity: 1; }
 .spark rect.last { fill: var(--acc); }
 .spark rect.surge { fill: var(--warm, #e8772e); }
+
+/* ---- 회계: 과징금·양정 시뮬레이터 ---- */
+.chip-row.wrap { flex-wrap: wrap; overflow: visible; }
+.sim .sim-result { position: sticky; top: 12px; max-height: calc(100vh - 100px); overflow-y: auto; }
+.sim-toggle { font-size: 13.5px; cursor: pointer; }
+.sim-period input[type="date"] { border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; background: var(--card); color: var(--fg); font: inherit; }
+.sim-reasons { display: flex; flex-direction: column; gap: 8px; }
+.sim-reason { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.5; cursor: pointer; }
+.sim-reason input { margin-top: 3px; flex: none; }
+.sim-line { font-size: 12.5px; line-height: 1.55; white-space: pre-wrap; }
+.sim-total { margin-top: 4px; color: var(--acc-fg); }
+.sim-total b { font-size: 16px; }
+.sim-ul { margin: 0; padding-left: 18px; line-height: 1.6; }
+.sim-save .infobox .i { width: 14px; height: 14px; vertical-align: -2px; }
+@media (max-width: 860px) {
+  .sim .sim-result { position: static; max-height: none; overflow: visible; }
+}
+
+/* ---- v2.5.0: 회사명 → DART 링크, 메뉴 묶음 접기 ---- */
+.co-link { color: var(--acc-fg, #1a56c7); text-decoration: underline; text-underline-offset: 2px; }
+.co-link:hover { text-decoration-thickness: 2px; }
+button.sh { display: flex; align-items: center; gap: 6px; width: 100%; border: 0; background: transparent; color: inherit; font: inherit; font-size: 11px; font-weight: 700; letter-spacing: .04em; cursor: pointer; text-align: left; border-radius: 8px; }
+button.sh > span:first-child { flex: 1; opacity: .75; }
+button.sh .n { font-weight: 600; opacity: .6; }
+button.sh .i { width: 15px; height: 15px; opacity: .7; }
+button.sh:hover { background: #1b2b4d; }
+button.sh.has-on > span:first-child { opacity: 1; color: var(--side-accent, #7fb2ff); }
+.sec.folded .mi { display: none; }
+body.collapsed .sec.folded .mi { display: flex; }
+@media (max-width: 860px) { body.collapsed .sec.folded .mi { display: none; } }

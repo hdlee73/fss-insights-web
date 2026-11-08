@@ -409,3 +409,29 @@ export function extractCards(html, baseUrl, pattern, maxTitle = 220) {
   });
   return out;
 }
+
+/**
+ * 금감원 게시판 가운데 카드형 목록(structured-item, 금융감독연구 자료실 등)에서 제목·저자·등록일을 읽는다.
+ * 카드마다 저자(소속)·연월·권호·등록일 항목이 있으며, 등록일을 날짜로 쓴다. 앱의 HtmlListParser.extractFssCards와 같다.
+ */
+export function extractFssCards(html, baseUrl) {
+  const clean = html.replace(noise, " ");
+  const item = /<li\b[^>]*class="[^"]*structured-item[^"]*"[^>]*>([\s\S]*?)<\/li>\s*(?=<li\b[^>]*structured-item|<\/ul>)/gi;
+  const link = /<a\b[^>]*href\s*=\s*"([^"]*nttId=\d+[^"]*)"[^>]*>([\s\S]*?)<\/a>/i;
+  const field = /<dt[^>]*>([\s\S]*?)<\/dt>\s*<dd[^>]*>([\s\S]*?)<\/dd>/gi;
+  const strip = (t) => compact(decodeEntities(String(t).replace(/<[^>]+>/g, " ")));
+  const out = new Map();
+  for (const m of clean.matchAll(item)) {
+    const block = m[1];
+    const l = block.match(link);
+    if (!l) continue;
+    const url = resolve(baseUrl, decodeEntities(l[1]).trim());
+    const title = strip(l[2]);
+    if (!url || !title) continue;
+    const f = {};
+    for (const x of block.matchAll(field)) f[strip(x[1])] = strip(x[2]);
+    const date = findDates(f["등록일"] || "")[0]?.date || Object.values(f).map((v) => findDates(v)[0]?.date).find(Boolean) || null;
+    if (!out.has(url)) out.set(url, { title, url, date, author: f["저자(소속)"] || null });
+  }
+  return [...out.values()];
+}

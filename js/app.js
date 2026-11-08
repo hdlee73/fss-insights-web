@@ -3,26 +3,35 @@
 import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, h, icon, store, toast } from "./core.js";
 
 // 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서.
+// 소제목이 있는 묶음은 제목을 눌러 하위 메뉴를 접고 펼 수 있다(접은 상태는 기억한다).
 export const MENU = [
   [null, [
     ["briefing", "오늘의 브리핑", "sun"],
     ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향", "trending-up"],
-    ["fisis", "금융회사 주요 현황", "building-2"],
-    ["sanction", "금융회사 제재현황", "gavel"],
-    ["dart", "기업 개황 및 공시(DART)", "building"],
     ["law", "스마트 법령검색", "scale"],
+  ]],
+  ["금융회사", [
+    ["fisis", "금융회사 주요 현황", "building-2"],
+    ["sanction", "금융회사 제재 현황", "gavel"],
+  ]],
+  ["기업공시 및 회계", [
+    ["dart", "기업 개황 및 공시(DART)", "building"],
+    ["disclosure", "공시조사결과제재", "shield-alert"],
+    ["audit", "회계감리 조치현황", "clipboard-check"],
+    ["accsearch", "회계기준서·질의회신·지적사례 검색", "book-marked"],
+    ["sim", "(회계)과징금 및 양정 시뮬레이터", "calculator"],
   ]],
   ["자료", [
     ["press", "보도자료", "file-text"],
     ["regulatory", "유권해석·비조치의견서·행정지도", "badge-check"],
     ["research", "금융관련 리포트", "book-open"],
-    ["library", "참고 자료실", "folder-open"],
+    ["library", "참고자료실", "folder-open"],
   ]],
   ["더보기", [
     ["sites", "주요사이트", "globe"],
     ["alerts", "알림", "bell"],
-    ["info", "앱 정보", "info"],
+    ["info", "앱정보", "info"],
   ]],
 ];
 const ROUTES = Object.fromEntries(MENU.flatMap(([, items]) => items.map(([id, label, ic]) => [id, { label, icon: ic }])));
@@ -34,6 +43,10 @@ const loaders = {
   fisis: () => import("./screens/fisis.js"),
   sanction: () => import("./screens/sanction.js"),
   dart: () => import("./screens/dart.js"),
+  disclosure: () => import("./screens/disclosure.js"),
+  audit: () => import("./screens/audit.js"),
+  accsearch: () => import("./screens/accsearch.js"),
+  sim: () => import("./screens/sim.js"),
   law: () => import("./screens/law.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
@@ -77,15 +90,48 @@ function buildMenu() {
       h("div", { class: "brand-t" }, h("b", null, "FSS Insights"), h("small", null, "웹 버전")),
       h("button", { class: "ib collapse", type: "button", title: "메뉴 접기", "aria-label": "메뉴 접기", onclick: toggleCollapse }, icon("panel-left"))),
     h("nav", { class: "menu" },
-      MENU.map(([head, items]) => h("div", { class: "sec" },
-        head ? h("div", { class: "sh" }, head) : null,
-        items.map(([id, label, ic]) => h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
-          if (!document.body.classList.contains("drawer")) return;
-          e.preventDefault();
-          closeDrawer(() => (location.hash = `#/${id}`));
-        } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true })))))),
+      MENU.map(([head, items]) => {
+        const folded = head && folds().includes(head);
+        return h("div", { class: "sec" + (folded ? " folded" : ""), "data-head": head || "" },
+          head ? h("button", { class: "sh", type: "button", "aria-expanded": String(!folded), title: folded ? `${head} 펼치기` : `${head} 접기`, onclick: () => toggleFold(head) },
+            h("span", null, head), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up")) : null,
+          items.map(([id, label, ic]) => h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
+            if (!document.body.classList.contains("drawer")) return;
+            e.preventDefault();
+            closeDrawer(() => (location.hash = `#/${id}`));
+          } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true }))));
+      })),
     h("div", { class: "sidefoot" }, h("div", { class: "unofficial" }, "금융감독원 공식 사이트가 아닙니다"), `v${APP_VERSION} · 이현덕 with Claude`)
   );
+}
+
+const folds = () => store.get("menu.folds", []);
+function toggleFold(head) {
+  const now = folds();
+  store.set("menu.folds", now.includes(head) ? now.filter((x) => x !== head) : [...now, head]);
+  refreshFolds();
+}
+/** 접힘 상태를 화면에 반영한다. 현재 화면이 든 묶음이 접혀 있으면 제목을 강조한다. */
+function refreshFolds(openCurrent = false) {
+  const { id } = currentRoute();
+  let list = folds();
+  const head = MENU.find(([hd, items]) => hd && items.some(([i]) => i === id))?.[0];
+  if (openCurrent && head && list.includes(head)) {
+    list = list.filter((x) => x !== head);
+    store.set("menu.folds", list);
+  }
+  for (const sec of side.querySelectorAll(".sec")) {
+    const hd = sec.dataset.head;
+    if (!hd) continue;
+    const folded = list.includes(hd);
+    sec.classList.toggle("folded", folded);
+    const btn = sec.querySelector("button.sh");
+    const items = MENU.find(([x]) => x === hd)[1];
+    btn.setAttribute("aria-expanded", String(!folded));
+    btn.title = folded ? `${hd} 펼치기` : `${hd} 접기`;
+    btn.classList.toggle("has-on", folded && hd === head);
+    btn.replaceChildren(h("span", null, hd), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up"));
+  }
 }
 
 function toggleCollapse() {
@@ -138,6 +184,7 @@ async function render() {
   const seq = ++renderSeq;
   const { id, params } = currentRoute();
   for (const a of side.querySelectorAll(".mi")) a.classList.toggle("on", a.dataset.id === id);
+  refreshFolds(id !== lastCountedId); // 다른 화면으로 옮겨 가면 그 화면이 든 묶음은 펼친다
   const route = ROUTES[id];
   setHeader(route.label);
   // 같은 화면 안에서 탭·조건만 바뀐 경우는 세지 않는다.
