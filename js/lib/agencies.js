@@ -66,6 +66,15 @@ export const AGENCIES = [
     isRss: true, pageable: false,
   },
   {
+    id: "FSS_RESEARCH", label: "금융감독연구", short: "금융감독연구", group: "RESEARCH", noun: "논문",
+    home: "https://www.fss.or.kr/fss/bbs/B0000332/list.do?menuNo=200807",
+    listUrl: (p) => `https://www.fss.or.kr/fss/bbs/B0000332/list.do?menuNo=200807&pageIndex=${p}`,
+    searchUrl: (q, p) => `https://www.fss.or.kr/fss/bbs/B0000332/list.do?menuNo=200807&pageIndex=${p}&searchCnd=1&searchWrd=${enc(q)}`,
+    siteSearch: (q) => `https://www.fss.or.kr/fss/bbs/B0000332/list.do?menuNo=200807&searchCnd=1&searchWrd=${enc(q)}`,
+    // 카드형 목록: 제목·저자(소속)·등록일을 카드 안에서 읽는다.
+    customParser: (body, url) => P.extractFssCards(body, url),
+  },
+  {
     id: "KCMI", label: "자본시장연구원", short: "자본시장연구원", group: "RESEARCH", noun: "보고서",
     home: "https://www.kcmi.re.kr/report/report_list",
     listUrl: (p, s) => `https://www.kcmi.re.kr/report/report_list?pg=${p}&pp=${s}`,
