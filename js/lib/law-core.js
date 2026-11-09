@@ -645,7 +645,8 @@ function cmpPath(a, b) {
     }
     return 0;
   };
-  return ((a.paragraph ?? -1) - (b.paragraph ?? -1)) || cmpList(nums(a.subparagraph), nums(b.subparagraph)) || String(a.item ?? "").localeCompare(String(b.item ?? ""));
+  const pk = (x) => x.paragraph ?? (isEmptyPath(x) ? -1 : 1); // 항 없이 호만 있는 위치는 각 호 외의 부분(0) 뒤, 조 전체는 맨 앞
+  return (pk(a) - pk(b)) || cmpList(nums(a.subparagraph), nums(b.subparagraph)) || String(a.item ?? "").localeCompare(String(b.item ?? ""));
 }
 /** 위임한 법 조문의 항·호·목 순서로 정렬(같은 위치면 원래 순서 유지) */
 export function sortByAnchor(nodes) {
