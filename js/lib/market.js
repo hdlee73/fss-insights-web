@@ -306,44 +306,63 @@ export async function search(query) {
   return [...out.values()];
 }
 
-/** 작은 꺾은선(SVG). values가 2개 미만이면 빈 상자. baseline이 있으면 점선 기준선. */
-export function sparkline(values, { width = 300, height = 64, color, baseline, prev, bars } = {}) {
+/**
+ * 작은 꺾은선(SVG). values가 2개 미만이면 빈 상자. baseline이 있으면 점선 기준선(전일 종가).
+ * prev(전 거래일 분봉)가 있으면 앱처럼 왼쪽 40%에 전일(회색)·세로 구분선·전일 종가→오늘 시가 연결선(갭 방향 색)·오른쪽에 오늘을 그린다.
+ * bars가 있으면(장중) 오늘 선은 거래 시간 비율만큼만 채운다.
+ */
+export function sparkline(values, { width = 300, height = 64, color, baseline, prev, open, bars } = {}) {
   const ns = "http://www.w3.org/2000/svg";
   const svg = document.createElementNS(ns, "svg");
   svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
   svg.setAttribute("preserveAspectRatio", "none");
   svg.setAttribute("class", "spark");
   if (!values || values.length < 2) return svg;
-  const all = values.concat(baseline != null ? [baseline] : [], prev || []);
-  const lo = Math.min(...all);
-  const span = Math.max(...all) - lo || 1;
-  const y = (v) => height - ((v - lo) / span) * height * 0.86 - height * 0.07;
-  const total = Math.max(bars || 0, values.length, prev?.length || 0);
-  const x = (i, n) => (bars ? (i / (total - 1)) * width : (i / (n - 1)) * width);
-  const line = (vals, stroke, extra = {}) => {
-    const p = document.createElementNS(ns, "polyline");
-    p.setAttribute("points", vals.map((v, i) => `${x(i, vals.length).toFixed(1)},${y(v).toFixed(1)}`).join(" "));
-    p.setAttribute("fill", "none");
-    p.setAttribute("stroke", stroke);
-    p.setAttribute("stroke-width", extra.w || 1.8);
-    p.setAttribute("vector-effect", "non-scaling-stroke");
-    p.setAttribute("stroke-linejoin", "round");
-    if (extra.dash) p.setAttribute("stroke-dasharray", extra.dash);
-    svg.append(p);
-  };
-  if (baseline != null) {
-    const l = document.createElementNS(ns, "line");
-    l.setAttribute("x1", 0);
-    l.setAttribute("x2", width);
-    l.setAttribute("y1", y(baseline));
-    l.setAttribute("y2", y(baseline));
-    l.setAttribute("stroke", "#9aa4b5");
-    l.setAttribute("stroke-dasharray", "3 3");
-    l.setAttribute("vector-effect", "non-scaling-stroke");
-    svg.append(l);
+  const stroke = color || "#1f6feb";
+  const compare = Array.isArray(prev) && prev.length >= 2;
+  const opening = compare && open > 0 ? open : null;
+  const all = values.concat(baseline > 0 ? [baseline] : [], compare ? prev : [], opening ? [opening] : []);
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const v of all) {
+    if (v < lo) lo = v;
+    if (v > hi) hi = v;
   }
-  if (prev?.length > 1) line(prev, "#b8c0cc", { w: 1.2 });
-  line(values, color || "#1f6feb");
+  const span = hi - lo || 1;
+  const y = (v) => height - ((v - lo) / span) * height * 0.86 - height * 0.07;
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(ns, tag);
+    for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, v);
+    n.setAttribute("vector-effect", "non-scaling-stroke");
+    svg.append(n);
+    return n;
+  };
+  const poly = (pts, s, w) => el("polyline", { points: pts.map(([px, py]) => `${px.toFixed(1)},${py.toFixed(1)}`).join(" "), fill: "none", stroke: s, "stroke-width": w, "stroke-linejoin": "round", "stroke-linecap": "round" });
+  const hline = (v, s, opacity) => el("line", { x1: 0, x2: width, y1: y(v), y2: y(v), stroke: s, "stroke-opacity": opacity, "stroke-dasharray": "3 3" });
+  // 화면 비율이 늘어나도 둥근 점으로 보이도록 길이 0인 선에 둥근 끝을 쓴다.
+  const dot = (px, py) => el("path", { d: `M${px.toFixed(1)},${py.toFixed(1)}h0`, stroke, "stroke-width": 5, "stroke-linecap": "round", fill: "none" });
+
+  if (compare) {
+    const mid = width * 0.4;
+    const pEnd = mid - width * 0.01;
+    const oStart = mid + width * 0.01;
+    const frac = bars > 1 ? Math.min(1, Math.max(0.02, (values.length - 1) / (bars - 1))) : 1;
+    const endX = oStart + (width * 0.985 - oStart) * frac;
+    if (baseline > 0) hline(baseline, stroke, 0.55);
+    poly(prev.map((v, i) => [(i / (prev.length - 1)) * pEnd, y(v)]), "#9aa4b5", 1.2);
+    el("line", { x1: mid, x2: mid, y1: 0, y2: height, stroke: "#9aa4b5", "stroke-opacity": 0.7, "stroke-dasharray": "2 3" });
+    const ref = baseline > 0 ? baseline : prev[prev.length - 1];
+    const first = opening ?? values[0];
+    poly([[pEnd, y(prev[prev.length - 1])], [oStart, y(first)]], first > ref ? UP : first < ref ? DOWN : "var(--muted)", 2);
+    const pts = values.map((v, i) => [oStart + ((endX - oStart) * i) / (values.length - 1), y(v)]);
+    poly(pts, stroke, 1.6);
+    dot(...pts[pts.length - 1]);
+    return svg;
+  }
+  if (baseline > 0) hline(baseline, "#9aa4b5", 1);
+  const total = Math.max(bars || 0, values.length);
+  const pts = values.map((v, i) => [(i / ((bars ? total : values.length) - 1)) * width, y(v)]);
+  poly(pts, stroke, 1.8);
   return svg;
 }
 

@@ -38,11 +38,13 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     try {
       if (intradayMode) {
         const d = await intraday(it.symbol, q.previous, q.price);
-        chart.replaceChildren(sparkline(d.points, { height: 30, color, baseline: d.previous, bars: d.live ? d.bars : 0 }));
+        // 앱처럼 전 거래일 흐름(회색)을 왼쪽에, 오늘 흐름을 오른쪽에 함께 그린다.
+        chart.replaceChildren(sparkline(d.points, { height: 30, color, baseline: d.previous, prev: d.prevPoints, open: d.open, bars: d.live ? d.bars : 0 }));
         nm.replaceChildren(it.name, d.status ? h("span", { class: "stag" + (d.status === "장중" ? " live" : "") }, d.status) : "");
       } else {
         const hh = await history(it.symbol);
-        chart.replaceChildren(sparkline(hh.closes, { height: 30, color: hh.closes[hh.closes.length - 1] >= hh.closes[0] ? UP : DOWN }));
+        // 색은 숫자(전일 대비)와 같게 맞춘다. 1년 첫날 대비로 칠하면 오늘 하락인데 빨간 선이 될 수 있다.
+        chart.replaceChildren(sparkline(hh.closes, { height: 30, color }));
         nm.replaceChildren(it.name);
       }
     } catch {
@@ -158,7 +160,7 @@ export async function render(root, params, ctx) {
           chart.replaceChildren(sparkline(d.points, { height: 26, color, baseline: d.previous, bars: d.live ? d.bars : 0 }));
         } else {
           const hh = await history(it.symbol);
-          chart.replaceChildren(sparkline(hh.closes, { height: 26, color: hh.closes[hh.closes.length - 1] >= hh.closes[0] ? UP : DOWN }));
+          chart.replaceChildren(sparkline(hh.closes, { height: 26, color }));
         }
       } catch {
         if (px.textContent === "—") dl.textContent = "시세 없음";
