@@ -42,7 +42,7 @@ export async function sendIfNeeded() {
   const cutoff = dayOf(new Date(Date.now() - KEEP_DAYS * 86400000));
   const pending = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
   const past = Object.keys(pending).filter((d) => d < today).sort().slice(-10);
-  const includeToday = store.get("usage.last", "") !== today;
+  const includeToday = store.get("usage.last", "") !== today || store.get("usage.lastV", "") !== APP_VERSION; // 같은 날 새 버전으로 바뀐 경우도 한 번 더 알린다
   if (!past.length && !includeToday) return;
   const days = [...past.map((d) => ({ d, m: pending[d] })), ...(includeToday ? [{ d: today, m: {} }] : [])];
   sending = true;
@@ -53,6 +53,7 @@ export async function sendIfNeeded() {
       past.forEach((d) => delete now[d]);
       store.set("usage.pending", now);
       store.set("usage.last", today);
+      store.set("usage.lastV", APP_VERSION);
     }
   } catch {
     // 오프라인·서버 오류는 다음에 다시
