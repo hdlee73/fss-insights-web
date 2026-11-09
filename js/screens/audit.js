@@ -2,7 +2,7 @@
 // 주소: ?q=검색어&m=시장&f=조치 · ?id=공시번호
 import { setHeader } from "../app.js";
 import { errorText, h, icon, loading, message } from "../core.js";
-import { dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
+import { caseButtons, dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
 import { Format } from "../lib/yangjeong.js";
 
 const MARKETS = ["전체", "코스닥", "유가증권", "코넥스", "비상장"];
@@ -74,21 +74,15 @@ function tags(a) {
   ];
 }
 
-/** 회사명을 누르면 「기업 개황 및 공시(DART)」에서 그 회사를 찾는다. */
-function companyName(a) {
-  const q = dartQuery(a.company);
-  if (!q) return h("span", null, a.company);
-  return h("a", { class: "co-link", href: "#/dart?q=" + encodeURIComponent(q), title: "기업 개황 및 공시(DART)에서 찾기", onclick: (e) => e.stopPropagation() }, a.company);
-}
-
 function row(a, open) {
   const fs = a.findings || [];
   const first = fs[0]?.title;
-  return h("div", { class: "item" }, h("div", { class: "body", role: "link", tabindex: 0, onclick: open, onkeydown: (e) => e.key === "Enter" && open() },
+  return h("div", { class: "item" }, h("div", { class: "body static" },
     h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, tags(a)),
-    h("div", { class: "t" }, companyName(a)),
+    h("div", { class: "t" }, a.company),
     h("div", { class: "m" }, `${Format.dateYmd(a.actionDate)} · ${a.market || "-"} · 감리대상 ${a.auditPeriod || "-"}`),
-    h("div", { class: "m" }, first ? (fs.length > 1 ? `${first} 외 ${fs.length - 1}건` : first) : "지적사항 자동 추출 실패 · 원문 확인")));
+    h("div", { class: "m" }, first ? (fs.length > 1 ? `${first} 외 ${fs.length - 1}건` : first) : "지적사항 자동 추출 실패 · 원문 확인"),
+    caseButtons(a.company, open)));
 }
 
 function detail(root, a) {

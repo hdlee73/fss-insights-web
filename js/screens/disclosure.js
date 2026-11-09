@@ -1,9 +1,9 @@
 // 공시조사결과제재: 금감원 '공시위반 조치 내역'(증권선물위원회·금융위원회) 가운데 2020년 이후 글을 첨부 세부내역까지 읽어 회사별로 보여 준다.
 // 앱의 DisclosureScreen.kt와 같은 필터. 주소: ?q=검색어&y=연도&f=조치 · ?id=건 번호
-// 회사명을 누르면 「기업 개황 및 공시(DART)」에서 그 회사를 찾고, 위반 조문을 누르면 스마트 법령검색이 열린다.
+// 항목마다 「기업개황 등」(DART 검색)·「세부내용」 버튼을 두고, 위반 조문을 누르면 스마트 법령검색이 열린다.
 import { setHeader } from "../app.js";
 import { errorText, h, icon, loading, message } from "../core.js";
-import { dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
+import { caseButtons, dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
 import { Format } from "../lib/yangjeong.js";
 
 const FILTERS = ["전체", "과징금", "증권발행제한", "경고·주의", "고발·통보"];
@@ -51,7 +51,7 @@ export async function render(root, params, ctx) {
     h("form", { class: "search", onsubmit: (e) => (e.preventDefault(), go({})) }, icon("search"), input, h("button", { class: "btn sm", type: "submit" }, "검색")),
     h("div", { class: "chip-row", style: { marginBottom: "6px" } }, years.map((x) => h("button", { type: "button", class: "pill" + (x === y ? " on" : ""), onclick: () => go({ y: x === "전체" ? null : x }) }, x))),
     h("div", { class: "chip-row" }, FILTERS.map((x) => h("button", { type: "button", class: "pill" + (x === f ? " on" : ""), onclick: () => go({ f: x === "전체" ? null : x }) }, x))),
-    h("p", { class: "note", style: { margin: "8px 0 0" } }, "회사명(파란 밑줄)을 누르면 「기업 개황 및 공시(DART)」에서 그 회사를 찾습니다. 한 첨부에 여러 회사가 있어도 회사별로 나누어 보여 줍니다."),
+    h("p", { class: "note", style: { margin: "8px 0 0" } }, "「기업개황 등」은 「기업 개황 및 공시(DART)」에서 그 회사를 찾고, 「세부내용」은 조치 상세를 엽니다. 한 첨부에 여러 회사가 있어도 회사별로 나누어 보여 줍니다."),
     listBox,
     h("p", { class: "note", style: { marginTop: "10px" } }, "출처: 금융감독원 공시조사결과제재(공시위반 조치 내역) / 직접 수집. " + DISCLAIMER)
   );
@@ -79,21 +79,15 @@ function tags(c) {
   return out;
 }
 
-/** 회사명: 검색할 수 있는 이름이면 DART 검색 링크, 가려진 이름(○○○)이면 글자만. */
-function companyName(c, extra = {}) {
-  const q = dartQuery(c.company);
-  if (!q) return h("span", extra, c.company);
-  return h("a", { ...extra, class: "co-link", href: "#/dart?q=" + encodeURIComponent(q), title: "기업 개황 및 공시(DART)에서 찾기", onclick: (e) => e.stopPropagation() }, c.company);
-}
-
 function row(c, open) {
   const vs = (c.violations || []).filter((v) => v.title);
   const first = vs[0]?.title;
-  return h("div", { class: "item" }, h("div", { class: "body", role: "link", tabindex: 0, onclick: open, onkeydown: (e) => e.key === "Enter" && open() },
+  return h("div", { class: "item" }, h("div", { class: "body static" },
     h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, tags(c)),
-    h("div", { class: "t" }, companyName(c)),
+    h("div", { class: "t" }, c.company),
     h("div", { class: "m" }, [c.date ? ymd(c.date) : "", c.role, c.committee].filter(Boolean).join(" · ")),
-    first ? h("div", { class: "m" }, vs.length > 1 ? `${first} 외 ${vs.length - 1}건` : first) : null));
+    first ? h("div", { class: "m" }, vs.length > 1 ? `${first} 외 ${vs.length - 1}건` : first) : null,
+    caseButtons(c.company, open)));
 }
 
 function detail(root, c) {
