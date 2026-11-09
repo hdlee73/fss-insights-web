@@ -346,6 +346,16 @@ function table(head, rows) {
     h("tbody", null, rows.map(([label, vals]) => h("tr", null, h("td", null, label), vals.map((v) => h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v)))))));
 }
 
+/** 손익현황 열. 분기·누적 뒤에 최근 3개 사업연도 연간을 모두 보이도록, 서버 연간 열에 없는 연도는 추이(trend)에서 채운다. */
+function incomeCols(f) {
+  const cols = [...(f.income || [])];
+  const have = new Set(cols.map((c) => /^(\d{4})년 연간/.exec(c.label)?.[1]).filter(Boolean).map(Number));
+  [...(f.trend || [])].sort((a, b) => b.year - a.year).slice(0, 3).forEach((t) => {
+    if (!have.has(t.year)) cols.push({ label: `${t.year}년 연간`, sub: "", revenue: t.revenue, op: t.op, net: t.net });
+  });
+  return cols;
+}
+
 /** 연결 재무제표가 있는 회사는 연결·별도 전환 단추를 보여 주고, 없는 회사는 별도(개별)만 보여 준다. */
 function financeTab(body, f0, closes, basisSel) {
   if (!f0.balance?.length && !f0.income?.length) return body.replaceChildren(message(f0.note || "재무 자료를 찾지 못했습니다. 정기보고서 제출 대상이 아닌 회사일 수 있습니다."));
@@ -368,10 +378,10 @@ function financeTab(body, f0, closes, basisSel) {
     ]),
     h("p", { class: "note" }, "부채비율 = 부채총계 ÷ 자본총계"),
     sec("손익현황", "DART 정기보고서 · 단위 억원"),
-    table(f.income.map((x) => [x.label, x.sub]), [
-      ["매출액", f.income.map((x) => eok(x.revenue))],
-      ["영업이익", f.income.map((x) => eok(x.op))],
-      ["당기순이익", f.income.map((x) => eok(x.net))],
+    table(incomeCols(f).map((x) => [x.label, x.sub]), [
+      ["매출액", incomeCols(f).map((x) => eok(x.revenue))],
+      ["영업이익", incomeCols(f).map((x) => eok(x.op))],
+      ["당기순이익", incomeCols(f).map((x) => eok(x.net))],
     ]),
     h("p", { class: "note" }, "금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다."));
   if (f.trend?.length >= 2) body.append(sec(`최근 ${f.trend.length}개년 추이`, `${f.basis}재무제표 · 단위 억원`), trendCard(f.trend));
@@ -574,10 +584,10 @@ async function companyDoc(ids, c) {
         ["자본총계", ...f.balance.map((b) => eok(b.equity))],
         ["부채비율", ...f.balance.map((b) => pct(b.equity && b.liab != null ? (b.liab / b.equity) * 100 : null))],
       ] } });
-      blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...f.income.map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
-        ["매출액", ...f.income.map((x) => eok(x.revenue))],
-        ["영업이익", ...f.income.map((x) => eok(x.op))],
-        ["당기순이익", ...f.income.map((x) => eok(x.net))],
+      blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...incomeCols(f).map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
+        ["매출액", ...incomeCols(f).map((x) => eok(x.revenue))],
+        ["영업이익", ...incomeCols(f).map((x) => eok(x.op))],
+        ["당기순이익", ...incomeCols(f).map((x) => eok(x.net))],
       ], bold: (i) => i === 2 } });
       if (f.trend?.length >= 2) blocks.push({ heading: `최근 ${f.trend.length}개년 추이 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.trend.map((t) => `${t.year}년`)], rows: [
         ["매출액", ...f.trend.map((t) => eok(t.revenue))],
