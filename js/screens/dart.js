@@ -233,7 +233,7 @@ async function detail(root, params, ctx) {
     else if (tab === 2) {
       await infoP.catch(() => null);
       const [f, closes] = await Promise.all([finance(corp), c.stock?.length === 6 ? yearEndCloses(c.stock) : {}]);
-      if (ctx.alive()) financeTab(body, f, closes);
+      if (ctx.alive()) financeTab(body, f, closes, "연결");
     } else {
       const type = ["a", "m", "e"][tab - 3];
       await filingsTab(body, corp, type, params, ctx);
@@ -346,10 +346,19 @@ function table(head, rows) {
     h("tbody", null, rows.map(([label, vals]) => h("tr", null, h("td", null, label), vals.map((v) => h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v)))))));
 }
 
-function financeTab(body, f, closes) {
-  if (!f.balance?.length && !f.income?.length) return body.replaceChildren(message(f.note || "재무 자료를 찾지 못했습니다. 정기보고서 제출 대상이 아닌 회사일 수 있습니다."));
+/** 연결 재무제표가 있는 회사는 연결·별도 전환 단추를 보여 주고, 없는 회사는 별도(개별)만 보여 준다. */
+function financeTab(body, f0, closes, basisSel) {
+  if (!f0.balance?.length && !f0.income?.length) return body.replaceChildren(message(f0.note || "재무 자료를 찾지 못했습니다. 정기보고서 제출 대상이 아닌 회사일 수 있습니다."));
+  const sep = f0.separate?.balance?.length || f0.separate?.income?.length ? f0.separate : null;
+  const useSep = !!sep && basisSel === "별도";
+  const f = useSep ? { ...f0, ...sep } : f0;
+  const toggle = sep
+    ? h("div", { class: "row-gap", style: { marginBottom: "4px" } },
+        [f0.basis, sep.basis].map((b) => h("button", { class: "pill" + (b === f.basis ? " on" : ""), type: "button", "aria-pressed": String(b === f.basis), onclick: () => financeTab(body, f0, closes, b) }, `${b}재무제표`)))
+    : null;
   const sec = (title, sub) => h("div", { class: "section-label", style: { marginTop: "14px" } }, h("span", { style: { color: "var(--acc-fg)" } }, title), h("div", { class: "acts note" }, sub));
   body.replaceChildren(
+    ...(toggle ? [toggle] : []),
     sec("재무상태 비교", `${f.basis}재무제표 · 단위 억원`),
     table(f.balance.map((b) => [b.label]), [
       ["자산총계", f.balance.map((b) => eok(b.assets))],
@@ -558,8 +567,7 @@ async function companyDoc(ids, c) {
   if (ids.has("finance")) {
     const [f, closes] = await Promise.all([finance(c.corp), (ci?.stock || c.stock)?.length === 6 ? yearEndCloses(ci?.stock || c.stock).catch(() => ({})) : {}]);
     const blocks = [];
-    if (!f.balance?.length && !f.income?.length) blocks.push({ text: f.note || "재무 자료를 찾지 못했습니다.", gray: true });
-    else {
+    const basisBlocks = (f, withEps) => {
       blocks.push({ heading: `재무상태 비교 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.balance.map((b) => b.label)], rows: [
         ["자산총계", ...f.balance.map((b) => eok(b.assets))],
         ["부채총계", ...f.balance.map((b) => eok(b.liab))],
@@ -578,7 +586,7 @@ async function companyDoc(ids, c) {
         ...(f.trend.some((t) => t.debt != null) ? [["부채비율", ...f.trend.map((t) => pct(t.debt))]] : []),
       ] } });
       const years = (f.trend || []).map((t) => t.year).filter((y) => f.eps?.[y] != null).slice(-4);
-      if (years.length) {
+      if (withEps && years.length) {
         const rows = [["EPS(원)", ...years.map((y) => grouped(f.eps[y]))]];
         if (Object.keys(closes).length) {
           rows.push(["연말 종가(원)", ...years.map((y) => grouped(closes[y]))]);
@@ -587,6 +595,11 @@ async function companyDoc(ids, c) {
         blocks.push({ heading: "주당·배수 지표" }, { table: { head: ["구분", ...years.map((y) => `${y}년`)], rows } },
           { text: "PER = 연말 종가 ÷ EPS로 직접 계산한 추정치입니다. 적자(EPS 0 이하)는 -로 표시합니다.", gray: true });
       }
+    };
+    if (!f.balance?.length && !f.income?.length) blocks.push({ text: f.note || "재무 자료를 찾지 못했습니다.", gray: true });
+    else {
+      basisBlocks(f, true);
+      if (f.separate?.balance?.length || f.separate?.income?.length) basisBlocks({ ...f, ...f.separate }, false);
       blocks.push({ text: "부채비율 = 부채총계 ÷ 자본총계. 금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다.", gray: true });
     }
     sections.push({ title: "재무손익", blocks });
