@@ -261,6 +261,7 @@ const ALIASES = {
   "^KS11": "kospi 코스피", "^KQ11": "kosdaq 코스닥",
 };
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
+const rank = (name, key) => { const n = norm(name); return n === key ? 0 : n.startsWith(key) ? 1 : 2; };
 const US_EX = new Set(["NMS", "NYQ", "NGM", "NCM", "ASE", "PCX", "BTS", "NASDAQ", "NYSE", "NYSEArca"]);
 
 function collectDomestic(v, out) {
@@ -278,12 +279,34 @@ function collectDomestic(v, out) {
   Object.values(v).forEach((x) => collectDomestic(x, out));
 }
 
+/** NAVER 국내 ETF 전체 목록(하루 캐시). 자동완성은 '반도체'처럼 일반 단어로는 ETF를 못 찾아서 앱처럼 이름 포함 검색에 쓴다. */
+function etfCatalog() {
+  return cached("etf-catalog", 86_400_000, async () => {
+    const { text } = await fetchSite("https://finance.naver.com/api/sise/etfItemList.nhn", { referer: NAVER_REF });
+    const items = JSON.parse(text)?.result?.etfItemList || [];
+    const list = items
+      .map((i) => ({ code: String(i.itemcode || "").toUpperCase(), name: String(i.itemname || "") }))
+      .filter((i) => /^[A-Z0-9]{6}$/.test(i.code) && i.name)
+      .map((i) => ({ symbol: i.code + ".KS", name: i.name, currency: "KRW", type: "ETF" }));
+    if (!list.length) throw new Error("ETF 목록 없음");
+    return list;
+  });
+}
+
 /** 이름·코드로 국내/미국 주식·ETF·지수를 찾는다. */
 export async function search(query) {
   const key = norm(query);
   const out = new Map();
   POPULAR.filter((p) => norm(p.name).includes(key) || norm(p.symbol).includes(key) || norm(ALIASES[p.symbol]).includes(key)).forEach((p) => out.set(p.symbol, p));
   let last = null;
+  await etfCatalog()
+    .then((list) => {
+      list
+        .filter((e) => norm(e.name).includes(key) || norm(e.symbol).includes(key))
+        .sort((a, b) => rank(a.name, key) - rank(b.name, key))
+        .forEach((e) => !out.has(e.symbol) && out.set(e.symbol, e));
+    })
+    .catch((e) => (last = e));
   await json(`https://m.stock.naver.com/front-api/search/autoComplete?query=${encodeURIComponent(query)}&target=stock,index`)
     .then((o) => collectDomestic(o, out))
     .catch((e) => (last = e));
