@@ -172,7 +172,10 @@ body.collapsed .sec + .sec { border-top: 1px solid #22345c; padding-top: 6px; }
 .item .body { flex: 1; min-width: 0; cursor: pointer; }
 .item .body.static { cursor: default; }
 .item .body.static:hover .t { color: inherit; text-decoration: none; }
-.case-btns { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.case-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; }
+.case-info { flex: 1 1 300px; min-width: 0; }
+/* 한 줄에 들어갈 공간이 있으면 버튼을 우측에, 없으면 아래로 내려간다 */
+.case-btns { display: flex; gap: 8px; flex: 0 0 auto; }
 .case-btns .btn { min-width: 96px; justify-content: center; }
 .item:has(.case-btns) { container-type: inline-size; }
 /* 공간이 넉넉하면(컨테이너 폭 560px 이상) 버튼을 우측으로, 좁으면 아래로 */
