@@ -177,9 +177,9 @@ body.collapsed .sec + .sec { border-top: 1px solid #22345c; padding-top: 6px; }
 .item:has(.case-btns) { container-type: inline-size; }
 /* 공간이 넉넉하면(컨테이너 폭 560px 이상) 버튼을 우측으로, 좁으면 아래로 */
 @container (min-width: 560px) {
-  .item .body.static:has(.case-btns) { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 16px; align-items: center; }
-  .item .body.static:has(.case-btns) > * { grid-column: 1; }
-  .item .body.static:has(.case-btns) > .case-btns { grid-column: 2; grid-row: 1 / span 10; margin-top: 0; flex-wrap: nowrap; }
+  .item .body.case-row { display: flex; align-items: center; gap: 16px; }
+  .item .body.case-row > .case-main { flex: 1; min-width: 0; }
+  .item .body.case-row > .case-btns { margin-top: 0; flex-wrap: nowrap; flex: none; }
 }
 .item .t { font-weight: 500; line-height: 1.45; }
 .item .body:hover .t { color: var(--acc-fg); text-decoration: underline; text-underline-offset: 2px; }

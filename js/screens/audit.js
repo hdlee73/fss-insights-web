@@ -77,11 +77,11 @@ function tags(a) {
 function row(a, open) {
   const fs = a.findings || [];
   const first = fs[0]?.title;
-  return h("div", { class: "item" }, h("div", { class: "body static" },
+  return h("div", { class: "item" }, h("div", { class: "body static case-row" }, h("div", { class: "case-main" },
     h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, tags(a)),
     h("div", { class: "t" }, a.company),
     h("div", { class: "m" }, `${Format.dateYmd(a.actionDate)} · ${a.market || "-"} · 감리대상 ${a.auditPeriod || "-"}`),
-    h("div", { class: "m" }, first ? (fs.length > 1 ? `${first} 외 ${fs.length - 1}건` : first) : "지적사항 자동 추출 실패 · 원문 확인"),
+    h("div", { class: "m" }, first ? (fs.length > 1 ? `${first} 외 ${fs.length - 1}건` : first) : "지적사항 자동 추출 실패 · 원문 확인"),),
     caseButtons(a.company, open)));
 }
 

@@ -82,11 +82,11 @@ function tags(c) {
 function row(c, open) {
   const vs = (c.violations || []).filter((v) => v.title);
   const first = vs[0]?.title;
-  return h("div", { class: "item" }, h("div", { class: "body static" },
+  return h("div", { class: "item" }, h("div", { class: "body static case-row" }, h("div", { class: "case-main" },
     h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, tags(c)),
     h("div", { class: "t" }, c.company),
     h("div", { class: "m" }, [c.date ? ymd(c.date) : "", c.role, c.committee].filter(Boolean).join(" · ")),
-    first ? h("div", { class: "m" }, vs.length > 1 ? `${first} 외 ${vs.length - 1}건` : first) : null,
+    first ? h("div", { class: "m" }, vs.length > 1 ? `${first} 외 ${vs.length - 1}건` : first) : null,),
     caseButtons(c.company, open)));
 }
 
