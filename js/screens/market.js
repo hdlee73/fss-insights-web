@@ -8,6 +8,12 @@ import {
   UP, DOWN,
 } from "../lib/market.js";
 
+/** 1년 전(첫 종가) 대비 현재가 방향 색. 현재가가 없으면 마지막 종가로 비교한다. */
+function yearColor(closes, price) {
+  const now = price > 0 ? price : closes[closes.length - 1];
+  return now > closes[0] ? UP : now < closes[0] ? DOWN : "var(--muted)";
+}
+
 const watchList = () => store.get("market.watch", DEFAULT_WATCH);
 const saveWatch = (l) => store.set("market.watch", l);
 
@@ -43,8 +49,8 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
         nm.replaceChildren(it.name, d.status ? h("span", { class: "stag" + (d.status === "장중" ? " live" : "") }, d.status) : "");
       } else {
         const hh = await history(it.symbol);
-        // 색은 숫자(전일 대비)와 같게 맞춘다. 1년 첫날 대비로 칠하면 오늘 하락인데 빨간 선이 될 수 있다.
-        chart.replaceChildren(sparkline(hh.closes, { height: 30, color }));
+        // 1년 그래프는 1년 전 가격 대비(현재가 기준)로 색을 정한다: 올랐으면 빨강, 내렸으면 파랑.
+        chart.replaceChildren(sparkline(hh.closes, { height: 30, color: yearColor(hh.closes, q.price) }));
         nm.replaceChildren(it.name);
       }
     } catch {
@@ -160,7 +166,7 @@ export async function render(root, params, ctx) {
           chart.replaceChildren(sparkline(d.points, { height: 26, color, baseline: d.previous, bars: d.live ? d.bars : 0 }));
         } else {
           const hh = await history(it.symbol);
-          chart.replaceChildren(sparkline(hh.closes, { height: 26, color }));
+          chart.replaceChildren(sparkline(hh.closes, { height: 26, color: yearColor(hh.closes, q.price) }));
         }
       } catch {
         if (px.textContent === "—") dl.textContent = "시세 없음";
