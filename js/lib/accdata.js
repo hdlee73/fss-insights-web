@@ -1,5 +1,5 @@
 // 회계 자료(기준서 목록·게시판 색인·감리 조치) 읽기. 앱과 같은 순서: ① 매일 갱신되는 원격 최신본 → ② 웹에 같이 올린 내장본.
-import { cached } from "../core.js";
+import { cached, h } from "../core.js";
 
 const REMOTE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/accounting-data/";
 
@@ -56,4 +56,12 @@ export function standardSource(group) {
 export function dartQuery(raw) {
   const s = String(raw || "").replace(/\([^)]*\)/g, " ").replace(/㈜|주식회사/g, "").replace(/\s+/g, " ").trim();
   return /[0-9A-Za-z가-힣]/.test(s.replace(/[○◯◌●□■◎☆★△▲◇◆]/g, "")) ? s : "";
+}
+
+/** 목록 항목의 명시적 버튼: 「기업개황 등」(DART 검색, 가려진 이름이면 숨김)과 「세부내용」. 회사명 자체는 글자로만 둔다. */
+export function caseButtons(company, open) {
+  const q = dartQuery(company);
+  return h("div", { class: "case-btns" },
+    q ? h("a", { class: "btn sm ghost", href: "#/dart?q=" + encodeURIComponent(q), title: "기업 개황 및 공시(DART)에서 찾기" }, "기업개황 등") : null,
+    h("button", { class: "btn sm", type: "button", onclick: open }, "세부내용"));
 }
