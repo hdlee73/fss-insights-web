@@ -348,34 +348,41 @@ function table(head, rows) {
 
 function financeTab(body, f, closes) {
   if (!f.balance?.length && !f.income?.length) return body.replaceChildren(message(f.note || "재무 자료를 찾지 못했습니다. 정기보고서 제출 대상이 아닌 회사일 수 있습니다."));
+  // 연결재무제표가 있는 회사는 연결·별도 기준을 모두, 없으면 별도(개별)만 서버가 내려 준다. 옛 응답(bases 없음)은 그대로 한 기준.
+  const bases = f.bases?.length ? f.bases : [f];
+  const multi = bases.length > 1;
   const sec = (title, sub) => h("div", { class: "section-label", style: { marginTop: "14px" } }, h("span", { style: { color: "var(--acc-fg)" } }, title), h("div", { class: "acts note" }, sub));
-  body.replaceChildren(
-    sec("재무상태 비교", `${f.basis}재무제표 · 단위 억원`),
-    table(f.balance.map((b) => [b.label]), [
-      ["자산총계", f.balance.map((b) => eok(b.assets))],
-      ["부채총계", f.balance.map((b) => eok(b.liab))],
-      ["자본총계", f.balance.map((b) => eok(b.equity))],
-      ["부채비율", f.balance.map((b) => pct(b.equity && b.liab != null ? (b.liab / b.equity) * 100 : null))],
-    ]),
-    h("p", { class: "note" }, "부채비율 = 부채총계 ÷ 자본총계"),
-    sec("손익현황", "DART 정기보고서 · 단위 억원"),
-    table(f.income.map((x) => [x.label, x.sub]), [
-      ["매출액", f.income.map((x) => eok(x.revenue))],
-      ["영업이익", f.income.map((x) => eok(x.op))],
-      ["당기순이익", f.income.map((x) => eok(x.net))],
-    ]),
-    h("p", { class: "note" }, "금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다."));
-  if (f.trend?.length >= 2) body.append(sec(`최근 ${f.trend.length}개년 추이`, `${f.basis}재무제표 · 단위 억원`), trendCard(f.trend));
-  const years = (f.trend || []).map((t) => t.year).filter((y) => f.eps?.[y] != null).slice(-4);
-  if (years.length) {
-    const rows = [["EPS(원)", years.map((y) => grouped(f.eps[y]))]];
-    if (Object.keys(closes).length) {
-      rows.push(["연말 종가(원)", years.map((y) => grouped(closes[y]))]);
-      rows.push(["PER(배)", years.map((y) => (closes[y] && f.eps[y] > 0 ? (closes[y] / f.eps[y]).toFixed(2) : "-"))]);
+  const tag = (b) => (multi ? ` · ${b.basis}기준` : "");
+  body.replaceChildren(...(multi ? [h("p", { class: "note" }, "연결재무제표가 있는 회사는 연결기준과 별도기준을 모두 보여 줍니다.")] : []));
+  bases.forEach((b) => {
+    body.append(
+      sec("재무상태 비교" + tag(b), `${b.basis}재무제표 · 단위 억원`),
+      table(b.balance.map((x) => [x.label]), [
+        ["자산총계", b.balance.map((x) => eok(x.assets))],
+        ["부채총계", b.balance.map((x) => eok(x.liab))],
+        ["자본총계", b.balance.map((x) => eok(x.equity))],
+        ["부채비율", b.balance.map((x) => pct(x.equity && x.liab != null ? (x.liab / x.equity) * 100 : null))],
+      ]),
+      h("p", { class: "note" }, "부채비율 = 부채총계 ÷ 자본총계"),
+      sec("손익현황" + tag(b), `DART 정기보고서 · ${b.basis}재무제표 · 단위 억원`),
+      table(b.income.map((x) => [x.label, x.sub]), [
+        ["매출액", b.income.map((x) => eok(x.revenue))],
+        ["영업이익", b.income.map((x) => eok(x.op))],
+        ["당기순이익", b.income.map((x) => eok(x.net))],
+      ]),
+      h("p", { class: "note" }, "금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다."));
+    if (b.trend?.length >= 2) body.append(sec(`최근 ${b.trend.length}개년 추이` + tag(b), `${b.basis}재무제표 · 단위 억원`), trendCard(b.trend));
+    const years = (b.trend || []).map((t) => t.year).filter((y) => b.eps?.[y] != null).slice(-4);
+    if (years.length) {
+      const rows = [["EPS(원)", years.map((y) => grouped(b.eps[y]))]];
+      if (Object.keys(closes).length) {
+        rows.push(["연말 종가(원)", years.map((y) => grouped(closes[y]))]);
+        rows.push(["PER(배)", years.map((y) => (closes[y] && b.eps[y] > 0 ? (closes[y] / b.eps[y]).toFixed(2) : "-"))]);
+      }
+      body.append(sec("주당·배수 지표" + tag(b), ""), table(years.map((y) => [`${y}년`]), rows),
+        h("p", { class: "note" }, "EPS는 DART 공시값입니다. PER = 연말 종가 ÷ EPS로 직접 계산한 추정치라 증권사 표시값과 다를 수 있습니다. 적자(EPS 0 이하)는 -로 표시합니다."));
     }
-    body.append(sec("주당·배수 지표", ""), table(years.map((y) => [`${y}년`]), rows),
-      h("p", { class: "note" }, "EPS는 DART 공시값입니다. PER = 연말 종가 ÷ EPS로 직접 계산한 추정치라 증권사 표시값과 다를 수 있습니다. 적자(EPS 0 이하)는 -로 표시합니다."));
-  }
+  });
   body.append(h("p", { class: "note", style: { marginTop: "10px" } }, "출처: DART 주요계정·전체 재무제표. 연말 종가는 시세 제공처 기준입니다."));
 }
 
@@ -560,33 +567,38 @@ async function companyDoc(ids, c) {
     const blocks = [];
     if (!f.balance?.length && !f.income?.length) blocks.push({ text: f.note || "재무 자료를 찾지 못했습니다.", gray: true });
     else {
-      blocks.push({ heading: `재무상태 비교 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.balance.map((b) => b.label)], rows: [
-        ["자산총계", ...f.balance.map((b) => eok(b.assets))],
-        ["부채총계", ...f.balance.map((b) => eok(b.liab))],
-        ["자본총계", ...f.balance.map((b) => eok(b.equity))],
-        ["부채비율", ...f.balance.map((b) => pct(b.equity && b.liab != null ? (b.liab / b.equity) * 100 : null))],
-      ] } });
-      blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...f.income.map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
-        ["매출액", ...f.income.map((x) => eok(x.revenue))],
-        ["영업이익", ...f.income.map((x) => eok(x.op))],
-        ["당기순이익", ...f.income.map((x) => eok(x.net))],
-      ], bold: (i) => i === 2 } });
-      if (f.trend?.length >= 2) blocks.push({ heading: `최근 ${f.trend.length}개년 추이 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.trend.map((t) => `${t.year}년`)], rows: [
-        ["매출액", ...f.trend.map((t) => eok(t.revenue))],
-        ["영업이익", ...f.trend.map((t) => eok(t.op))],
-        ["당기순이익", ...f.trend.map((t) => eok(t.net))],
-        ...(f.trend.some((t) => t.debt != null) ? [["부채비율", ...f.trend.map((t) => pct(t.debt))]] : []),
-      ] } });
-      const years = (f.trend || []).map((t) => t.year).filter((y) => f.eps?.[y] != null).slice(-4);
-      if (years.length) {
-        const rows = [["EPS(원)", ...years.map((y) => grouped(f.eps[y]))]];
-        if (Object.keys(closes).length) {
-          rows.push(["연말 종가(원)", ...years.map((y) => grouped(closes[y]))]);
-          rows.push(["PER(배)", ...years.map((y) => (closes[y] && f.eps[y] > 0 ? (closes[y] / f.eps[y]).toFixed(2) : "-"))]);
+      const bases = f.bases?.length ? f.bases : [f];
+      const multi = bases.length > 1;
+      bases.forEach((b) => {
+        const tg = multi ? ` ${b.basis}기준` : "";
+        blocks.push({ heading: `재무상태 비교${tg} (${b.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...b.balance.map((x) => x.label)], rows: [
+          ["자산총계", ...b.balance.map((x) => eok(x.assets))],
+          ["부채총계", ...b.balance.map((x) => eok(x.liab))],
+          ["자본총계", ...b.balance.map((x) => eok(x.equity))],
+          ["부채비율", ...b.balance.map((x) => pct(x.equity && x.liab != null ? (x.liab / x.equity) * 100 : null))],
+        ] } });
+        blocks.push({ heading: `손익현황${tg} (DART 정기보고서 · ${b.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...b.income.map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
+          ["매출액", ...b.income.map((x) => eok(x.revenue))],
+          ["영업이익", ...b.income.map((x) => eok(x.op))],
+          ["당기순이익", ...b.income.map((x) => eok(x.net))],
+        ], bold: (i) => i === 2 } });
+        if (b.trend?.length >= 2) blocks.push({ heading: `최근 ${b.trend.length}개년 추이${tg} (${b.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...b.trend.map((t) => `${t.year}년`)], rows: [
+          ["매출액", ...b.trend.map((t) => eok(t.revenue))],
+          ["영업이익", ...b.trend.map((t) => eok(t.op))],
+          ["당기순이익", ...b.trend.map((t) => eok(t.net))],
+          ...(b.trend.some((t) => t.debt != null) ? [["부채비율", ...b.trend.map((t) => pct(t.debt))]] : []),
+        ] } });
+        const years = (b.trend || []).map((t) => t.year).filter((y) => b.eps?.[y] != null).slice(-4);
+        if (years.length) {
+          const rows = [["EPS(원)", ...years.map((y) => grouped(b.eps[y]))]];
+          if (Object.keys(closes).length) {
+            rows.push(["연말 종가(원)", ...years.map((y) => grouped(closes[y]))]);
+            rows.push(["PER(배)", ...years.map((y) => (closes[y] && b.eps[y] > 0 ? (closes[y] / b.eps[y]).toFixed(2) : "-"))]);
+          }
+          blocks.push({ heading: `주당·배수 지표${tg}` }, { table: { head: ["구분", ...years.map((y) => `${y}년`)], rows } },
+            { text: "PER = 연말 종가 ÷ EPS로 직접 계산한 추정치입니다. 적자(EPS 0 이하)는 -로 표시합니다.", gray: true });
         }
-        blocks.push({ heading: "주당·배수 지표" }, { table: { head: ["구분", ...years.map((y) => `${y}년`)], rows } },
-          { text: "PER = 연말 종가 ÷ EPS로 직접 계산한 추정치입니다. 적자(EPS 0 이하)는 -로 표시합니다.", gray: true });
-      }
+      });
       blocks.push({ text: "부채비율 = 부채총계 ÷ 자본총계. 금융회사는 영업수익 등 업종별 계정을 매출액 줄에 보여 주며, 해당 계정이 없으면 -로 표시됩니다.", gray: true });
     }
     sections.push({ title: "재무손익", blocks });
