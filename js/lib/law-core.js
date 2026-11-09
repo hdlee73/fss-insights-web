@@ -581,7 +581,7 @@ function buildTree(input) {
   const rules = input.rules.map((a, i) => mk("rule-" + i, RULE, input.ruleName || `${input.lawName} 시행규칙`, a));
   const rootN = mk("law", LAW, input.lawName, input.lawArticle);
   rootN.children.push(...decrees);
-  decrees.forEach((d) => (d.anchor = lawNo ? anchorOf(d.article.content, LAW_PREFIX, lawNo) || EMPTY : EMPTY));
+  decrees.forEach((d) => (d.anchor = lawNo ? delegationAnchor(d.article.content, lawNo) || EMPTY : EMPTY));
   for (const r of rules) {
     const parent = decrees.find((d) => d.article.number && refersTo(r.article.content, DECREE_PREFIX, d.article.number)) || decrees[0] || rootN;
     parent.children.push(r);
@@ -610,28 +610,74 @@ function buildTree(input) {
     }));
   return rootN;
 }
-function isDelegation(sub, lawArticle, lawNo) {
+/**
+ * 시행령이 법 조문을 인용한 위치들. strong = `법 제71조제3호에서 "대통령령으로 정하는 …"란`처럼 위임을 되풀이해 정의한 꼴,
+ * weak = 그 밖의 모든 인용(`법 제71조제3호에 따른 기업금융업무` 같은 단순 인용 포함).
+ */
+function citeInfo(sub, lawNo) {
   const parsed = sub.parsed;
   const texts = [parsed.lead, ...parsed.items.map((p) => flatItem(p).map((x) => x.text).join("\n"))];
-  let cites = texts.map((t) => anchorOf(t, LAW_PREFIX, lawNo)).filter(Boolean);
-  if (!cites.length) cites = [anchorOf(sub.content, LAW_PREFIX, lawNo)].filter(Boolean);
-  if (!cites.length) return true;
-  return cites.some((c) => delegatesAt(lawArticle, c));
+  let weak = texts.map((t) => anchorOf(t, LAW_PREFIX, lawNo)).filter(Boolean);
+  if (!weak.length) weak = [anchorOf(sub.content, LAW_PREFIX, lawNo)].filter(Boolean);
+  let strong = texts.flatMap((t) => restatedAnchors(t, lawNo));
+  if (!strong.length) strong = restatedAnchors(sub.content, lawNo);
+  return { weak, strong };
+}
+export function restatedAnchors(text, no) {
+  const re = new RegExp(`${LAW_PREFIX}\\s*제\\s*${esc(no.main)}\\s*조${branchRe(no)}(?![\\d-])(?:\\s*제\\s*(\\d+)\\s*항)?(?:\\s*제\\s*(\\d+(?:\\s*의\\s*\\d+)?)\\s*호)?(?:\\s*([가-힣])\\s*목)?([^\\n"“”]{0,25}?)에서\\s*(?:["“][^"”\\n]{1,80}["”]|위임|(?:대통령령|총리령|[가-힣]{1,12}부령)으로)`, "g");
+  const out = [];
+  for (const m of text.matchAll(re)) {
+    const p = path(m[1] ? +m[1] : null, m[2] ? m[2].replace(/\s+/g, "") : null, m[3] || null);
+    out.push(isEmptyPath(p) && /^\s*(?:각\s*호\s*외의\s*부분|본문|단서)/.test(m[4]) ? LEAD : p);
+  }
+  return out;
+}
+/** 위임을 되풀이해 정의한 인용이 있으면 그 위치, 없으면 처음 인용한 위치 */
+const delegationAnchor = (text, no) => restatedAnchors(text, no)[0] || anchorOf(text, LAW_PREFIX, no);
+
+/** 위치의 법 조문 속 순서: 조 전체 < 각 호 외의 부분 < 항 < 호 < 목 */
+function cmpPath(a, b) {
+  const nums = (x) => (x == null ? [] : String(x).split("의").map((t) => parseInt(t, 10)).filter((n) => !isNaN(n)));
+  const cmpList = (x, y) => {
+    for (let i = 0; i < Math.max(x.length, y.length); i++) {
+      const c = (x[i] ?? -1) - (y[i] ?? -1);
+      if (c) return c;
+    }
+    return 0;
+  };
+  return ((a.paragraph ?? -1) - (b.paragraph ?? -1)) || cmpList(nums(a.subparagraph), nums(b.subparagraph)) || String(a.item ?? "").localeCompare(String(b.item ?? ""));
+}
+/** 위임한 법 조문의 항·호·목 순서로 정렬(같은 위치면 원래 순서 유지) */
+export function sortByAnchor(nodes) {
+  return nodes.map((n, i) => [n, i]).sort((x, y) => cmpPath(x[0].anchor || EMPTY, y[0].anchor || EMPTY) || x[1] - y[1]).map((x) => x[0]);
 }
 function buildSplit(input) {
   const tree = buildTree(input);
   const lawNo = input.lawArticle.number;
   if (!lawNo) return { root: tree, cited: [] };
+  const infos = tree.children.map((c) => {
+    const info = citeInfo(c.article, lawNo);
+    return { c, info, own: info.strong.filter((a) => delegatesAt(input.lawArticle, a)) };
+  });
+  const related = (x, y) => pathStartsWith(x, y) || pathStartsWith(y, x);
   const kept = [], cited = [];
-  for (const c of tree.children) (isDelegation(c.article, input.lawArticle, lawNo) ? kept : cited).push(c);
-  return { root: { ...tree, children: kept }, cited };
+  for (const { c, info, own } of infos) {
+    let direct;
+    if (own.length) direct = true;
+    else if (!info.weak.length) direct = true; // 법 조문 인용이 없는데 3단비교가 연결해 준 것은 위임으로 믿는다
+    else if (!info.weak.some((w) => delegatesAt(input.lawArticle, w))) direct = false;
+    // 위임 문구가 있는 위치를 "법 제N조제K호에 따른 …"처럼 인용만 했고 같은 위치의 위임을 다른 규정이 직접 정의했으면 단순 인용
+    else direct = !infos.some((o) => o.c !== c && o.own.some((sa) => info.weak.some((w) => related(sa, w))));
+    (direct ? kept : cited).push(c);
+  }
+  return { root: { ...tree, children: sortByAnchor(kept) }, cited };
 }
 
 /** 시행령 한 조의 항들이 법률의 서로 다른 위치를 위임하면 항별 노드로 쪼갠다. */
 export function withParagraphPieces(n) {
   const lawNo = n.article.number;
   if (!lawNo) return n;
-  return { ...n, children: n.children.flatMap((c) => splitChild(c, lawNo)) };
+  return { ...n, children: sortByAnchor(n.children.flatMap((c) => splitChild(c, lawNo))) };
 }
 const isPara = (i) => i.path.paragraph != null && i.path.subparagraph == null && i.path.item == null;
 function splitChild(c, lawNo) {
@@ -640,7 +686,7 @@ function splitChild(c, lawNo) {
   if (paras.length < 2) return [c];
   const pieces = [];
   for (const p of paras) {
-    const a = anchorOf(flatItem(p).map((x) => x.text).join("\n"), LAW_PREFIX, lawNo);
+    const a = delegationAnchor(flatItem(p).map((x) => x.text).join("\n"), lawNo);
     if (!a && pieces.length) pieces[pieces.length - 1].paras.push(p);
     else pieces.push({ paras: [p], anchor: a || c.anchor || EMPTY });
   }
