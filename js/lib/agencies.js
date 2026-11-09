@@ -12,19 +12,9 @@ export const GROUPS = {
   RESEARCH: { label: "금융관련 리포트", noun: "보고서", addNoun: "연구소" },
 };
 
-const bcbsPattern = /\/bcbs\/publ\/[A-Za-z0-9_.-]+\.(htm|html|pdf)|\/publ\/bcbs[A-Za-z0-9_.-]*\.(htm|html|pdf)/i;
-const masPattern = /\/publications\/[A-Za-z0-9-]+\/(\d{4}\/)?[A-Za-z0-9][A-Za-z0-9-]{5,}/i;
-
-const bcbsHtml = {
-  listUrl: () => "https://www.bis.org/bcbs/publications.htm",
-  customParser: (body, url) => {
-    const cards = P.extractCards(body, url, bcbsPattern);
-    const plain = cards.length ? [] : P.extract(body, url, bcbsPattern).filter((x) => x.date);
-    return [...cards, ...plain].filter((x) => x.date).sort(byDateDesc);
-  },
-  pageable: false,
-  deepSearch: false,
-};
+// BIS가 2025년께 사이트를 개편해 옛 RSS(/doclist/bcbspubls.rss)와 /bcbs/publications.htm은 없어졌다.
+// 지금은 /committees/bcbs/publications 의 카드 목록(?page=0부터)을 읽는다. 상세 주소는 /publications/202610-... 꼴이다.
+const bcbsPattern = /\/publications\/\d{6}-[^/?#"\s]+/i;
 
 /** 기관 목록(앱의 AgencyId와 같은 순서·이름). */
 export const AGENCIES = [
@@ -141,10 +131,10 @@ export const AGENCIES = [
   },
   {
     id: "BCBS", label: "바젤은행감독위원회(BIS)", short: "BCBS", group: "RESEARCH", noun: "보고서",
-    home: "https://www.bis.org/publications",
-    listUrl: () => "https://www.bis.org/doclist/bcbspubls.rss",
-    isRss: true, pageable: false, deepSearch: false,
-    fallback: bcbsHtml,
+    home: "https://www.bis.org/committees/bcbs/publications",
+    listUrl: (p) => `https://www.bis.org/committees/bcbs/publications?page=${Math.max(0, p - 1)}`,
+    customParser: (body, url) => P.extractCards(body, url, bcbsPattern).filter((x) => x.date).sort(byDateDesc),
+    deepSearch: false,
   },
   {
     id: "ESMA", label: "ESMA", short: "ESMA", group: "RESEARCH", noun: "보고서",
@@ -156,9 +146,26 @@ export const AGENCIES = [
   {
     id: "MAS", label: "싱가포르 통화청", short: "MAS", group: "RESEARCH", noun: "보고서",
     home: "https://www.mas.gov.sg/publications",
-    listUrl: () => "https://www.mas.gov.sg/publications",
-    customParser: (body, url) => P.extractCards(body, url, masPattern),
-    pageable: false, deepSearch: false,
+    listUrl: (p) => `https://www.mas.gov.sg/publications?page=${p}`,
+    // 목록 화면은 스크립트로 그려서 HTML에는 카드가 없다. 그 스크립트가 부르는 검색 API(JSON)를 직접 읽는다.
+    jsonList: async (p, s, q = "") => {
+      const kw = String(q || "").trim();
+      const api =
+        "https://www.mas.gov.sg/api/v1/search?json.nl=map&wt=json" +
+        `&q=${enc(kw ? `document_title_t:(${kw.replace(/[+\-&|!(){}\[\]^"~*?:\\/]/g, " ")})` : "*:*")}` +
+        `&start=${(p - 1) * s}&rows=${s}&fq=${enc('mas_mastercontenttypes_sm:"Publications"')}&sort=${enc("mas_date_tdt desc")}`;
+      const { text } = await fetchSite(api, { referer: "https://www.mas.gov.sg/publications" });
+      return (JSON.parse(text).response?.docs || [])
+        .filter((d) => d.page_url_s && d.document_title_string_s)
+        .map((d) => ({
+          title: P.compact(P.decodeEntities(String(d.document_title_string_s))),
+          url: new URL(d.page_url_s, "https://www.mas.gov.sg").href,
+          // 응답은 UTC라 싱가포르 시각(+8)으로 날짜를 맞춘다.
+          date: d.mas_date_tdt ? new Date(Date.parse(d.mas_date_tdt) + 8 * 3600e3).toISOString().slice(0, 10) : null,
+          author: null,
+        }));
+    },
+    pageSize: 20, deepSearch: false,
   },
 ].map((a) => ({ pageable: true, pageSize: 10, deepSearch: true, ...a }));
 
