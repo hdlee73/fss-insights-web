@@ -269,8 +269,24 @@ function summary(root, data, goto, ctx) {
   const hist = data.history.slice(-30);
   const palette = [COLORS[0], COLORS[1], COLORS[2], COLORS[3], COLORS[4]];
   root.append(h("div", { class: "cr-grid2" },
-    card(`국내 거래대금 추이 (최근 ${hist.length}회 집계)`, "bar-chart-3", barChart(hist.map((x) => x.total_value_24h), hist.map((x) => slotShort(x.date, x.slot)))),
-    card("거래소 점유율 (24h 거래대금)", "building-2", donut((s.exchanges || []).filter((e) => e.ok && (e.value_24h || 0) > 0).map((e, i) => ({ name: e.name || exName(e.exchange), v: e.value_24h, color: palette[i % palette.length] }))))));
+    card(`국내 거래대금 추이 (최근 ${hist.length}회 집계)`, "bar-chart-3", h("div", { class: "stack" },
+      barChart(hist.map((x) => x.total_value_24h), hist.map((x) => slotShort(x.date, x.slot))),
+      (() => {
+        const v = hist.map((x) => x.total_value_24h).filter((x) => x != null && Number.isFinite(x));
+        if (v.length < 2) return null;
+        const avg = v.reduce((a, b) => a + b, 0) / v.length, mx = Math.max(...v), mn = Math.min(...v);
+        return table(["구분", "거래대금", "비고"], [
+          ["이번 집계", won(v.at(-1)) + " 원", `평균 대비 ${pct(ratio(v.at(-1), avg), 1, true)}`],
+          ["기간 평균", won(avg) + " 원", `${v.length}회 집계`],
+          ["기간 최고", won(mx) + " 원", slotShort(hist[hist.findIndex((x) => x.total_value_24h === mx)]?.date, "")],
+          ["기간 최저", won(mn) + " 원", slotShort(hist[hist.findIndex((x) => x.total_value_24h === mn)]?.date, "")]]);
+      })(),
+      note("막대는 매일 24시 마감 기준 국내 5개 거래소 24시간 거래대금 합계입니다."))),
+    card("거래소 점유율 (24h 거래대금)", "building-2", h("div", { class: "stack" },
+      donut((s.exchanges || []).filter((e) => e.ok && (e.value_24h || 0) > 0).map((e, i) => ({ name: e.name || exName(e.exchange), v: e.value_24h, color: palette[i % palette.length] }))),
+      table(["거래소", "거래대금", "점유율", "전일 대비"], (s.exchanges || []).filter((e) => e.ok).map((e) => [e.name || exName(e.exchange), won(e.value_24h) + " 원", pct(e.share), chg(ratio(e.value_24h, prev?.exchanges?.[e.exchange]?.value ?? prev?.by_exchange?.[e.exchange]), 1)]),
+      ),
+      note("점유율은 5개 거래소 24시간 거래대금 합계 대비 비중입니다.")))));
   root.append(h("div", { class: "cr-grid2" },
     card("거래대금 상위 (5개 거래소 합산)", "trending-up", table(["종목", "등락", "거래대금"], (s.top || []).slice(0, 6).map((r) => [r.symbol, chg(r.change_rate), won(r.value_24h)]))),
     card("주요코인 시세 · 김프 (실시간)", "activity", h("div", { class: "stack" },
@@ -404,12 +420,16 @@ function finView(root, data, params, ctx) {
   }
   root.append(note(`DART 사업보고서(정기보고서) 또는 외부감사 보고서의 재무제표 · 갱신 ${fin.updated || "-"} · 금액은 원 단위 환산`));
   // 가장 최근 연도의 연결·별도(있는 것만)를 모두 보여 준다. 연결이 없는 법인은 별도만.
-  const latest = list.map((e) => ({ ...e, ys: e.years.filter((y) => y.year === e.years[0]?.year), y: e.years[0] }));
+  const annual = (e) => e.years.filter((y) => (y.period || "연간") === "연간");
+  const interim = (e) => e.years.filter((y) => y.period && y.period !== "연간");
+  const latest = list.map((e) => { const a = annual(e); return { ...e, ys: a.filter((y) => y.year === a[0]?.year), y: a[0] }; });
   const cols = [["자산", "assets"], ["부채", "liabilities"], ["자본", "equity"], ["영업수익", "revenue"], ["영업이익", "op_income"], ["당기순이익", "net_income"]];
   root.append(card("거래소별 비교 (가장 최근 사업연도 · 연결/별도)", "scale", table(["거래소(법인)", "연도", ...cols.map((c) => c[0]), "부채비율", "영업이익률"],
     latest.flatMap((e) => (e.ys.length
       ? e.ys.map((y) => [`${e.n}(${e.corp || ""})`, `${y.year} ${y.basis || ""}`, ...cols.map(([, key]) => (y[key] == null ? "-" : won(y[key]))), pct(ratioOf(y.liabilities, y.equity), 0), pct(ratioOf(y.op_income, y.revenue), 1)])
       : [[`${e.n}(${e.corp || ""})`, "공시 없음", ...cols.map(() => "-"), "-", "-"]])))));
+  const interimRows = list.flatMap((e) => interim(e).map((y) => [`${e.n}(${e.corp || ""})`, `${y.year} ${y.period} ${y.basis || ""}`, ...cols.map(([, key]) => (y[key] == null ? "-" : won(y[key]))), pct(ratioOf(y.liabilities, y.equity), 0), pct(ratioOf(y.op_income, y.revenue), 1)]));
+  if (interimRows.length) root.append(card("최근 분기·반기 (정기보고서 제출 법인, 손익은 누적)", "calendar", table(["거래소(법인)", "기간", ...cols.map((c) => c[0]), "부채비율", "영업이익률"], interimRows)));
   const bar = (key, label, color) => {
     const items = latest.filter((e) => e.y?.[key] != null).map((e) => ({ label: e.n, v: e.y[key], color: e.y[key] < 0 ? "#e5484d" : color }));
     return items.length ? card(label, "bar-chart-3", hbars(items.map((i) => ({ ...i, v: Math.max(i.v, 0) })), (v) => won(v))) : null;
@@ -418,12 +438,13 @@ function finView(root, data, params, ctx) {
   const sel = list.some((e) => e.k === params.ex) ? params.ex : (list.find((e) => e.years.length)?.k || "upbit");
   root.append(tabs(EXCHANGES.map((e) => e[1]), EXCHANGES.findIndex(([k]) => k === sel), (i) => ctx.go({ ...params, ex: EXCHANGES[i][0] }, { replace: true }), "seg"));
   const cur = list.find((e) => e.k === sel);
-  root.append(card(`${cur.n}(${cur.corp || ""}) 연도별 재무·손익`, "table", cur.years.length
-    ? table(["항목", ...cur.years.map((y) => `${y.year} ${y.basis || ""}`)], [...cols.map(([nm, key]) => [nm, ...cur.years.map((y) => (y[key] == null ? "-" : won(y[key])))]),
-      ["부채비율", ...cur.years.map((y) => pct(ratioOf(y.liabilities, y.equity), 0))], ["영업이익률", ...cur.years.map((y) => pct(ratioOf(y.op_income, y.revenue), 1))],
-      ["출처", ...cur.years.map((y) => (y.source || "").replace("(DART)", ""))]])
+  const ys = cur.years;
+  root.append(card(`${cur.n}(${cur.corp || ""}) 연도별 재무·손익`, "table", ys.length
+    ? table(["항목", ...ys.map((y) => `${y.year}${y.period && y.period !== "연간" ? " " + y.period : ""} ${y.basis || ""}`)], [...cols.map(([nm, key]) => [nm, ...ys.map((y) => (y[key] == null ? "-" : won(y[key])))]),
+      ["부채비율", ...ys.map((y) => pct(ratioOf(y.liabilities, y.equity), 0))], ["영업이익률", ...ys.map((y) => pct(ratioOf(y.op_income, y.revenue), 1))],
+      ["출처", ...ys.map((y) => (y.source || "").replace("(DART)", ""))]])
     : note("이 거래소는 DART에서 가져올 수 있는 재무제표가 아직 없습니다(외부감사 대상이 아니거나 공시 전).")));
-  root.append(note("법인에 따라 사업보고서(연결/별도) 또는 감사보고서(별도)에서 가져와 계정 과목명이 다르면 일부 항목이 '-'로 보일 수 있습니다. 정확한 값은 DART 원문을 확인하세요. " + SRC_NOTE));
+  root.append(note("법인은 DART 상호·법인등록번호로 확인한 값입니다(빗썸=주식회사 빗썸, 코빗=디지털엑스). 분·반기 손익은 해당 기간 누적입니다. 법인에 따라 사업보고서(연결/별도) 또는 감사보고서(별도)에서 가져와 계정 과목명이 다르면 일부 항목이 '-'로 보일 수 있습니다. 정확한 값은 DART 원문을 확인하세요. " + SRC_NOTE));
 }
 
 // ---------- 시장 일보 ----------
@@ -458,7 +479,7 @@ function reportHtml(data, picked) {
   const lst = Object.entries(s.listings || {});
   add("list", "신규 상장·상장 폐지", `<ul>${lst.map(([k, l]) => `<li><b>${esc(exName(k))}</b> 상장: ${esc((l.listed || []).join(", ") || "없음")} / 폐지: ${esc((l.delisted || []).join(", ") || "없음")}</li>`).join("")}</ul>`);
   const fx = data.fin?.exchanges || {};
-  add("fin", "거래소 재무·손익 (DART, 최근 사업연도)", Object.keys(fx).length ? tblHtml(["거래소", "연도", "자산", "부채", "자본", "영업수익", "영업이익", "순이익"], EXCHANGES.filter(([k]) => fx[k]?.years?.length).flatMap(([k, n]) => fx[k].years.filter((y) => y.year === fx[k].years[0].year).map((y) => [n, `${y.year} ${y.basis || ""}`, won(y.assets), won(y.liabilities), won(y.equity), won(y.revenue), won(y.op_income), won(y.net_income)]))) : "");
+  add("fin", "거래소 재무·손익 (DART, 최근 사업연도)", Object.keys(fx).length ? tblHtml(["거래소", "연도", "자산", "부채", "자본", "영업수익", "영업이익", "순이익"], EXCHANGES.filter(([k]) => fx[k]?.years?.length).flatMap(([k, n]) => { const an = fx[k].years.filter((y) => (y.period || "연간") === "연간"); return an.filter((y) => y.year === an[0]?.year).map((y) => [n, `${y.year} ${y.basis || ""}`, won(y.assets), won(y.liabilities), won(y.equity), won(y.revenue), won(y.op_income), won(y.net_income)]); })) : "");
   return `<!doctype html><html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>국내 가상자산 시장 일보 ${esc(whenText(s))}</title><style>
 body{font-family:'Malgun Gothic','Apple SD Gothic Neo',sans-serif;color:#1b2a41;max-width:860px;margin:24px auto;padding:0 16px}
 h1{font-size:34px;line-height:1.25;margin:0 0 6px}.meta{color:#5b6b86;font-size:13px;margin-bottom:18px}
