@@ -8,7 +8,7 @@ import * as P from "./htmllist.js";
 const enc = encodeURIComponent;
 
 export const GROUPS = {
-  PRESS: { label: "금융당국 보도자료", noun: "보도자료", addNoun: "기관" },
+  PRESS: { label: "금융당국 등 보도자료", noun: "보도자료", addNoun: "기관" },
   RESEARCH: { label: "금융관련 리포트", noun: "보고서", addNoun: "연구소" },
 };
 

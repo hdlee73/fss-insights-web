@@ -43,7 +43,7 @@ export async function render(root, params, ctx) {
     await loadSanctions(true).catch((e) => toast(errorText(e)));
     ctx.go(params, { replace: true });
   });
-  setHeader("금융회사 제재현황", "2011년 이후 금감원 제재공시와 통계", [dlBtn, rfBtn]);
+  setHeader("금융회사 제재 공시", "2011년 이후 금감원 제재공시와 통계", [dlBtn, rfBtn]);
   root.append(tabs(["제재 공시", "통계"], stats ? 1 : 0, (i) => ctx.go({ view: i ? "stats" : null }, { replace: true })));
 
   // 검색 조건

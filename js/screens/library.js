@@ -7,7 +7,7 @@ const folders = new Map(); // 폴더ID → { name, parent } (경로 표시용)
 let rootId = null;
 
 export async function render(root, params, ctx) {
-  setHeader("참고 자료실", "법령·감독 자료 모음", [iconButton("refresh-cw", "새로고침", () => ctx.go(params, { replace: true }))]);
+  setHeader("기타 참고자료", "법령·감독 자료 모음", [iconButton("refresh-cw", "새로고침", () => ctx.go(params, { replace: true }))]);
   const q = (params.q || "").trim();
   const box = searchBox({ placeholder: "제목·설명·본문·#태그 검색", value: q, onSearch: (v) => ctx.go(v ? { q: v } : {}) });
   box.input.addEventListener("input", () => !box.input.value && q && ctx.go({}, { replace: true }));

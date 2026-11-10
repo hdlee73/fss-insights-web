@@ -8,7 +8,7 @@ export const DISCLAIMER_DETAIL =
   "FSS Insights는 개인이 만든 비공식 서비스이며 금융감독원 등 어떤 기관과도 제휴·위탁 관계가 없습니다. " +
   "화면에 표시되는 보도자료, 통계, 법령 등은 외부 출처의 공개 자료를 모아 보여주는 것으로, 정확성과 최신성을 보장하지 않습니다. " +
   "중요한 판단에는 반드시 원문과 공식 자료를 확인하시기 바랍니다.";
-export const APP_VERSION = "2.5.10";
+export const APP_VERSION = "2.6.0";
 
 // 서버(Cloudflare Worker). 앱과 같은 서버를 쓰고, 웹 주소(Origin)로 들어온 요청만 토큰 없이 받는다.
 const DEFAULT_SERVER = "https://news-proxy.hdlee73.workers.dev";
@@ -286,13 +286,42 @@ export function fmtNum(n, digits = 0) {
   return Number(n).toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-/** 탭 줄. 고른 번호를 onSelect로 알린다. */
+/** 같은 주소의 JSON을 읽는다(실패하면 예외). 소비자 지킴이 자료용. */
+export function loadJson(path) {
+  return cached("json:" + path, 30 * 60 * 1000, async () => {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error("자료를 불러오지 못했습니다 (" + res.status + ")");
+    return res.json();
+  });
+}
+
+/**
+ * 탭 줄. 고른 번호를 onSelect로 알린다.
+ * 화면이 좁아 오른쪽(또는 왼쪽)에 가려진 탭이 있으면 가장자리에 »(«) 표시가 나타나고, 누르면 그쪽으로 밀어 준다.
+ */
 export function tabs(labels, selected, onSelect, cls = "") {
-  return h(
+  const row = h(
     "div",
     { class: "tabs " + cls, role: "tablist" },
     labels.map((label, i) => h("button", { type: "button", role: "tab", class: i === selected ? "on" : "", "aria-selected": String(i === selected), onclick: () => onSelect(i) }, label))
   );
+  const more = (dir) => h("button", { type: "button", class: "tabs-more " + dir, hidden: true, "aria-label": dir === "r" ? "오른쪽에 탭이 더 있습니다" : "왼쪽에 탭이 더 있습니다", title: dir === "r" ? "더 보기" : "이전 탭",
+    onclick: () => row.scrollBy({ left: (dir === "r" ? 1 : -1) * Math.max(120, row.clientWidth * 0.6), behavior: "smooth" }) }, dir === "r" ? "»" : "«");
+  const left = more("l");
+  const right = more("r");
+  const wrap = h("div", { class: "tabs-wrap" }, left, row, right);
+  const update = () => {
+    const max = row.scrollWidth - row.clientWidth;
+    left.hidden = !(max > 2 && row.scrollLeft > 2);
+    right.hidden = !(max > 2 && row.scrollLeft < max - 2);
+  };
+  row.addEventListener("scroll", update, { passive: true });
+  if (typeof ResizeObserver === "function") new ResizeObserver(update).observe(row);
+  requestAnimationFrame(() => {
+    row.querySelector("button.on")?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    update();
+  });
+  return wrap;
 }
 
 export function searchBox({ placeholder, value = "", onSearch, autofocus = false }) {

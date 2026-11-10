@@ -12,7 +12,7 @@ const MAX = 100;
 const DISCLAIMER = "이 정보는 참고용이며 공식 해석이 아닙니다. 판단의 근거로는 원문을 확인하세요.";
 
 export async function render(root, params, ctx) {
-  setHeader("기준서/질의회신/지적사례 검색", "회계기준서 · 질의회신 · 기준해석 · 감리지적사례 제목 색인");
+  setHeader("회계기준서·질의회신·지적사례", "회계기준서 · 질의회신 · 기준해석 · 감리지적사례 제목 색인");
   const tab = Math.min(Math.max(+params.tab || 0, 0), 4);
   const q = params.q || "";
   const group = params.g || "";
