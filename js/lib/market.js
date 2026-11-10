@@ -495,10 +495,12 @@ export function statDelta(it) {
 // ---- 거시경제 지표(한국은행 ECOS, 서버 /stats) ----
 // 기본 4개(실질GDP 성장률·소비자물가 상승률·실업률·경상수지)와 추가로 고를 수 있는 지표. 서버(Worker)의 STAT_SPECS와 id가 같아야 한다.
 export const MACRO_CATALOG = [
-  sd("gdp-growth", "실질GDP 성장률(전기 대비)", "성장·생산"), sd("exports-sa", "상품수출(계절조정)", "성장·생산"),
-  sd("cpi-yoy", "소비자물가 상승률(전년동월비)", "물가"), sd("ppi-yoy", "생산자물가 상승률(전년동월비)", "물가"),
-  sd("unemployment", "실업률", "고용"), sd("employment-rate", "고용률", "고용"), sd("employed", "취업자 수", "고용"),
-  sd("current-account", "경상수지", "대외"), sd("usdkrw", "원/달러 환율(매매기준율)", "대외"),
+  sd("gdp-growth", "실질GDP 성장률(전기 대비)", "성장·소득"), sd("consumption-growth", "민간소비 증감률(전기 대비)", "성장·소득"), sd("facility-growth", "설비투자 증감률(전기 대비)", "성장·소득"), sd("gni-growth", "실질 GNI 증감률(전기 대비)", "성장·소득"),
+  sd("cpi-yoy", "소비자물가 상승률(전년동월비)", "물가"), sd("core-cpi-yoy", "근원물가 상승률(농산물·석유류 제외)", "물가"), sd("living-cpi-yoy", "생활물가 상승률(전년동월비)", "물가"), sd("ppi-yoy", "생산자물가 상승률(전년동월비)", "물가"),
+  sd("unemployment", "실업률", "고용·인구"), sd("employment-rate", "고용률", "고용·인구"), sd("employed", "취업자 수", "고용·인구"), sd("labor-participation", "경제활동참가율", "고용·인구"),
+  sd("production-yoy", "전산업생산 증감률(전년동월비)", "생산·투자·소비"), sd("retail-yoy", "소매판매 증감률(불변, 전년동월비)", "생산·투자·소비"), sd("facility-index-yoy", "설비투자지수 증감률(전년동월비)", "생산·투자·소비"), sd("utilization", "제조업 평균가동률", "생산·투자·소비"),
+  sd("ccsi", "소비자심리지수", "경기·심리"), sd("esi", "경제심리지수", "경기·심리"), sd("bsi", "기업경기실사지수(전산업 업황실적)", "경기·심리"), sd("leading-index", "선행지수 순환변동치", "경기·심리"),
+  sd("current-account", "경상수지", "대외"), sd("exports-sa", "상품수출(계절조정)", "대외"), sd("imports-sa", "상품수입(FOB)", "대외"), sd("usdkrw", "원/달러 환율(매매기준율)", "대외"),
 ];
 export const DEFAULT_MACRO = ["gdp-growth", "cpi-yoy", "unemployment", "current-account"];
 export const macroSelection = () => store.get("market.macro", DEFAULT_MACRO);
