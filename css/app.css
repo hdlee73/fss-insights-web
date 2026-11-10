@@ -958,3 +958,16 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .cr-links { display: inline-flex; gap: 8px; }
 .err-note { color: var(--danger); }
 @media (max-width: 560px) { .cr-hb { grid-template-columns: 110px 1fr 50px; } }
+
+.kpi-hint { margin-top: 6px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+.cr-sechead { margin-top: 6px; }
+.cr-sechead h3 { font-size: 15px; }
+.cr-desc { margin: 2px 0 6px; font-size: 12.5px; line-height: 1.5; color: var(--muted); }
+.cr-trends { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+.cr-trends.one { grid-template-columns: 1fr; }
+.cr-trend h4 { font-size: 14px; margin: 0; }
+.cr-head { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin: 2px 0 2px; }
+.cr-head b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.cr-delta { font-size: 12.5px; font-weight: 600; }
+.cr-few { margin: 6px 0 0; padding: 6px 10px; border-radius: 8px; background: var(--warn-soft); color: var(--warn-fg); font-size: 12px; }
+.cr-chart { height: auto !important; }
