@@ -2,7 +2,8 @@
 import { setHeader } from "../app.js";
 import { cached, h, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
-import { buildDigest } from "../lib/digest.js";
+import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
+import * as N from "../lib/news.js";
 import { INDEX_CHOICES, KOREA_INDEXES, indexSelection, statSelection } from "../lib/market.js";
 import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
 import { drawStats, indexTile } from "./market.js";
@@ -21,10 +22,10 @@ export async function render(root, params, ctx) {
   root.append(hero);
   drawHero(hero, null);
 
-  // 오늘의 금융감독 브리핑(요약 카드): 수집된 기사·보도자료를 규칙으로 3~5줄로 묶는다. 아래 기사·보도자료가 도착하는 대로 채워진다.
+  // 최신 주요 이슈 카드: 많이 나온 말, 원장·위원장 일정, (기기 AI가 있으면) 주요 기사 요약. 아래 기사·보도자료가 도착하는 대로 채워진다.
   const digestBox = h("section", { class: "br-digest card", "aria-live": "polite" });
   root.append(digestBox);
-  const digestData = { articles: null, press: null };
+  const digestData = { articles: null, press: null, extra: [], ai: undefined };
   const drawDigest = () => ctx.alive() && drawDigestCard(digestBox, digestData);
   drawDigest();
   cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHero(hero, w)).catch(() => {});
@@ -65,6 +66,7 @@ export async function render(root, params, ctx) {
     if (!ctx.alive()) return;
     digestData.articles = page.articles;
     drawDigest();
+    loadIssueExtras(digestData, page.articles, drawDigest, ctx);
     const top = page.articles.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, ARTICLE_COUNT);
     newsBox.replaceChildren(...(top.length ? top.map((a) => articleRow(a, { compact: true })) : [h("div", { class: "note" }, "30대 언론의 최근 기사가 없습니다.")]));
   }).catch(() => {
@@ -110,19 +112,49 @@ export async function render(root, params, ctx) {
   root.append(h("p", { class: "note", style: { margin: "14px 2px 0" } }, "알림을 켜 두면 새 보도자료·자료실 자료를 모아 알려 드려요. ", h("a", { class: "link-more", href: "#/alerts?view=settings" }, "알림 설정")));
 }
 
-// ---- 오늘의 금융감독 브리핑 카드 ----
+// ---- 최신 주요 이슈 카드 ----
+
+/** 금융감독원장·금융위원장 기사를 따로 찾고, 기기 AI가 있으면 주요 기사를 요약한다. */
+function loadIssueExtras(data, articles, redraw, ctx) {
+  const s = { ...N.settings(), range: "DAY" };
+  cachedOffline("issue:sched", 10 * 60 * 1000, async () => {
+    const pages = await Promise.all(["금감원장", "금융위원장"].map((q) => N.search(q, s).catch(() => null)));
+    return pages.flatMap((p) => (p ? p.articles : []));
+  }).then((list) => { if (ctx.alive()) { data.extra = list || []; redraw(); } }).catch(() => {});
+  const d = buildDigest(articles, null);
+  const lead = d?.lead || [];
+  if (!lead.length) { data.ai = null; return; }
+  const key = "issue.ai." + lead.map((a) => a.link).join("|").length + ":" + lead[0].link;
+  const hit = (() => { try { return JSON.parse(sessionStorage.getItem(key) || "null"); } catch { return null; } })();
+  if (hit) { data.ai = hit; redraw(); return; }
+  aiAvailable().then(async (ok) => {
+    if (!ok || !ctx.alive()) { data.ai = null; return; }
+    data.ai = "loading"; redraw();
+    const lines = await aiSummary(lead);
+    data.ai = lines;
+    try { if (lines) sessionStorage.setItem(key, JSON.stringify(lines)); } catch {}
+    if (ctx.alive()) redraw();
+  });
+}
+
 
 function drawDigestCard(box, data) {
-  const head = h("div", { class: "ch" }, icon("activity"), h("h3", null, "오늘의 금융감독 브리핑"), h("small", { class: "dg-tag" }, "자동 요약"));
+  const head = h("div", { class: "ch" }, icon("activity"), h("h3", null, "최신 주요 이슈"), h("small", { class: "dg-tag" }, "자동 정리"));
   if (data.articles == null) return box.replaceChildren(head, skeleton(3));
   const d = buildDigest(data.articles, data.press);
-  if (!d) return box.replaceChildren(head, h("p", { class: "note" }, data.press == null ? "수집된 기사가 아직 없습니다." : "오늘 요약할 기사가 아직 없습니다. 잠시 뒤 새로고침해 보세요."));
+  if (!d) return box.replaceChildren(head, h("p", { class: "note" }, data.press == null ? "수집된 기사가 아직 없습니다." : "정리할 기사가 아직 없습니다. 잠시 뒤 새로고침해 보세요."));
   const piece = (x) => (typeof x === "string" ? x
     : x.href ? h("a", { href: x.href, target: "_blank", rel: "noopener" }, x.text)
     : h("a", { href: "#/news?q=" + encodeURIComponent(x.q) }, x.text));
-  box.replaceChildren(head,
-    h("ul", { class: "dg-lines" }, d.lines.map((l) => h("li", null, icon(l.icon), h("span", null, l.parts.map(piece))))),
-    h("p", { class: "note dg-foot" }, `${d.label} 수집된 기사·보도자료의 키워드 집계로 만든 요약입니다(AI 요약 아님). 정확한 내용은 원문을 확인하세요.`));
+  const kids = [head];
+  if (Array.isArray(data.ai)) kids.push(h("div", { class: "dg-ai" }, h("b", null, "기기 AI 요약"), h("ul", null, data.ai.map((l) => h("li", null, l)))));
+  else if (data.ai === "loading") kids.push(h("div", { class: "dg-ai" }, h("b", null, "기기 AI 요약"), h("p", { class: "note" }, "요약하는 중…")));
+  if (d.words.length) kids.push(h("div", { class: "dg-words" }, h("small", null, `${d.label} 기사에 많이 나온 말`), h("div", { class: "dg-chips" }, d.words.map((w) => h("a", { class: "dg-chip", href: "#/news?q=" + encodeURIComponent(w.text) }, `${w.text} `, h("em", null, w.count))))));
+  const sch = findSchedules([...(data.extra || []), ...(d.schedules || [])]).slice(0, 4);
+  if (sch.length) kids.push(h("ul", { class: "dg-lines dg-sched" }, sch.map((x) => h("li", null, icon("calendar"), h("span", null, h("b", null, x.who + " "), h("a", { href: x.href, target: "_blank", rel: "noopener" }, x.title), x.source ? ` (${String(x.source).slice(0, 12)})` : "")))));
+  kids.push(h("ul", { class: "dg-lines" }, d.lines.map((l) => h("li", null, icon(l.icon), h("span", null, l.parts.map(piece))))));
+  kids.push(h("p", { class: "note dg-foot" }, `${d.label} 수집된 기사·보도자료의 낱말 집계로 정리했습니다. 기기 AI(Gemini Nano)를 쓸 수 있는 기기에서는 주요 기사 요약이 더해지며, 기사 내용은 기기 밖으로 보내지 않습니다. 정확한 내용은 원문을 확인하세요.`));
+  box.replaceChildren(...kids);
   if (data.press == null) box.append(h("div", { class: "dg-wait" }, "보도자료를 불러오는 중…"));
 }
 
