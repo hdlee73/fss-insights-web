@@ -94,23 +94,52 @@ const subEl = document.getElementById("sub");
 const actionsEl = document.getElementById("top-actions");
 const mobile = matchMedia("(max-width: 860px)");
 
+const favs = () => store.get("menu.favs", []).filter((id) => ROUTES[id]);
+/** 메뉴 묶음 목록. 즐겨찾기가 있으면 맨 위에 '즐겨찾기' 묶음을 붙인다(항목은 원래 자리에도 그대로 남는다). */
+function sections() {
+  const list = favs();
+  if (!list.length) return MENU;
+  return [[FAV_HEAD, "star", list.map((id) => [id, ROUTES[id].label, ROUTES[id].icon])], ...MENU];
+}
+const FAV_HEAD = "즐겨찾기";
+
+function toggleFav(id) {
+  const now = favs();
+  const on = !now.includes(id);
+  store.set("menu.favs", on ? [...now, id] : now.filter((x) => x !== id));
+  const badges = [...side.querySelectorAll(".mi[data-id] .badge:not([hidden])")].map((b) => [b.closest(".mi").dataset.id, b.textContent]);
+  const top = side.scrollTop;
+  buildMenu();
+  for (const [bid, t] of badges) for (const b of side.querySelectorAll(`.mi[data-id="${bid}"] .badge`)) { b.hidden = false; b.textContent = t; }
+  const { id: cur } = currentRoute();
+  for (const a of side.querySelectorAll(".mi")) a.classList.toggle("on", a.dataset.id === cur);
+  side.scrollTop = top;
+  toast(on ? `즐겨찾기에 추가했습니다: ${ROUTES[id].label}` : "즐겨찾기에서 뺐습니다");
+}
+
 function buildMenu() {
+  const favSet = new Set(favs());
   side.replaceChildren(
     h("div", { class: "brand" },
       h("img", { class: "logo", src: "icons/icon-192.png", alt: "" }),
       h("div", { class: "brand-t" }, h("b", null, "FSS Insights"), h("small", null, "웹 버전")),
       h("button", { class: "ib collapse", type: "button", title: "메뉴 접기", "aria-label": "메뉴 접기", onclick: toggleCollapse }, icon("panel-left"))),
     h("nav", { class: "menu" },
-      MENU.map(([head, gic, items]) => {
+      sections().map(([head, gic, items]) => {
         const folded = head && folds().includes(head);
         return h("div", { class: "sec" + (head ? " grouped" : "") + (folded ? " folded" : ""), "data-head": head || "" },
           head ? h("button", { class: "sh grp", type: "button", "aria-expanded": String(!folded), title: folded ? `${head} 펼치기` : `${head} 접기`, onclick: () => toggleFold(head) },
             icon(gic), h("span", { class: "gl" }, head), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up", "i chev")) : null,
-          items.map(([id, label, ic]) => h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
-            if (!document.body.classList.contains("drawer")) return;
-            e.preventDefault();
-            closeDrawer(() => (location.hash = `#/${id}`));
-          } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true }))));
+          items.map(([id, label, ic]) => {
+            const fav = favSet.has(id);
+            return h("div", { class: "mr" },
+              h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
+                if (!document.body.classList.contains("drawer")) return;
+                e.preventDefault();
+                closeDrawer(() => (location.hash = `#/${id}`));
+              } }, icon(ic), h("span", null, label), h("em", { class: "badge", hidden: true })),
+              h("button", { class: "fav" + (fav ? " on" : ""), type: "button", "aria-pressed": String(fav), title: fav ? "즐겨찾기 해제" : "즐겨찾기에 추가", "aria-label": `${label} ${fav ? "즐겨찾기 해제" : "즐겨찾기에 추가"}`, onclick: () => toggleFav(id) }, icon("star")));
+          }));
       })),
     h("div", { class: "sidefoot" }, h("div", { class: "unofficial" }, "금융감독원 공식 사이트가 아닙니다"), `v${APP_VERSION} · 이현덕 with Claude`)
   );
@@ -137,10 +166,10 @@ function refreshFolds(openCurrent = false) {
     const folded = list.includes(hd);
     sec.classList.toggle("folded", folded);
     const btn = sec.querySelector("button.sh");
-    const [, gic, items] = MENU.find(([x]) => x === hd);
+    const [, gic, items] = sections().find(([x]) => x === hd);
     btn.setAttribute("aria-expanded", String(!folded));
     btn.title = folded ? `${hd} 펼치기` : `${hd} 접기`;
-    btn.classList.toggle("has-on", folded && hd === head);
+    btn.classList.toggle("has-on", folded && (hd === head || (hd === FAV_HEAD && items.some(([i]) => i === id))));
     btn.replaceChildren(icon(gic), h("span", { class: "gl" }, hd), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up", "i chev"));
   }
 }
@@ -173,10 +202,10 @@ addEventListener("popstate", () => {
 
 /** 메뉴 옆 숫자 배지(알림 화면이 새 글 수를 표시). */
 export function setBadge(id, count) {
-  const el = side.querySelector(`.mi[data-id="${id}"] .badge`);
-  if (!el) return;
-  el.hidden = !count;
-  el.textContent = count > 99 ? "99+" : String(count || "");
+  for (const el of side.querySelectorAll(`.mi[data-id="${id}"] .badge`)) {
+    el.hidden = !count;
+    el.textContent = count > 99 ? "99+" : String(count || "");
+  }
 }
 
 let renderSeq = 0;
