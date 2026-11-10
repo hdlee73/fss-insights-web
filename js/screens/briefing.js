@@ -24,9 +24,9 @@ export async function render(root, params, ctx) {
 
   // 최신 주요 이슈 카드: 많이 나온 말, 원장·위원장 일정, (기기 AI가 있으면) 주요 기사 요약. 아래 기사·보도자료가 도착하는 대로 채워진다.
   const digestBox = h("section", { class: "br-digest card", "aria-live": "polite" });
-  root.append(digestBox);
+  // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
   const digestData = { articles: null, press: null, extra: [], ai: undefined };
-  const drawDigest = () => ctx.alive() && drawDigestCard(digestBox, digestData);
+  const drawDigest = () => {};
   drawDigest();
   cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHero(hero, w)).catch(() => {});
 
@@ -66,7 +66,6 @@ export async function render(root, params, ctx) {
     if (!ctx.alive()) return;
     digestData.articles = page.articles;
     drawDigest();
-    loadIssueExtras(digestData, page.articles, drawDigest, ctx);
     const top = page.articles.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, ARTICLE_COUNT);
     newsBox.replaceChildren(...(top.length ? top.map((a) => articleRow(a, { compact: true })) : [h("div", { class: "note" }, "30대 언론의 최근 기사가 없습니다.")]));
   }).catch(() => {
