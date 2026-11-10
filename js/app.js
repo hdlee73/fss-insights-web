@@ -9,7 +9,7 @@ export const MENU = [
   [null, null, [
     ["briefing", "오늘의 브리핑", "sun"],
     ["news", "뉴스검색", "newspaper"],
-    ["market", "금융시장 동향", "trending-up"],
+    ["market", "금융시장 동향 및 거시경제 지표", "trending-up"],
     ["law", "스마트 법령검색", "scale"],
     ["consumer", "금융소비자 지킴이", "shield-check"],
   ]],
