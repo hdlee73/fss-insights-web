@@ -10,6 +10,8 @@ export const MENU = [
     ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향", "trending-up"],
     ["law", "스마트 법령검색", "scale"],
+    ["emergency", "보이스피싱 긴급대응", "alert-triangle"],
+    ["guard", "금융소비자 보호 지킴이", "shield-check"],
   ]],
   ["금융회사", [
     ["fisis", "금융회사 주요 현황", "building-2"],
@@ -48,6 +50,8 @@ const loaders = {
   accsearch: () => import("./screens/accsearch.js"),
   sim: () => import("./screens/sim.js"),
   law: () => import("./screens/law.js"),
+  emergency: () => import("./screens/emergency.js"),
+  guard: () => import("./screens/guard.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
   regulatory: () => import("./screens/regulatory.js"),
