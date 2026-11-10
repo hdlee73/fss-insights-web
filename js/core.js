@@ -8,7 +8,7 @@ export const DISCLAIMER_DETAIL =
   "FSS Insights는 개인이 만든 비공식 서비스이며 금융감독원 등 어떤 기관과도 제휴·위탁 관계가 없습니다. " +
   "화면에 표시되는 보도자료, 통계, 법령 등은 외부 출처의 공개 자료를 모아 보여주는 것으로, 정확성과 최신성을 보장하지 않습니다. " +
   "중요한 판단에는 반드시 원문과 공식 자료를 확인하시기 바랍니다.";
-export const APP_VERSION = "2.6.0";
+export const APP_VERSION = "2.7.0";
 
 // 서버(Cloudflare Worker). 앱과 같은 서버를 쓰고, 웹 주소(Origin)로 들어온 요청만 토큰 없이 받는다.
 const DEFAULT_SERVER = "https://news-proxy.hdlee73.workers.dev";
@@ -152,11 +152,28 @@ export function cached(key, ttlMs, load) {
   memo.set(key, { at: Date.now(), promise });
   return promise;
 }
+/** 같은 주소의 JSON을 읽는다(실패하면 예외). 30분 동안은 다시 받지 않는다. */
+export async function loadJson(path) {
+  return cached("json:" + path, 30 * 60 * 1000, async () => {
+    const res = await fetch(path);
+    if (!res.ok) throw new Error("자료를 불러오지 못했습니다 (" + res.status + ")");
+    return res.json();
+  });
+}
+
 export function forget(prefix) {
   for (const k of memo.keys()) if (k.startsWith(prefix)) memo.delete(k);
 }
 
 // ---- DOM ----
+// replaceChildren(null)은 "null"이라는 글자를 넣어 버리므로, 비어 있는 자리(null·false)는 건너뛰도록 바꿔 둔다.
+{
+  const orig = Element.prototype.replaceChildren;
+  Element.prototype.replaceChildren = function (...kids) {
+    return orig.apply(this, kids.flat().filter((k) => k != null && k !== false));
+  };
+}
+
 export function h(tag, attrs, ...children) {
   const el = document.createElement(tag);
   if (attrs) {
@@ -320,13 +337,34 @@ export function fmtNum(n, digits = 0) {
   return Number(n).toLocaleString("ko-KR", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 }
 
-/** 탭 줄. 고른 번호를 onSelect로 알린다. */
+/** 탭 줄. 고른 번호를 onSelect로 알린다.
+ *  탭이 화면 폭을 넘어 오른쪽이 가려지면 오른쪽 끝에 » 표시가 나타나고, 누르면 다음 탭들이 보이도록 밀어 준다. */
 export function tabs(labels, selected, onSelect, cls = "") {
-  return h(
+  const bar = h(
     "div",
     { class: "tabs " + cls, role: "tablist" },
     labels.map((label, i) => h("button", { type: "button", role: "tab", class: i === selected ? "on" : "", "aria-selected": String(i === selected), onclick: () => onSelect(i) }, label))
   );
+  const more = h("button", { type: "button", class: "tabs-more", "aria-label": "다음 메뉴 더 보기", title: "더 보기", hidden: true, onclick: () => bar.scrollBy({ left: Math.max(120, bar.clientWidth * 0.7), behavior: "smooth" }) }, "»");
+  const wrap = h("div", { class: "tabs-wrap" + (cls.includes("seg") ? " seg" : "") }, bar, more);
+  const check = () => {
+    more.hidden = bar.scrollWidth - bar.scrollLeft - bar.clientWidth <= 2;
+  };
+  bar.addEventListener("scroll", check, { passive: true });
+  // 탭 줄 자체와 각 탭의 크기가 바뀔 때(창 크기·글꼴 로딩)마다 다시 확인한다.
+  if (typeof ResizeObserver === "function") {
+    const ro = new ResizeObserver(check);
+    ro.observe(bar);
+    for (const b of bar.children) ro.observe(b);
+  } else setTimeout(check, 0);
+  document.fonts?.ready?.then(check).catch(() => {});
+  // 고른 탭이 가려져 있으면 보이는 곳으로 옮긴다.
+  requestAnimationFrame(() => {
+    const on = bar.querySelector("button.on");
+    if (on && on.offsetLeft + on.offsetWidth > bar.clientWidth) bar.scrollLeft = on.offsetLeft - 16;
+    check();
+  });
+  return wrap;
 }
 
 export function searchBox({ placeholder, value = "", onSearch, autofocus = false }) {
