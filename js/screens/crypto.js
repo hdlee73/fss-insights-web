@@ -253,6 +253,82 @@ const table = (head, rows) =>
 const chg = (r, d = 2) => h("span", { class: cls(r) }, pct(r, d, true));
 const note = (t) => h("p", { class: "note" }, t);
 
+
+// ---------- 거래소 점유율(기간별) ----------
+const SHARE_PERIODS = [["day", "일"], ["week", "주(7일)"], ["month", "월"], ["quarter", "분기"], ["half", "반기"], ["year", "연"], ["custom", "기간 설정"]];
+function periodStart(period, date) {
+  const [y, m] = [Number(date.slice(0, 4)), Number(date.slice(5, 7))];
+  const pad = (n) => String(n).padStart(2, "0");
+  if (period === "month") return `${y}-${pad(m)}-01`;
+  if (period === "quarter") return `${y}-${pad(Math.floor((m - 1) / 3) * 3 + 1)}-01`;
+  if (period === "half") return `${y}-${m <= 6 ? "01" : "07"}-01`;
+  if (period === "year") return `${y}-01-01`;
+  if (period === "week") { const d = new Date(date + "T00:00:00Z"); d.setUTCDate(d.getUTCDate() - 6); return d.toISOString().slice(0, 10); }
+  return date;
+}
+/** 기간 내 일별 24h 거래대금을 합산해 거래소별 점유율을 계산한다(달력 기준 누계: 월·분기·반기·연은 해당 기간 첫날부터 마지막 집계일까지). */
+function periodShares(hist, period, range) {
+  const rows = hist.filter((x) => x.date);
+  if (!rows.length) return null;
+  const last = range?.to || rows.at(-1).date, from = range?.from || periodStart(period, last);
+  const sel = rows.filter((x) => x.date >= from && x.date <= last);
+  const sums = {};
+  let days = 0;
+  for (const r of sel) {
+    let any = false;
+    for (const [k] of EXCHANGES) {
+      const v = r.exchanges?.[k]?.value ?? r.by_exchange?.[k];
+      if (v != null && Number.isFinite(v)) { sums[k] = (sums[k] || 0) + v; any = true; }
+    }
+    if (any) days++;
+  }
+  const total = Object.values(sums).reduce((a, b) => a + b, 0);
+  return { from, to: last, days, sums, total };
+}
+function sharePanel(s, hist, palette, prev) {
+  const body = h("div", { class: "stack" });
+  const dates = hist.map((x) => x.date).filter(Boolean);
+  const minD = dates[0] || "", maxD = dates.at(-1) || "";
+  const fromIn = h("input", { type: "date", min: minD, max: maxD, value: minD }), toIn = h("input", { type: "date", min: minD, max: maxD, value: maxD });
+  const rangeBox = h("div", { class: "cr-range", hidden: true }, h("label", null, "시작 ", fromIn), h("label", null, "종료 ", toIn), h("span", { class: "note" }, `선택 가능: ${minD} ~ ${maxD}`));
+  let cur = "day";
+  const draw = (period) => {
+    cur = period;
+    rangeBox.hidden = period !== "custom";
+    let range = null;
+    if (period === "custom") {
+      let f = fromIn.value || minD, t = toIn.value || maxD;
+      if (f > t) [f, t] = [t, f];
+      range = { from: f, to: t };
+    }
+    const r = period === "day" ? null : periodShares(hist, period, range);
+    let sums, total, head;
+    if (period === "day" || !r) {
+      sums = Object.fromEntries((s.exchanges || []).filter((e) => e.ok).map((e) => [e.exchange, e.value_24h || 0]));
+      total = Object.values(sums).reduce((a, b) => a + b, 0);
+      head = note(`${s.date || ""} 24시 마감 기준 하루 거래대금`);
+    } else {
+      sums = r.sums; total = r.total;
+      const full = { week: 7, month: 28, quarter: 85, half: 175, year: 360 }[period];
+      if (!r.days) { body.replaceChildren(note("선택한 기간에 집계 자료가 없습니다. 기간을 바꿔 주세요.")); return; }
+      head = note(`${r.from} ~ ${r.to} 누계(집계 ${r.days}일분)` + (period !== "custom" && r.days < Math.min(full || 5, 5) ? " · 이력이 아직 짧아 일부 기간만 반영됩니다." : ""));
+    }
+    const rows = EXCHANGES.filter(([k]) => sums[k] > 0).map(([k, n], i) => ({ k, n, v: sums[k], color: palette[i % palette.length] }));
+    body.replaceChildren(head,
+      donut(rows.map((e) => ({ name: e.n, v: e.v, color: e.color }))),
+      table(["거래소", period === "day" ? "거래대금" : "기간 거래대금", "점유율"], rows.map((e) => [e.n, won(e.v) + " 원", pct(total ? e.v / total : null)]).concat([["합계", won(total) + " 원", "100%"]])),
+      note("점유율 = 거래소 거래대금 ÷ 5개 거래소 합계. 기간 거래대금은 매일 24시 마감 집계값을 더한 것입니다."));
+  };
+  const seg = tabs(SHARE_PERIODS.map((p) => p[1]), 0, (i) => {
+    seg.querySelectorAll("[role=tab]").forEach((b, j) => { b.classList.toggle("on", j === i); b.setAttribute("aria-selected", String(j === i)); });
+    draw(SHARE_PERIODS[i][0]);
+  }, "seg");
+  fromIn.addEventListener("change", () => cur === "custom" && draw("custom"));
+  toIn.addEventListener("change", () => cur === "custom" && draw("custom"));
+  draw("day");
+  return card("거래소 점유율 (기간별)", "building-2", h("div", { class: "stack" }, seg, rangeBox, body));
+}
+
 // ---------- 시장 요약 ----------
 function summary(root, data, goto, ctx) {
   const s = data.snapshot, d = s.domestic || {}, g = s.global || {};
@@ -282,11 +358,7 @@ function summary(root, data, goto, ctx) {
           ["기간 최저", won(mn) + " 원", slotShort(hist[hist.findIndex((x) => x.total_value_24h === mn)]?.date, "")]]);
       })(),
       note("막대는 매일 24시 마감 기준 국내 5개 거래소 24시간 거래대금 합계입니다."))),
-    card("거래소 점유율 (24h 거래대금)", "building-2", h("div", { class: "stack" },
-      donut((s.exchanges || []).filter((e) => e.ok && (e.value_24h || 0) > 0).map((e, i) => ({ name: e.name || exName(e.exchange), v: e.value_24h, color: palette[i % palette.length] }))),
-      table(["거래소", "거래대금", "점유율", "전일 대비"], (s.exchanges || []).filter((e) => e.ok).map((e) => [e.name || exName(e.exchange), won(e.value_24h) + " 원", pct(e.share), chg(ratio(e.value_24h, prev?.exchanges?.[e.exchange]?.value ?? prev?.by_exchange?.[e.exchange]), 1)]),
-      ),
-      note("점유율은 5개 거래소 24시간 거래대금 합계 대비 비중입니다.")))));
+    sharePanel(s, data.history, palette, prev)));
   root.append(h("div", { class: "cr-grid2" },
     card("거래대금 상위 (5개 거래소 합산)", "trending-up", table(["종목", "등락", "거래대금"], (s.top || []).slice(0, 6).map((r) => [r.symbol, chg(r.change_rate), won(r.value_24h)]))),
     card("주요코인 시세 · 김프 (실시간)", "activity", h("div", { class: "stack" },
