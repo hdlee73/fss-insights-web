@@ -23,7 +23,9 @@ const clip = (s, n = 38) => (s.length > n ? s.slice(0, n - 1) + "…" : s);
 
 
 const WHO = [[/금융감독원장|금감원장/, "금융감독원장"], [/금융위원장|금융위\s*위원장/, "금융위원장"]];
-const SCHED = /간담회|방문|참석|주재|면담|회동|회의|만나|현장|취임|출범|토론|특강|국정감사|국감|업무보고|기자간담|세미나|포럼|행사|점검|발표|개최|예정|오전|오후|내일|이날/;
+// 실제 일정으로 볼 만한 말만(사진 설명·인사말 기사는 제외)
+const SCHED = /간담회|방문|주재|면담|회동|점검회의|현장|특강|토론회|세미나|포럼|업무보고|국정감사|국감|기자간담|취임식|협약식/;
+const CAPTION = /대화하는|인사하는|악수|사진|포토|참석한|질의|답변하는|발언하는|입장하는|이야기/;
 /** 기사·보도자료 제목에서 원장·위원장 일정으로 보이는 것(최근 순, 최대 4건). */
 export function findSchedules(items) {
   const out = [];
@@ -31,13 +33,13 @@ export function findSchedules(items) {
   for (const a of items || []) {
     const t = a.title || "";
     const who = WHO.find(([re]) => re.test(t));
-    if (!who || !SCHED.test(`${t} ${a.summary || ""}`.slice(0, 200))) continue;
+    if (!who || CAPTION.test(t) || !SCHED.test(t)) continue;
     const key = who[1] + t.replace(/[^가-힣a-zA-Z0-9]/g, "").slice(0, 14);
     if (seen.has(key)) continue;
     seen.add(key);
     out.push({ who: who[1], title: t, href: a.link, source: a.source || a.label || "", at: a.at || (a.date ? Date.parse(a.date) : 0) });
   }
-  return out.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, 4);
+  return out.sort((a, b) => (b.at || 0) - (a.at || 0)).filter((x, i, arr) => arr.findIndex((y) => y.who === x.who) === i).slice(0, 2);
 }
 
 // ---- 기기 안 AI 요약 ----
@@ -107,13 +109,6 @@ export function buildDigest(articles, press, now = Date.now()) {
     const kw = new Map();
     for (const a of arts) for (const k of a.matched || []) kw.set(k, (kw.get(k) || 0) + 1);
     const topKw = top(kw, 3);
-    const parts = [`${label} 기사 ${arts.length}건 수집(30대 언론 ${major}건).`];
-    if (topKw.length) {
-      parts.push(" 가장 많이 다뤄진 키워드는 ");
-      topKw.forEach(([k, c], i) => parts.push(i ? ", " : "", { text: `${k} ${c}건`, q: k }));
-      parts.push("입니다.");
-    }
-    lines.push({ icon: "newspaper", parts });
 
     // 2) 제목 속 자주 나온 말(키워드와 겹치지 않는 것)
     const known = new Set([...kw.keys()].flatMap((k) => k.toLowerCase().split(/\s+/)));
@@ -121,31 +116,10 @@ export function buildDigest(articles, press, now = Date.now()) {
     for (const a of arts) for (const t of titleTerms(a.title)) if (!known.has(t)) freq.set(t, (freq.get(t) || 0) + 1);
     // 키워드(내가 정한 것)도 단어로 함께 센다
     for (const [k, c] of kw) freq.set(k.toLowerCase(), (freq.get(k.toLowerCase()) || 0) + c);
-    words = top(freq, 12).filter(([, c]) => c >= 2).slice(0, 8).map(([t, c]) => ({ text: t, count: c }));
+    words = top(freq, 12).filter(([, c]) => c >= 2).slice(0, 6).map(([t, c]) => ({ text: t, count: c }));
 
-    // 3) 감독·제재 관련(검사·제재·과징금 등이 2개 이상 겹친 기사)
-    const prio = arts.filter((a) => a.priority).sort((a, b) => b.at - a.at);
-    if (prio.length) {
-      const a = prio[0];
-      lines.push({ icon: "gavel", parts: [`감독·제재 성격의 기사 ${prio.length}건. 대표 기사: `, { text: `‘${clip(a.title)}’`, href: a.link }, ` (${String(a.source || "").slice(0, 12)})`] });
-    }
-  }
-
-  // 4) 금융당국 보도자료
-  if (pressToday.length) {
-    const p = pressToday[0];
-    lines.push({ icon: "file-text", parts: [`금융당국 보도자료 ${pressToday.length}건(어제~오늘). 최신: `, { text: `‘${clip(p.title, 42)}’`, href: p.link }, p.label ? ` (${p.label})` : ""] });
-  }
-
-  // 5) 주요 출처
-  if (arts.length >= 5 && lines.length < 5) {
-    const src = new Map();
-    for (const a of arts) {
-      const s = String(a.source || "").slice(0, 12);
-      if (s) src.set(s, (src.get(s) || 0) + 1);
-    }
-    const t = top(src, 3);
-    if (t.length >= 2) lines.push({ icon: "globe", parts: ["기사를 많이 낸 곳: " + t.map(([s, c]) => `${s} ${c}건`).join(" · ")] });
+    const prio = arts.filter((a) => a.priority).length;
+    lines.push({ icon: "newspaper", parts: [`${label} 기사 ${arts.length}건 수집` + (prio ? ` · 감독·제재 성격 ${prio}건` : "")] });
   }
   const schedules = findSchedules([...arts, ...pressToday.map((p) => ({ ...p, summary: "" }))]);
   const lead = arts.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, 6);

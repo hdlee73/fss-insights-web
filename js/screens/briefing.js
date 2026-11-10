@@ -149,11 +149,11 @@ function drawDigestCard(box, data) {
   const kids = [head];
   if (Array.isArray(data.ai)) kids.push(h("div", { class: "dg-ai" }, h("b", null, "기기 AI 요약"), h("ul", null, data.ai.map((l) => h("li", null, l)))));
   else if (data.ai === "loading") kids.push(h("div", { class: "dg-ai" }, h("b", null, "기기 AI 요약"), h("p", { class: "note" }, "요약하는 중…")));
-  if (d.words.length) kids.push(h("div", { class: "dg-words" }, h("small", null, `${d.label} 기사에 많이 나온 말`), h("div", { class: "dg-chips" }, d.words.map((w) => h("a", { class: "dg-chip", href: "#/news?q=" + encodeURIComponent(w.text) }, `${w.text} `, h("em", null, w.count))))));
-  const sch = findSchedules([...(data.extra || []), ...(d.schedules || [])]).slice(0, 4);
+  if (d.words.length) kids.push(h("div", { class: "dg-words" }, h("div", { class: "dg-chips" }, d.words.map((w) => h("a", { class: "dg-chip", href: "#/news?q=" + encodeURIComponent(w.text) }, `${w.text} `, h("em", null, w.count))))));
+  const sch = findSchedules([...(data.extra || []), ...(d.schedules || [])]).slice(0, 2);
   if (sch.length) kids.push(h("ul", { class: "dg-lines dg-sched" }, sch.map((x) => h("li", null, icon("calendar"), h("span", null, h("b", null, x.who + " "), h("a", { href: x.href, target: "_blank", rel: "noopener" }, x.title), x.source ? ` (${String(x.source).slice(0, 12)})` : "")))));
   kids.push(h("ul", { class: "dg-lines" }, d.lines.map((l) => h("li", null, icon(l.icon), h("span", null, l.parts.map(piece))))));
-  kids.push(h("p", { class: "note dg-foot" }, `${d.label} 수집된 기사·보도자료의 낱말 집계로 정리했습니다. 기기 AI(Gemini Nano)를 쓸 수 있는 기기에서는 주요 기사 요약이 더해지며, 기사 내용은 기기 밖으로 보내지 않습니다. 정확한 내용은 원문을 확인하세요.`));
+  kids.push(h("p", { class: "note dg-foot" }, "낱말 집계로 정리한 것입니다. 정확한 내용은 원문을 확인하세요."));
   box.replaceChildren(...kids);
   if (data.press == null) box.append(h("div", { class: "dg-wait" }, "보도자료를 불러오는 중…"));
 }
