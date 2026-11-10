@@ -54,7 +54,7 @@ let refs = null; // 이 화면의 DOM 묶음
 
 export async function render(root) {
   boot();
-  setHeader("과징금·양정 시뮬레이터", "외감규정·시행세칙 양정기준 적용 모의계산 (참고용)");
+  setHeader("(베타) 회계 양정 및 과징금 시뮬레이터", "외감규정·시행세칙 양정기준 적용 모의계산 (참고용)");
   refs = { root, form: h("div", { class: "col" }), result: h("div", { class: "col sim-result" }), stockBox: h("div", { class: "stack" }), saveMsg: h("div", { class: "note", role: "status" }) };
   root.append(h("div", { class: "grid2 sim" }, refs.form, refs.result));
   drawForm();

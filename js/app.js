@@ -1,40 +1,47 @@
 // 앱 뼈대: 왼쪽 메뉴(접기·펼치기, 휴대폰은 서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
-import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, h, icon, store, toast } from "./core.js";
+import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, forget, freshness, h, icon, skeleton, store, toast } from "./core.js";
+import { installQuickSearchKey, openQuickSearch } from "./quicksearch.js";
 
 // 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서.
 // 소제목이 있는 묶음은 제목을 눌러 하위 메뉴를 접고 펼 수 있다(접은 상태는 기억한다).
 export const MENU = [
-  [null, [
+  [null, null, [
     ["briefing", "오늘의 브리핑", "sun"],
     ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향", "trending-up"],
     ["law", "스마트 법령검색", "scale"],
+    ["consumer", "금융소비자 지킴이", "shield-check"],
   ]],
-  ["금융회사", [
+  ["금융회사 현황 및 검사", "landmark", [
     ["fisis", "금융회사 주요 현황", "building-2"],
-    ["sanction", "금융회사 제재 현황", "gavel"],
+    ["sanction", "금융회사 제재 공시", "gavel"],
+    ["finsim", "(베타)제재 양정 시뮬레이터", "calculator"],
   ]],
-  ["기업공시 및 회계", [
+  ["기업공시 및 회계", "bar-chart-3", [
     ["dart", "기업 개황 및 공시(DART)", "building"],
     ["disclosure", "공시조사결과제재", "shield-alert"],
     ["audit", "회계감리 조치현황", "clipboard-check"],
-    ["accsearch", "회계기준서·질의회신·지적사례 검색", "book-marked"],
-    ["sim", "(회계)과징금 및 양정 시뮬레이터", "calculator"],
+    ["accsearch", "회계기준서·질의회신·지적사례", "book-marked"],
+    ["sim", "(베타) 회계 양정 및 과징금 시뮬레이터", "calculator"],
   ]],
-  ["자료", [
-    ["press", "보도자료", "file-text"],
+  [null, null, [
+    ["crypto", "가상자산 시장 동향", "coins"],
+  ]],
+  ["금융관련 자료", "folder-open", [
+    ["press", "금융당국 등 보도자료", "file-text"],
     ["regulatory", "유권해석·비조치의견서·행정지도", "badge-check"],
     ["research", "금융관련 리포트", "book-open"],
-    ["library", "참고자료실", "folder-open"],
+    ["library", "기타 참고자료", "folder-open"],
   ]],
-  ["더보기", [
+  ["더보기", "ellipsis-vertical", [
+    ["vault", "보관함(스크랩·메모)", "bookmark-check"],
     ["sites", "주요사이트", "globe"],
     ["alerts", "알림", "bell"],
     ["info", "앱정보", "info"],
   ]],
 ];
-const ROUTES = Object.fromEntries(MENU.flatMap(([, items]) => items.map(([id, label, ic]) => [id, { label, icon: ic }])));
+const ROUTES = Object.fromEntries(MENU.flatMap(([, , items]) => items.map(([id, label, ic]) => [id, { label, icon: ic }])));
 
 const loaders = {
   briefing: () => import("./screens/briefing.js"),
@@ -47,7 +54,11 @@ const loaders = {
   audit: () => import("./screens/audit.js"),
   accsearch: () => import("./screens/accsearch.js"),
   sim: () => import("./screens/sim.js"),
+  finsim: () => import("./screens/finsim.js"),
+  consumer: () => import("./screens/consumer.js"),
+  crypto: () => import("./screens/crypto.js"),
   law: () => import("./screens/law.js"),
+  vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
   regulatory: () => import("./screens/regulatory.js"),
@@ -90,11 +101,11 @@ function buildMenu() {
       h("div", { class: "brand-t" }, h("b", null, "FSS Insights"), h("small", null, "웹 버전")),
       h("button", { class: "ib collapse", type: "button", title: "메뉴 접기", "aria-label": "메뉴 접기", onclick: toggleCollapse }, icon("panel-left"))),
     h("nav", { class: "menu" },
-      MENU.map(([head, items]) => {
+      MENU.map(([head, gic, items]) => {
         const folded = head && folds().includes(head);
-        return h("div", { class: "sec" + (folded ? " folded" : ""), "data-head": head || "" },
-          head ? h("button", { class: "sh", type: "button", "aria-expanded": String(!folded), title: folded ? `${head} 펼치기` : `${head} 접기`, onclick: () => toggleFold(head) },
-            h("span", null, head), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up")) : null,
+        return h("div", { class: "sec" + (head ? " grouped" : "") + (folded ? " folded" : ""), "data-head": head || "" },
+          head ? h("button", { class: "sh grp", type: "button", "aria-expanded": String(!folded), title: folded ? `${head} 펼치기` : `${head} 접기`, onclick: () => toggleFold(head) },
+            icon(gic), h("span", { class: "gl" }, head), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up", "i chev")) : null,
           items.map(([id, label, ic]) => h("a", { class: "mi", href: `#/${id}`, "data-id": id, title: label, onclick: (e) => {
             if (!document.body.classList.contains("drawer")) return;
             e.preventDefault();
@@ -115,7 +126,7 @@ function toggleFold(head) {
 function refreshFolds(openCurrent = false) {
   const { id } = currentRoute();
   let list = folds();
-  const head = MENU.find(([hd, items]) => hd && items.some(([i]) => i === id))?.[0];
+  const head = MENU.find(([hd, , items]) => hd && items.some(([i]) => i === id))?.[0];
   if (openCurrent && head && list.includes(head)) {
     list = list.filter((x) => x !== head);
     store.set("menu.folds", list);
@@ -126,11 +137,11 @@ function refreshFolds(openCurrent = false) {
     const folded = list.includes(hd);
     sec.classList.toggle("folded", folded);
     const btn = sec.querySelector("button.sh");
-    const items = MENU.find(([x]) => x === hd)[1];
+    const [, gic, items] = MENU.find(([x]) => x === hd);
     btn.setAttribute("aria-expanded", String(!folded));
     btn.title = folded ? `${hd} 펼치기` : `${hd} 접기`;
     btn.classList.toggle("has-on", folded && hd === head);
-    btn.replaceChildren(h("span", null, hd), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up"));
+    btn.replaceChildren(icon(gic), h("span", { class: "gl" }, hd), h("span", { class: "n" }, folded ? String(items.length) : ""), icon(folded ? "chevron-down" : "chevron-up", "i chev"));
   }
 }
 
@@ -180,6 +191,50 @@ export function setHeader(title, sub = "", actions = []) {
 }
 
 let lastCountedId = null;
+let shownId = null;
+
+/** 헤더의 새로고침: 기억해 둔 자료를 모두 비우고 지금 화면을 다시 불러온다. */
+export function refreshAll() {
+  forget("");
+  window.dispatchEvent(new Event("fss-refresh"));
+  shownId = null; // 뼈대를 다시 보여 주며 처음부터 불러온다
+  render();
+}
+
+// ---- 헤더 우측: 마지막 업데이트 시각 · 빠른 검색 · 새로고침 ----
+const pad = (n) => String(n).padStart(2, "0");
+const stamp = (t) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+function paintFresh() {
+  const el = document.getElementById("fresh-t");
+  if (!el) return;
+  const offline = !navigator.onLine;
+  const stale = !!freshness.stale;
+  const wrap = document.getElementById("fresh");
+  wrap.classList.toggle("stale", !!stale || offline);
+  const when = freshness.at ? stamp(freshness.at) : "-";
+  el.replaceChildren(
+    h("span", { class: "fresh-k" }, "마지막 업데이트: "), h("b", null, h("span", { class: "fresh-full" }, when), h("span", { class: "fresh-short" }, when.slice(5))),
+    ...(stale || offline ? [h("span", { class: "fresh-tag" }, offline ? "오프라인 · 저장본" : "저장본")] : []));
+  el.title = stale || offline ? "연결이 불안정해 마지막으로 저장해 둔 자료를 보여 주고 있습니다." : "자료를 마지막으로 정상 수신한 시각";
+}
+function setupFresh() {
+  const wrap = document.getElementById("fresh");
+  if (!wrap) return;
+  const btn = document.getElementById("fresh-btn");
+  btn.addEventListener("click", () => {
+    btn.classList.add("busy");
+    setTimeout(() => btn.classList.remove("busy"), 900);
+    refreshAll();
+  });
+  document.getElementById("qs-btn").addEventListener("click", openQuickSearch);
+  window.addEventListener("fss-fresh", paintFresh);
+  addEventListener("online", () => (paintFresh(), toast("다시 연결되었습니다. 새로고침으로 최신 자료를 받을 수 있어요.")));
+  addEventListener("offline", paintFresh);
+  paintFresh();
+}
 async function render() {
   const seq = ++renderSeq;
   const { id, params } = currentRoute();
@@ -195,6 +250,8 @@ async function render() {
   try {
     currentScreen?.leave?.();
   } catch {}
+  // 다른 화면으로 옮길 때는 자료가 올 때까지 뼈대(스켈레톤)를 보여 준다. 같은 화면 안의 조건 변경은 그대로 둔다.
+  if (shownId !== id) main.replaceChildren(h("div", { class: "screen" }, skeleton(6, "page")));
   let mod;
   try {
     mod = await loaders[id]();
@@ -205,6 +262,7 @@ async function render() {
   if (seq !== renderSeq) return;
   const root = h("div", { class: "screen screen-" + id });
   main.replaceChildren(root);
+  shownId = id;
   main.scrollTop = 0;
   currentScreen = mod;
   try {
@@ -282,7 +340,9 @@ addEventListener("touchmove", (e) => {
     touchX = null;
   }
 }, { passive: true });
-addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 저장된 화면만 볼 수 있습니다."));
+addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 마지막으로 저장된 자료를 보여 드립니다."));
+setupFresh();
+installQuickSearchKey();
 if (!location.hash) history.replaceState(null, "", "#/briefing");
 render();
 registerWorker();
