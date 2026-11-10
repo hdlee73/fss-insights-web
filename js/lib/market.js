@@ -480,17 +480,29 @@ export function periodLabel(p) {
 }
 export function statText(it, v) {
   const rate = it.unit === "%";
-  const d = rate ? 2 : it.unit === "조원" ? 1 : Math.abs(v) >= 1000 ? 0 : 1;
+  const d = Number.isInteger(it.digits) ? it.digits : rate ? 2 : it.unit === "조원" ? 1 : Math.abs(v) >= 1000 ? 0 : 1;
   return grp(v, d) + (rate ? "%" : it.unit ? " " + it.unit : "");
 }
 export function statDelta(it) {
   if (it.previous == null) return null;
   const ch = it.value - it.previous;
   const rate = it.unit === "%";
-  const d = rate ? 2 : it.unit === "조원" ? 2 : Math.abs(it.value) >= 1000 ? 0 : 1;
+  const d = Number.isInteger(it.digits) ? it.digits : rate ? 2 : it.unit === "조원" ? 2 : Math.abs(it.value) >= 1000 ? 0 : 1;
   const pc = !rate && it.previous ? ` (${sgn(((it.value - it.previous) / Math.abs(it.previous)) * 100, 2, "%")})` : "";
   return sgn(ch, d) + (rate ? "%p" : "") + pc;
 }
+
+// ---- 거시경제 지표(한국은행 ECOS, 서버 /stats) ----
+// 기본 4개(실질GDP 성장률·소비자물가 상승률·실업률·경상수지)와 추가로 고를 수 있는 지표. 서버(Worker)의 STAT_SPECS와 id가 같아야 한다.
+export const MACRO_CATALOG = [
+  sd("gdp-growth", "실질GDP 성장률(전기 대비)", "성장·생산"), sd("exports-sa", "상품수출(계절조정)", "성장·생산"),
+  sd("cpi-yoy", "소비자물가 상승률(전년동월비)", "물가"), sd("ppi-yoy", "생산자물가 상승률(전년동월비)", "물가"),
+  sd("unemployment", "실업률", "고용"), sd("employment-rate", "고용률", "고용"), sd("employed", "취업자 수", "고용"),
+  sd("current-account", "경상수지", "대외"), sd("usdkrw", "원/달러 환율(매매기준율)", "대외"),
+];
+export const DEFAULT_MACRO = ["gdp-growth", "cpi-yoy", "unemployment", "current-account"];
+export const macroSelection = () => store.get("market.macro", DEFAULT_MACRO);
+export const saveMacroSelection = (ids) => store.set("market.macro", ids);
 
 // ---- 자본시장 통계(금융투자협회 FreeSIS, 키 없음) ----
 const KOFIA_LISTS = { 펀드: ["fundList1", "fundList2", "fundList3", "fundList4", "fundList5"], 자금동향: ["fundTrendList1", "fundTrendList2", "fundTrendList3"] };
