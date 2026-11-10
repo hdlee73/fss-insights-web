@@ -197,7 +197,13 @@ async function detail(root, params, ctx, sector) {
     h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
   ]);
   // 증권사·운용사는 금융투자협회의 펀드 순자산 탭을 더한다.
-  const tabNames = ["재무현황", "주요경영지표", ...(sector === "F" || sector === "G" ? ["펀드 순자산"] : []), "최근 제재내역"];
+  // 증권사는 협회 자료에 그 회사 자체 수치가 있을 때만(소수) 보이고, 없으면 탭을 숨긴다. 운용사는 항상 보인다.
+  let showFund = sector === "G";
+  if (sector === "F") {
+    const fm = await import("../lib/fundaum.js");
+    showFund = await fm.loadFundAum().then((d) => !!fm.findCompany(d, co.name, "F"), () => false);
+  }
+  const tabNames = ["재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역"];
   const tab = Math.min(+(params.tab || 0), tabNames.length - 1);
   const tabName = tabNames[tab];
   root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
@@ -209,7 +215,7 @@ async function detail(root, params, ctx, sector) {
   }
   if (tabName === "펀드 순자산") {
     const m = await import("../lib/fundaum.js");
-    return m.fundAumPane(body, co.name);
+    return m.fundAumPane(body, co.name, sector);
   }
   body.append(loading("경영정보를 불러오는 중…"));
   let profile;
