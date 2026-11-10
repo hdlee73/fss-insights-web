@@ -673,3 +673,89 @@ button.sh.has-on > span:first-child { opacity: 1; color: var(--side-accent, #7fb
 .sec.folded .mi { display: none; }
 body.collapsed .sec.folded .mi { display: flex; }
 @media (max-width: 860px) { body.collapsed .sec.folded .mi { display: none; } }
+
+/* ---- 보이스피싱 긴급대응 · 금융소비자 보호 지킴이 (금융소비자 지킴이 웹에서 가져옴) ----
+   기존 화면과 이름이 겹치지 않도록 두 화면 안에서만 적용한다. */
+:root { --urgent: #e5484d; --urgent-soft: #fdeaea; }
+:is(.screen-guard, .screen-emergency) .sos { display: inline-flex; align-items: center; gap: 6px; background: var(--urgent); color: #fff; font-weight: 700; padding: 7px 12px; border-radius: 8px; font-size: 13px; white-space: nowrap; }
+:is(.screen-guard, .screen-emergency) .sos:hover { filter: brightness(.95); }
+@media (max-width: 520px) { :is(.screen-guard, .screen-emergency) .sos .lbl { display: none; } :is(.screen-guard, .screen-emergency) .sos { padding: 8px; } }
+:is(.screen-guard, .screen-emergency) .hero { background: linear-gradient(135deg, #14213d, #22407a); color: #fff; border-radius: 14px; padding: 22px 22px 20px; margin-bottom: 16px; }
+:is(.screen-guard, .screen-emergency) .hero h2 { font-size: 22px; margin-bottom: 6px; }
+:is(.screen-guard, .screen-emergency) .hero p { opacity: .85; }
+:is(.screen-guard, .screen-emergency) .sit-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+:is(.screen-guard, .screen-emergency) .sit-grid.two { grid-template-columns: repeat(2, 1fr); }
+@media (max-width: 700px) { :is(.screen-guard, .screen-emergency) .sit-grid, :is(.screen-guard, .screen-emergency) .sit-grid.two { grid-template-columns: 1fr; } }
+:is(.screen-guard, .screen-emergency) .sit { display: flex; align-items: center; gap: 12px; text-align: left; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px; cursor: pointer; min-height: 64px; }
+:is(.screen-guard, .screen-emergency) .sit:hover { border-color: var(--acc); background: var(--acc-soft); }
+:is(.screen-guard, .screen-emergency) .sit.on { border-color: var(--acc); background: var(--acc-soft); outline: 2px solid var(--acc); }
+:is(.screen-guard, .screen-emergency) .sit.danger { border-color: #f1b5b7; background: var(--urgent-soft); }
+:is(.screen-guard, .screen-emergency) .sit.danger .sit-ic { background: var(--urgent); color: #fff; }
+:is(.screen-guard, .screen-emergency) .sit-ic { width: 38px; height: 38px; border-radius: 10px; background: var(--acc-soft); color: var(--acc); display: grid; place-items: center; flex: none; }
+:is(.screen-guard, .screen-emergency) .sit-t { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+:is(.screen-guard, .screen-emergency) .sit-t small { color: var(--muted); font-size: 12.5px; }
+:is(.screen-guard, .screen-emergency) .tel-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+:is(.screen-guard, .screen-emergency) .tel-row .btn { min-width: 150px; }
+:is(.screen-guard, .screen-emergency) .note-bar, :is(.screen-guard, .screen-emergency) .hint-top { display: flex; gap: 8px; align-items: flex-start; background: var(--acc-soft); color: var(--acc-fg); padding: 9px 12px; border-radius: 9px; font-size: 12.5px; margin-bottom: 12px; }
+:is(.screen-guard, .screen-emergency) .note-bar .i, :is(.screen-guard, .screen-emergency) .hint-top .i { margin-top: 2px; }
+:is(.screen-guard, .screen-emergency) .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px 12px; }
+:is(.screen-guard, .screen-emergency) .seg-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+:is(.screen-guard, .screen-emergency) .seg-card { display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); cursor: pointer; }
+:is(.screen-guard, .screen-emergency) .seg-card small { color: var(--muted); font-size: 11.5px; }
+:is(.screen-guard, .screen-emergency) .seg-card.on { border-color: var(--acc); background: var(--acc-soft); outline: 1px solid var(--acc); }
+:is(.screen-guard, .screen-emergency) .result { border-radius: 12px; padding: 16px 18px; margin: 12px 0; border: 1px solid var(--line); }
+:is(.screen-guard, .screen-emergency) .result.ok { background: var(--ok-soft); border-color: #bfe6d1; }
+:is(.screen-guard, .screen-emergency) .result.urgent { background: var(--warn-soft); border-color: #f3d29c; }
+:is(.screen-guard, .screen-emergency) .result.over, :is(.screen-guard, .screen-emergency) .result.bad { background: var(--urgent-soft); border-color: #f1b5b7; }
+:is(.screen-guard, .screen-emergency) .result .big { font-size: 34px; font-weight: 800; line-height: 1.2; }
+:is(.screen-guard, .screen-emergency) .result .big.small { font-size: 20px; }
+:is(.screen-guard, .screen-emergency) .result .big-sub { font-size: 15px; font-weight: 600; margin-top: 2px; }
+:is(.screen-guard, .screen-emergency) .hint { color: var(--muted); padding: 14px 4px; }
+:is(.screen-guard, .screen-emergency) .plain { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+:is(.screen-guard, .screen-emergency) .plain.num { list-style: decimal; }
+:is(.screen-guard, .screen-emergency) .q { margin: 0; }
+:is(.screen-guard, .screen-emergency) .ans { display: flex; gap: 6px; flex-wrap: wrap; }
+:is(.screen-guard, .screen-emergency) .legal { margin-top: 18px; line-height: 1.6; }
+:is(.screen-guard, .screen-emergency) textarea.doc { width: 100%; font: 13.5px/1.7 "Pretendard Variable", "Malgun Gothic", sans-serif; padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; resize: vertical; }
+:is(.screen-guard, .screen-emergency) textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 9px; }
+:is(.screen-guard, .screen-emergency) .link-list { display: flex; flex-direction: column; gap: 8px; }
+:is(.screen-guard, .screen-emergency) .link-item { display: flex; align-items: center; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+:is(.screen-guard, .screen-emergency) .link-item:hover { border-color: var(--acc); background: var(--acc-soft); }
+:is(.screen-guard, .screen-emergency) .link-item > div { flex: 1; min-width: 0; }
+:is(.screen-guard, .screen-emergency) .link-item b { display: block; font-weight: 600; }
+:is(.screen-guard, .screen-emergency) .link-item small { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+:is(.screen-guard, .screen-emergency) .link-item.slim { padding: 9px 12px; }
+:is(.screen-guard, .screen-emergency) .link-item.slim b { flex: 1; }
+:is(.screen-guard, .screen-emergency) .link-item .i { color: var(--muted); }
+:is(.screen-guard, .screen-emergency) .alert-banner { display: flex; gap: 10px; align-items: flex-start; background: var(--urgent-soft); border: 1px solid #f1b5b7; color: #8a1f1f; border-radius: 12px; padding: 12px 14px; }
+:is(.screen-guard, .screen-emergency) .alert-banner .i { color: var(--urgent); margin-top: 2px; }
+:is(.screen-guard, .screen-emergency) .big-btn { padding: 14px 22px; font-size: 16px; flex: 1; min-width: 150px; }
+:is(.screen-guard, .screen-emergency) .progress { font-weight: 700; color: var(--acc-fg); }
+:is(.screen-guard, .screen-emergency) .step { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--urgent); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; }
+:is(.screen-guard, .screen-emergency) .step.done { border-left-color: var(--ok-fg); opacity: .65; }
+:is(.screen-guard, .screen-emergency) .step-h { display: flex; gap: 10px; align-items: flex-start; }
+:is(.screen-guard, .screen-emergency) .step-h > div { flex: 1; min-width: 0; }
+:is(.screen-guard, .screen-emergency) .step-n { width: 26px; height: 26px; border-radius: 50%; background: var(--fg); color: #fff; display: grid; place-items: center; font-size: 13px; font-weight: 700; flex: none; }
+:is(.screen-guard, .screen-emergency) .when { font-size: 12px; color: var(--urgent); font-weight: 700; }
+:is(.screen-guard, .screen-emergency) .chk { display: inline-flex; gap: 5px; align-items: center; font-size: 13px; cursor: pointer; padding: 4px 6px; }
+:is(.screen-guard, .screen-emergency) .chk input { width: 20px; height: 20px; }
+
+/* 사례 검색·성적표 */
+:is(.screen-guard, .screen-emergency) .case { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; display: flex; flex-direction: column; gap: 8px; }
+:is(.screen-guard, .screen-emergency) .case-h { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+:is(.screen-guard, .screen-emergency) .case-h .note { margin-left: auto; }
+:is(.screen-guard, .screen-emergency) .case h4 { font-size: 15px; }
+:is(.screen-guard, .screen-emergency) .case p { margin: 0; line-height: 1.6; }
+:is(.screen-guard, .screen-emergency) .bars { display: flex; gap: 10px; align-items: flex-end; height: 120px; }
+:is(.screen-guard, .screen-emergency) .bar-col { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 2px; }
+:is(.screen-guard, .screen-emergency) .bar { width: 100%; max-width: 56px; background: var(--acc); border-radius: 5px 5px 0 0; }
+:is(.screen-guard, .screen-emergency) .bar-col small { color: var(--muted); font-size: 11px; }
+:is(.screen-guard, .screen-emergency) .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--card); }
+.tabs.pill { border: 0; gap: 6px; padding-bottom: 2px; }
+.tabs.pill button { border: 0; border-radius: 99px; background: var(--chip); color: var(--muted); padding: 7px 14px; white-space: nowrap; font-weight: 500; }
+.tabs.pill button:hover { color: var(--fg); }
+.tabs.pill button.on { background: var(--acc); color: #fff; font-weight: 700; }
+.screen-guard .guard-tabs { position: sticky; top: -1px; z-index: 2; background: var(--bg); padding: 2px 0 10px; margin-bottom: 8px; }
+.screen-guard .guard-body > .tabs:not(.pill) { margin-top: 2px; }
+.screen-guard .tbl th, .screen-guard .tbl td { white-space: nowrap; }
+@media print { .screen-guard .guard-tabs, .screen-guard .note-bar, .screen-emergency .btn { display: none !important; } }
