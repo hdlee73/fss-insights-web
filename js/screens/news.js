@@ -2,8 +2,10 @@
 // 맞춤 키워드 뉴스, 직접 검색(AND·OR·"문구"·-제외어), 언론 범위·기간 필터, 중복 정리, 즐겨찾기, 이전 기사 더 불러오기,
 // 키워드 모니터링(최근 7일 기사 수·급증), 맞춤 키워드 설정.
 import { setHeader } from "../app.js";
-import { cached, dialog, errorText, forget, h, icon, iconButton, loading, message, openUrl, share, toast } from "../core.js";
+import { cached, dialog, errorText, forget, h, icon, iconButton, loading, message, openUrl, share, skeleton, toast } from "../core.js";
 import * as N from "../lib/news.js";
+import { cachedOffline } from "../lib/offline.js";
+import { editNote, getNote, isRead, markRead } from "../lib/vault.js";
 
 const SEOUL = "Asia/Seoul";
 const dayFmt = new Intl.DateTimeFormat("ko-KR", { timeZone: SEOUL, month: "long", day: "numeric", weekday: "long" });
@@ -37,18 +39,30 @@ export function articleRow(a, { compact = false } = {}) {
     }, on ? "on" : "");
     return b;
   };
-  const open = () => openUrl(a.link);
-  return h("div", { class: "item news-item" + (a.priority ? " prio" : "") },
+  const open = () => {
+    markRead(a.link);
+    row.classList.add("read");
+    openUrl(a.link);
+  };
+  const memo = () => iconButton("pencil", getNote(a.link) ? "메모 고치기" : "메모 쓰기(보관함에 담김)", async () => {
+    if (!N.isBookmarked(a.link)) N.toggleBookmark(a);
+    if (await editNote(a.link, a.title)) acts.replaceChildren(bm(), memo(), shareBtn);
+  }, getNote(a.link) ? "on" : "");
+  const shareBtn = iconButton("share-2", "제목과 링크 공유", () => share(a.title, a.link));
+  const acts = h("div", { class: "acts" }, bm(), memo(), shareBtn);
+  const row = h("div", { class: "item news-item" + (a.priority ? " prio" : "") + (isRead(a.link) ? " read" : "") },
     h("div", { class: "body", onclick: open, role: "link", tabindex: 0, onkeydown: (e) => e.key === "Enter" && open() },
       h("div", { class: "m src" }, h("span", { class: "tag" + (a.priority ? " orange" : " blue") }, String(a.source || "").slice(0, 12)), relativeTime(a.at)),
       h("div", { class: "t" }, a.title),
       compact ? null : h("div", { class: "sum" }, a.summary),
       a.matched?.length ? h("div", { class: "kw" }, a.matched.map((k) => "#" + k).join(" · ")) : null),
-    h("div", { class: "acts" }, bm(), iconButton("share-2", "제목과 링크 공유", () => share(a.title, a.link))));
+    acts);
+  return row;
 }
 
 // 직접 검색 결과는 화면을 오가도(뒤로가기) 다시 읽지 않도록 잠시 기억한다.
 const results = new Map();
+addEventListener("fss-refresh", () => results.clear()); // 헤더의 새로고침 버튼
 let filterOpen = false; // 필터를 펼친 채로 조건을 바꿔도 접히지 않게
 const TTL = 3 * 60 * 1000;
 
@@ -153,7 +167,7 @@ export async function render(root, params, ctx) {
 
   const title = q ? `‘${q}’ 검색 결과` : "맞춤 뉴스";
   drawHead(title, null);
-  list.replaceChildren(loading("최신 기사를 모으고 있습니다"));
+  list.replaceChildren(skeleton(6));
   let state;
   try {
     const k = key(q, s);
@@ -208,7 +222,7 @@ export async function render(root, params, ctx) {
 
 /** 맞춤 뉴스(브리핑의 최근 기사와 함께 쓴다). */
 export function loadHome(s = N.settings()) {
-  return cached("news:home:" + key("", s), TTL, () => N.home(s));
+  return cachedOffline("news:home:" + key("", s), TTL, () => N.home(s));
 }
 
 const key = (q, s) => [q, s.scope, s.range, s.keywords.join("|")].join("\u001f");
