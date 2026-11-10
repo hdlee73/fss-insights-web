@@ -218,6 +218,8 @@ function paintFresh() {
   el.replaceChildren(
     h("span", { class: "fresh-k" }, "마지막 업데이트: "), h("b", null, h("span", { class: "fresh-full" }, when), h("span", { class: "fresh-short" }, when.slice(5))),
     ...(stale || offline ? [h("span", { class: "fresh-tag" }, offline ? "오프라인 · 저장본" : "저장본")] : []));
+  const btn = document.getElementById("fresh-btn");
+  if (btn) btn.title = `새로고침 · 마지막 업데이트 ${when}${offline ? " (오프라인 · 저장본)" : stale ? " (저장본)" : ""}`;
   el.title = stale || offline ? "연결이 불안정해 마지막으로 저장해 둔 자료를 보여 주고 있습니다." : "자료를 마지막으로 정상 수신한 시각";
 }
 function setupFresh() {
