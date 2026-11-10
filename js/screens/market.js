@@ -1,10 +1,10 @@
-// 금융시장 동향: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행), 자본시장 통계(금융투자협회).
+// 금융시장 동향 및 거시경제 지표: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행 ECOS), 거시경제 지표(한국은행 ECOS), 자본시장 통계(금투협).
 // 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 지수는 10초, 전체는 20초마다 새로 읽는다.
 import { setHeader } from "../app.js";
 import { dialog, errorText, forget, h, icon, iconButton, store, toast } from "../core.js";
 import {
-  INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, STAT_CATALOG, changeOf, deltaText, groupOf, history, indexSelection, intraday, investors,
-  loadKofia, loadStats, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
+  INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
+  loadKofia, loadStats, macroSelection, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
   UP, DOWN,
 } from "../lib/market.js";
 
@@ -83,7 +83,7 @@ export async function render(root, params, ctx) {
     forget("kofia");
     ctx.go({}, { replace: true });
   });
-  setHeader("금융시장 동향", "지수·환율·금리·원자재를 한눈에", [refreshBtn]);
+  setHeader("금융시장 동향 및 거시경제 지표", "지수·환율·금리·거시경제 지표를 한눈에", [refreshBtn]);
 
   // ---- 증시동향 ----
   const indexMode = store.get("market.indexIntraday", true);
@@ -176,14 +176,21 @@ export async function render(root, params, ctx) {
 
   // ---- 국내 금융 통계 ----
   const stats = h("div");
-  root.append(subhead("국내 금융 통계", soft("통계 선택", async () => {
+  root.append(subhead("국내 금융 통계(한국은행 ECOS)", soft("통계 선택", async () => {
     if (await pickStats()) ctx.go(params, { replace: true });
   })), stats, h("p", { class: "note", style: { marginTop: "6px" } }, "한국은행 ECOS 기준. 기준금리는 직전 변경 대비, 나머지는 직전 관측값 대비."));
   drawStats(stats, statSelection().market);
 
+  // ---- 거시경제 지표 ----
+  const macro = h("div");
+  root.append(subhead("거시경제 지표(한국은행 ECOS)", soft("지표 선택", async () => {
+    if (await pickMacro()) ctx.go(params, { replace: true });
+  })), macro, h("p", { class: "note", style: { marginTop: "6px" } }, "한국은행 ECOS 기준. 분기·월 지표는 발표 주기에 따라 갱신되며, 직전 관측값 대비 변화를 보입니다. 물가 상승률은 전년동월비, 성장률은 전기비입니다."));
+  drawStats(macro, macroSelection(), { catalog: MACRO_CATALOG, emptyText: "표시할 지표가 없습니다. ‘지표 선택’에서 고르세요." });
+
   // ---- 자본시장 통계 ----
   const kofia = h("div", { class: "kofia-cols" });
-  root.append(subhead("자본시장 통계", soft("항목 선택", async () => {
+  root.append(subhead("자본시장 통계(금투협)", soft("항목 선택", async () => {
     if (await pickKofia()) ctx.go(params, { replace: true });
   })), kofia, h("p", { class: "note", style: { marginTop: "6px" } }, "금융투자협회 종합통계 포털 기준. 직전 영업일(신규펀드는 직전 조회일) 대비 증감."));
   drawKofia(kofia);
@@ -206,17 +213,19 @@ export async function render(root, params, ctx) {
   }, 10_000);
 }
 
-export async function drawStats(box, ids, { compact = false } = {}) {
+export async function drawStats(box, ids, { compact = false, catalog = STAT_CATALOG, emptyText = "표시할 통계가 없습니다. ‘통계 선택’에서 고르세요." } = {}) {
+  const macro = catalog === MACRO_CATALOG;
+  const groupOf = (id) => catalog.find((s) => s.id === id)?.group || "기타";
   box.replaceChildren(h("div", { class: "note card" }, "통계를 불러오는 중입니다…"));
-  if (!ids.length) return box.replaceChildren(h("p", { class: "note card" }, "표시할 통계가 없습니다. ‘통계 선택’에서 고르세요."));
+  if (!ids.length) return box.replaceChildren(h("p", { class: "note card" }, emptyText));
   let r;
   try {
-    r = await loadStats(STAT_CATALOG.map((s) => s.id).filter((id) => ids.includes(id)));
+    r = await loadStats(catalog.map((s) => s.id).filter((id) => ids.includes(id)));
   } catch (e) {
     return box.replaceChildren(h("p", { class: "note card", style: { color: "var(--danger)" } }, "통계를 서버에서 받지 못했습니다. " + errorText(e)));
   }
-  const visible = STAT_CATALOG.map((d) => r.items.find((x) => x.id === d.id)).filter(Boolean);
-  const absent = STAT_CATALOG.filter((d) => ids.includes(d.id) && !r.items.some((x) => x.id === d.id));
+  const visible = catalog.map((d) => ids.includes(d.id) && r.items.find((x) => x.id === d.id)).filter(Boolean);
+  const absent = catalog.filter((d) => ids.includes(d.id) && !r.items.some((x) => x.id === d.id));
   const groups = new Map();
   for (const it of visible) {
     const g = groupOf(it.id);
@@ -229,7 +238,7 @@ export async function drawStats(box, ids, { compact = false } = {}) {
       h("b", null, statText(it, it.value)), h("div", { class: "dl", style: { color: tint(ch) } }, statDelta(it) || "직전 값 —"));
   };
   box.replaceChildren(...[
-    visible.length ? h("div", { class: "stats" }, [...groups].map(([g, rows]) => [compact ? null : h("div", { class: "g" }, g), h("div", { class: "cells" }, rows.map(cell))])) : h("p", { class: "note card" }, "통계를 서버에서 받지 못했습니다."),
+    visible.length ? h("div", { class: "stats" }, [...groups].map(([g, rows]) => [compact ? null : h("div", { class: "g" }, g), h("div", { class: "cells" }, rows.map(cell))])) : h("p", { class: "note card" }, macro ? "거시경제 지표를 받지 못했습니다. 서버 업데이트 전이거나 한국은행 ECOS 응답이 없을 수 있습니다." : "통계를 서버에서 받지 못했습니다."),
     absent.length && visible.length ? h("p", { class: "note", style: { color: "var(--danger)", marginTop: "6px" } }, "받지 못한 통계: " + absent.map((d) => d.name + (r.reasons[d.id] ? ` [${r.reasons[d.id]}]` : "")).join("; ")) : null].filter(Boolean));
 }
 
@@ -290,6 +299,13 @@ async function pickStats() {
   if (!(await dialog({ title: "통계 선택", body: [h("div", { class: "note" }, "금융시장 동향과 오늘의 브리핑에 보일 통계를 고릅니다."), t.box], ok: "저장", wide: true }))) return false;
   const r = t.read();
   saveStatSelection({ market: r.a, briefing: r.b });
+  return true;
+}
+
+async function pickMacro() {
+  const t = pickTable(MACRO_CATALOG.map((s) => ({ key: s.id, label: s.name, group: s.group })), new Set(macroSelection()), null, ["표시"]);
+  if (!(await dialog({ title: "거시경제 지표 선택", body: [h("div", { class: "note" }, "금융시장 동향에 보일 거시경제 지표를 고릅니다. 기본은 실질GDP 성장률·소비자물가 상승률·실업률·경상수지입니다."), t.box], ok: "저장", wide: true }))) return false;
+  saveMacroSelection(t.read().a);
   return true;
 }
 
