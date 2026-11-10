@@ -52,15 +52,16 @@ export async function loadFundAum(force = false) {
   }
 }
 
-/** 금융회사 주요 현황의 회사 이름으로 찾는다(이름 표기가 같거나, 끝의 자산운용·증권 등을 뗀 이름이 하나로 맞을 때만). */
-export function findCompany(data, company) {
+/** 금융회사 주요 현황의 회사 이름으로 찾는다. 증권사(sector "F")는 이름이 똑같은 경우만(끝의 '증권'을 떼어 같은 계열
+ *  자산운용사 수치를 잘못 붙이지 않도록), 운용사는 이름이 같거나 끝의 자산운용 등을 뗀 이름이 증권사 아닌 한 곳으로 맞을 때만. */
+export function findCompany(data, company, sector = "G") {
   const k = key(company);
   if (!k) return null;
   const exact = data.companies.find((c) => key(c.name) === k);
-  if (exact) return exact;
+  if (exact || sector === "F" || /증권$/.test(k)) return exact || null;
   const s = stem(company);
   if (s.length < 2) return null;
-  const hits = data.companies.filter((c) => stem(c.name) === s);
+  const hits = data.companies.filter((c) => !/증권$/.test(key(c.name)) && stem(c.name) === s);
   return hits.length === 1 ? hits[0] : null;
 }
 
@@ -77,15 +78,15 @@ export function eokText(v) {
 const dateLabel = (s) => (s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6)}` : s || "");
 
 /** 금융회사 주요 현황 → '펀드 순자산' 탭. */
-export async function fundAumPane(box, company) {
+export async function fundAumPane(box, company, sector = "G") {
   box.replaceChildren(loading("펀드 순자산 자료를 불러오는 중…"));
   let data;
   try {
     data = await loadFundAum();
   } catch (e) {
-    return box.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => fundAumPane(box, company) }));
+    return box.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => fundAumPane(box, company, sector) }));
   }
-  const c = findCompany(data, company);
+  const c = findCompany(data, company, sector);
   if (!c) return box.replaceChildren(message(`금융투자협회 회사별 펀드 설정규모에서 ‘${company}’ 이름으로 된 자료를 찾지 못했습니다.\n(펀드를 설정·운용하지 않는 회사이거나 회사명 표기가 다를 수 있습니다.)`));
   const heads = [["최근일자", data.asOf.recent], ["최직근 분기말", data.asOf.quarter], ["최직근 연말", data.asOf.year]];
   const row = (label, vals, bold) => h("tr", null, h("th", { scope: "row", style: bold ? { color: "var(--text)" } : null }, label), vals.map((v) => h("td", { class: "num", style: bold ? { fontWeight: "700" } : null }, eokText(v))));
