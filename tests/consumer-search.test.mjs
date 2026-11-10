@@ -20,4 +20,12 @@ assert.equal(S.similar(idx, "t1")[0].doc.id, "t5");
 assert.equal(S.search(idx, "", {}).length, 0);
 const st = S.ratioStats(docs); assert.equal(st.n, 4); assert.equal(st.median, 45); assert.equal(st.min, 30); assert.equal(st.max, 60);
 assert.equal(S.ratioStats([{ ratio: null }]), null);
+// 새 자료 필드(사실관계·신청취지·유형)도 색인에 들어가는지
+const F = { title: 3, issue: 2.5, type: 2, tags: 2, claim: 1.5, claims: 1, facts: 1, reasoning: 1, order: 0.8, tip: 0.6, result: 0.5 };
+const idx2 = S.buildIndex([
+  { id: "d1", title: "예탁금계좌 부당해지", type: "여ㆍ수신", facts: "보이스피싱 조직원이 전화하여 계좌 해지를 종용", order: "금 51,649,425원을 지급한다" },
+  { id: "d2", title: "자동차보험 대인배상", type: "자동차보험(대인)", claim: "보험금을 지급하라" },
+], F);
+assert.equal(S.search(idx2, "보이스피싱 해지")[0].doc.id, "d1");
+assert.equal(S.search(idx2, "자동차보험")[0].doc.id, "d2");
 console.log("search OK");
