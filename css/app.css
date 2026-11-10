@@ -687,10 +687,24 @@ button.sh.has-on > .gl { color: var(--side-accent, #7fb2ff); }
 .sec.grouped .mi { margin-left: 22px; padding: 6px 10px 6px 12px; border-left: 2px solid #2b3f6b; border-radius: 0 8px 8px 0; font-size: 13px; opacity: .92; }
 .sec.grouped .mi .i { width: 16px; height: 16px; }
 .sec.grouped .mi.on { opacity: 1; border-left-color: var(--side-accent); box-shadow: none; }
-.sec.grouped .mi:last-child { margin-bottom: 4px; }
-.sec.folded .mi { display: none; }
-body.collapsed .sec.folded .mi { display: flex; }
-@media (max-width: 860px) { body.collapsed .sec.folded .mi { display: none; } }
+.sec.grouped .mr:last-child .mi { margin-bottom: 4px; }
+.sec.folded .mr { display: none; }
+body.collapsed .sec.folded .mr { display: block; }
+@media (max-width: 860px) { body.collapsed .sec.folded .mr { display: none; } }
+
+/* 메뉴 즐겨찾기 별: 항목 오른쪽 끝. 마우스를 올리거나 키보드로 닿을 때 보이고, 등록된 것은 늘 보인다. 터치 기기는 늘 흐리게 보인다. */
+.mr { position: relative; }
+.menu .sec .mr .mi { padding-right: 34px; }
+.mr .fav { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; display: grid; place-items: center; border-radius: 6px; color: var(--side-fg); opacity: 0; background: none; border: 0; cursor: pointer; padding: 0; }
+.mr .fav .i { width: 15px; height: 15px; }
+.mr:hover .fav, .mr .fav:focus-visible { opacity: .6; }
+.mr .fav:hover { opacity: 1; background: #1b2b4d; }
+.mr .fav.on { opacity: 1; color: #f5b83d; }
+.mr .fav.on .i { fill: currentColor; }
+@media (hover: none) { .mr .fav { opacity: .4; } .mr .fav.on { opacity: 1; } }
+body.collapsed .mr .fav { display: none; }
+body.collapsed .menu .sec .mr .mi { padding-right: 0; }
+@media (max-width: 860px) { body.collapsed .mr .fav { display: grid; } body.collapsed .menu .sec .mr .mi { padding-right: 34px; } }
 
 /* ---- 헤더 우측: 마지막 업데이트·빠른 검색·새로고침 ---- */
 .fresh { display: flex; align-items: center; gap: 2px; color: var(--muted); font-size: 12px; flex: none; }
