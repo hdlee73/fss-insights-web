@@ -1,6 +1,7 @@
 // 앱 뼈대: 왼쪽 메뉴(접기·펼치기, 휴대폰은 서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
-import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, h, icon, store, toast } from "./core.js";
+import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, forget, freshness, h, icon, skeleton, store, toast } from "./core.js";
+import { installQuickSearchKey, openQuickSearch } from "./quicksearch.js";
 
 // 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서.
 // 소제목이 있는 묶음은 제목을 눌러 하위 메뉴를 접고 펼 수 있다(접은 상태는 기억한다).
@@ -23,6 +24,7 @@ export const MENU = [
     ["sim", "(회계)과징금 및 양정 시뮬레이터", "calculator"],
   ]],
   ["자료", [
+    ["vault", "보관함", "bookmark-check"],
     ["press", "보도자료", "file-text"],
     ["regulatory", "유권해석·비조치의견서·행정지도", "badge-check"],
     ["research", "금융관련 리포트", "book-open"],
@@ -48,6 +50,7 @@ const loaders = {
   accsearch: () => import("./screens/accsearch.js"),
   sim: () => import("./screens/sim.js"),
   law: () => import("./screens/law.js"),
+  vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
   regulatory: () => import("./screens/regulatory.js"),
@@ -180,6 +183,50 @@ export function setHeader(title, sub = "", actions = []) {
 }
 
 let lastCountedId = null;
+let shownId = null;
+
+/** 헤더의 새로고침: 기억해 둔 자료를 모두 비우고 지금 화면을 다시 불러온다. */
+export function refreshAll() {
+  forget("");
+  window.dispatchEvent(new Event("fss-refresh"));
+  shownId = null; // 뼈대를 다시 보여 주며 처음부터 불러온다
+  render();
+}
+
+// ---- 헤더 우측: 마지막 업데이트 시각 · 빠른 검색 · 새로고침 ----
+const pad = (n) => String(n).padStart(2, "0");
+const stamp = (t) => {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+function paintFresh() {
+  const el = document.getElementById("fresh-t");
+  if (!el) return;
+  const offline = !navigator.onLine;
+  const stale = !!freshness.stale;
+  const wrap = document.getElementById("fresh");
+  wrap.classList.toggle("stale", !!stale || offline);
+  const when = freshness.at ? stamp(freshness.at) : "-";
+  el.replaceChildren(
+    h("span", { class: "fresh-k" }, "마지막 업데이트: "), h("b", null, h("span", { class: "fresh-full" }, when), h("span", { class: "fresh-short" }, when.slice(5))),
+    ...(stale || offline ? [h("span", { class: "fresh-tag" }, offline ? "오프라인 · 저장본" : "저장본")] : []));
+  el.title = stale || offline ? "연결이 불안정해 마지막으로 저장해 둔 자료를 보여 주고 있습니다." : "자료를 마지막으로 정상 수신한 시각";
+}
+function setupFresh() {
+  const wrap = document.getElementById("fresh");
+  if (!wrap) return;
+  const btn = document.getElementById("fresh-btn");
+  btn.addEventListener("click", () => {
+    btn.classList.add("busy");
+    setTimeout(() => btn.classList.remove("busy"), 900);
+    refreshAll();
+  });
+  document.getElementById("qs-btn").addEventListener("click", openQuickSearch);
+  window.addEventListener("fss-fresh", paintFresh);
+  addEventListener("online", () => (paintFresh(), toast("다시 연결되었습니다. 새로고침으로 최신 자료를 받을 수 있어요.")));
+  addEventListener("offline", paintFresh);
+  paintFresh();
+}
 async function render() {
   const seq = ++renderSeq;
   const { id, params } = currentRoute();
@@ -195,6 +242,8 @@ async function render() {
   try {
     currentScreen?.leave?.();
   } catch {}
+  // 다른 화면으로 옮길 때는 자료가 올 때까지 뼈대(스켈레톤)를 보여 준다. 같은 화면 안의 조건 변경은 그대로 둔다.
+  if (shownId !== id) main.replaceChildren(h("div", { class: "screen" }, skeleton(6, "page")));
   let mod;
   try {
     mod = await loaders[id]();
@@ -205,6 +254,7 @@ async function render() {
   if (seq !== renderSeq) return;
   const root = h("div", { class: "screen screen-" + id });
   main.replaceChildren(root);
+  shownId = id;
   main.scrollTop = 0;
   currentScreen = mod;
   try {
@@ -282,7 +332,9 @@ addEventListener("touchmove", (e) => {
     touchX = null;
   }
 }, { passive: true });
-addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 저장된 화면만 볼 수 있습니다."));
+addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 마지막으로 저장된 자료를 보여 드립니다."));
+setupFresh();
+installQuickSearchKey();
 if (!location.hash) history.replaceState(null, "", "#/briefing");
 render();
 registerWorker();

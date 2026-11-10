@@ -1,6 +1,8 @@
 // 보도자료(금융당국) · 금융관련 리포트(연구기관) 화면. 기관 탭 → 최근 20건, 제목 검색(10년), 저장함, 기관 추가.
 import { setHeader } from "../app.js";
-import { cached, dialog, dotDate, errorText, forget, h, icon, iconButton, loading, message, openUrl, searchBox, share, store, tabs, toast } from "../core.js";
+import { dialog, dotDate, errorText, forget, h, icon, iconButton, loading, message, openUrl, searchBox, share, skeleton, store, tabs, toast } from "../core.js";
+import { cachedOffline } from "../lib/offline.js";
+import { editNote, getNote, isRead, markRead, saveRelease } from "../lib/vault.js";
 import { AGENCIES, GROUPS, addCustom, agencyById, customList, latest, latestCustom, removeCustom, search } from "../lib/agencies.js";
 
 const searches = new Map(); // 기관별 검색 상태(화면을 오가도 유지)
@@ -32,14 +34,26 @@ export function releaseRow(item, { showAgency = false, isNew = false } = {}) {
     }, saved ? "on" : "");
     return b;
   };
-  return h(
+  const open = () => {
+    markRead(item.link);
+    row.classList.add("read");
+    openUrl(item.link);
+  };
+  const memo = () => iconButton("pencil", getNote(item.link) ? "메모 고치기" : "메모 쓰기(보관함에 담김)", async () => {
+    saveRelease(item);
+    if (await editNote(item.link, item.title)) acts.replaceChildren(saveButton(), memo(), shareBtn);
+  }, getNote(item.link) ? "on" : "");
+  const shareBtn = iconButton("share-2", "제목과 링크 공유", () => share(item.title, item.link));
+  const acts = h("div", { class: "acts" }, saveButton(), memo(), shareBtn);
+  const row = h(
     "div",
-    { class: "item" },
-    h("div", { class: "body", onclick: () => openUrl(item.link), role: "link", tabindex: 0, onkeydown: (e) => e.key === "Enter" && openUrl(item.link) },
+    { class: "item" + (isRead(item.link) ? " read" : "") },
+    h("div", { class: "body", onclick: open, role: "link", tabindex: 0, onkeydown: (e) => e.key === "Enter" && open() },
       h("div", { class: "t" }, item.title),
       h("div", { class: "m" }, isNew ? h("span", { class: "new" }, "N") : null, meta)),
-    h("div", { class: "acts" }, saveButton(), iconButton("share-2", "제목과 링크 공유", () => share(item.title, item.link)))
+    acts
   );
+  return row;
 }
 
 export async function render(root, params, ctx) {
@@ -115,13 +129,13 @@ export async function render(root, params, ctx) {
         forget("rel:" + key);
         showLatest();
       })));
-    const list = h("div", { class: "card list" }, loading());
+    const list = h("div", { class: "card list" }, skeleton(6));
     body.replaceChildren(label, list);
     const draw = (items) => {
       if (!ctx.alive()) return;
       list.replaceChildren(...items.map((x) => releaseRow(x, { isNew: seen.size > 0 && !seen.has(x.link) })));
     };
-    cached("rel:" + key, 10 * 60 * 1000, () => (agency ? latest(agency, 20, draw) : latestCustom(inst, 20)))
+    cachedOffline("rel:" + key, 10 * 60 * 1000, () => (agency ? latest(agency, 20, draw) : latestCustom(inst, 20)))
       .then((items) => {
         draw(items);
         store.set(seenKey, [...new Set([...items.map((x) => x.link), ...seen])].slice(0, 200));

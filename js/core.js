@@ -8,7 +8,7 @@ export const DISCLAIMER_DETAIL =
   "FSS Insights는 개인이 만든 비공식 서비스이며 금융감독원 등 어떤 기관과도 제휴·위탁 관계가 없습니다. " +
   "화면에 표시되는 보도자료, 통계, 법령 등은 외부 출처의 공개 자료를 모아 보여주는 것으로, 정확성과 최신성을 보장하지 않습니다. " +
   "중요한 판단에는 반드시 원문과 공식 자료를 확인하시기 바랍니다.";
-export const APP_VERSION = "2.5.10";
+export const APP_VERSION = "2.6.0";
 
 // 서버(Cloudflare Worker). 앱과 같은 서버를 쓰고, 웹 주소(Origin)로 들어온 요청만 토큰 없이 받는다.
 const DEFAULT_SERVER = "https://news-proxy.hdlee73.workers.dev";
@@ -52,6 +52,27 @@ export class ApiError extends Error {
   }
 }
 
+// ---- 데이터 최신성: 서버에서 자료를 마지막으로 정상 수신한 시각(헤더 우측에 표시) ----
+export const freshness = { at: store.get("updated", 0), stale: 0 };
+let savedAt = 0;
+function emitFresh() {
+  window.dispatchEvent(new Event("fss-fresh"));
+}
+function markFresh() {
+  freshness.at = Date.now();
+  freshness.stale = 0;
+  if (freshness.at - savedAt > 10000) {
+    savedAt = freshness.at;
+    store.set("updated", freshness.at);
+  }
+  emitFresh();
+}
+/** 연결이 안 되어 저장해 둔 자료(저장 시각 at)로 대신 보여 주는 중임을 알린다. */
+export function markStale(at) {
+  freshness.stale = Math.max(freshness.stale, at || 0);
+  emitFresh();
+}
+
 async function request(path, init = {}) {
   let res;
   try {
@@ -59,6 +80,7 @@ async function request(path, init = {}) {
   } catch {
     throw new ApiError("서버에 연결하지 못했습니다. 인터넷 연결을 확인해 주세요.", 0);
   }
+  if (res.ok) markFresh();
   if (res.status === 429) throw new ApiError("요청이 많아 잠시 쉬고 있습니다. 1분 뒤 다시 시도해 주세요.", 429);
   if (!res.ok) {
     let message = `서버 응답 오류 (${res.status})`;
@@ -173,6 +195,18 @@ export function iconButton(name, label, onClick, cls = "") {
 
 export function loading(text = "불러오는 중…") {
   return h("div", { class: "state" }, h("div", { class: "spin" }), h("div", null, text));
+}
+
+/** 자료를 기다리는 동안 보여 주는 뼈대(스켈레톤). rows: 줄 수, kind: "list"(기사 줄) 또는 "page"(화면 전체). */
+export function skeleton(rows = 5, kind = "list") {
+  const row = () => h("div", { class: "skel-row" }, h("div", { class: "skel skel-s" }), h("div", { class: "skel skel-l" }), h("div", { class: "skel skel-m" }));
+  if (kind === "page") {
+    return h("div", { class: "skel-page", "aria-busy": "true", "aria-label": "불러오는 중" },
+      h("div", { class: "skel skel-hero" }),
+      h("div", { class: "skel-tiles" }, [1, 2, 3, 4].map(() => h("div", { class: "skel skel-tile" }))),
+      h("div", { class: "card list" }, Array.from({ length: rows }, row)));
+  }
+  return h("div", { class: "skel-list", "aria-busy": "true", "aria-label": "불러오는 중" }, Array.from({ length: rows }, row));
 }
 
 export function message(text, { error = false, action, onAction } = {}) {
