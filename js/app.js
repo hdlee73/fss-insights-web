@@ -261,7 +261,7 @@ function setupFresh() {
     setTimeout(() => btn.classList.remove("busy"), 900);
     refreshAll();
   });
-  document.getElementById("qs-btn").addEventListener("click", openQuickSearch);
+  document.getElementById("qs-btn")?.addEventListener("click", openQuickSearch);
   window.addEventListener("fss-fresh", paintFresh);
   addEventListener("online", () => (paintFresh(), toast("다시 연결되었습니다. 새로고침으로 최신 자료를 받을 수 있어요.")));
   addEventListener("offline", paintFresh);
