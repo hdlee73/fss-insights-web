@@ -375,6 +375,7 @@ addEventListener("touchmove", (e) => {
 }, { passive: true });
 addEventListener("offline", () => toast("인터넷 연결이 끊겼습니다. 마지막으로 저장된 자료를 보여 드립니다."));
 setupFresh();
+import("./notices.js").then((m) => m.installNotices(document.getElementById("notice-bar"))).catch(() => {});
 installQuickSearchKey();
 if (!location.hash) history.replaceState(null, "", "#/briefing");
 render();
