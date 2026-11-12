@@ -74,9 +74,9 @@ function gtag() {
 const basePath = () => location.pathname.replace(/[^/]*$/, "");
 const pageOf = (id, label) => ({ page_title: label, page_location: location.origin + basePath() + id, page_path: basePath() + id });
 
-/** 화면을 열 때마다 GA에 페이지 조회를 남긴다(github.io에서만). */
+/** 화면을 열 때마다 GA에 페이지 조회를 남긴다(github.io·fssinsights.com에서만). */
 export function pageView(id, label) {
-  if (!enabled() || location.protocol !== "https:" || !location.hostname.endsWith("github.io")) return;
+  if (!enabled() || location.protocol !== "https:" || !(location.hostname.endsWith("github.io") || location.hostname.endsWith("fssinsights.com"))) return;
   if (!gaReady) {
     gaReady = true;
     window[`ga-disable-${GA_ID}`] = false;
