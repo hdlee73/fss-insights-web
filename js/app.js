@@ -1,6 +1,7 @@
 // 앱 뼈대: 왼쪽 메뉴(접기·펼치기, 휴대폰은 서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
 import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, forget, freshness, h, icon, skeleton, store, toast } from "./core.js";
+import { installSidebarResize } from "./sidebar-resize.js";
 import { installQuickSearchKey, openQuickSearch } from "./quicksearch.js";
 
 // 서랍 메뉴: [소제목, [[경로, 이름, 아이콘], …]] — 앱(FinanceNewsRadarApp.kt)의 drawerSections와 같은 순서.
@@ -355,6 +356,7 @@ function registerWorker() {
 
 // ---- 시작 ----
 buildMenu();
+installSidebarResize();
 // 접속할 때는 항상 메뉴를 펼친 상태로 시작한다(접기는 그때그때만).
 document.body.classList.remove("collapsed");
 document.getElementById("hamb").addEventListener("click", () => (mobile.matches ? openDrawer() : toggleCollapse()));
