@@ -1,7 +1,8 @@
 // 가상자산 시장 동향: 국내 원화거래소 5곳 합산 시장 일보(VirtualAssets에서 옮겨 온 화면).
-// 자료는 FSS_insights 레포 crypto-data 브랜치(매일 24:00 KST 하루 한 번 집계한 JSON·PDF·HWPX와 거래소 재무, 워크플로 crypto-data.yml). 주요 코인 시세는 업비트·Coinbase 공개 API를 브라우저에서 실시간 조회를 읽는다. 별도 서버 없음.
+// 자료는 FSS_insights 레포 crypto-data 브랜치(매일 24:00 KST 하루 한 번 집계한 JSON·PDF·HWPX와 거래소 재무, 워크플로 crypto-data.yml). 주요 코인 시세는 업비트·빗썸 웹소켓(끊기면 폴링)과 Coinbase를 브라우저에서 직접 읽는다. 별도 서버 없음.
 import { setHeader } from "../app.js";
 import { card, errorText, h, icon, loading, message, tabs } from "../core.js";
+import { liveCrypto } from "../lib/livefeed.js";
 
 const BASE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/crypto-data";
 const TABS = [["summary", "시장 요약"], ["coins", "주요코인 시세"], ["exchange", "거래소별 현황"], ["fin", "거래소 재무"], ["global", "해외 시장 비교"], ["report", "시장 일보"]];
@@ -185,66 +186,40 @@ function hbars(items, fmt = pct) {
       h("b", null, fmt(it.v)))));
 }
 
-// ---------- 실시간 시세(브라우저에서 직접 조회) ----------
-async function liveUpbit(syms) {
-  const r = await fetch("https://api.upbit.com/v1/ticker?markets=" + syms.map((x) => "KRW-" + x).join(","));
-  if (!r.ok) throw new Error("upbit " + r.status);
-  const out = {};
-  for (const t of await r.json()) out[String(t.market).replace("KRW-", "")] = { price: t.trade_price, rate: t.signed_change_rate, value: t.acc_trade_price_24h };
-  return out;
-}
-async function liveUsd(syms) {
-  const rs = await Promise.allSettled(syms.map(async (x) => {
-    const r = await fetch(`https://api.exchange.coinbase.com/products/${x}-USD/ticker`);
-    if (!r.ok) throw new Error("cb " + r.status);
-    return [x, Number((await r.json()).price)];
-  }));
-  const out = {};
-  for (const r of rs) if (r.status === "fulfilled" && Number.isFinite(r.value[1])) out[r.value[0]] = r.value[1];
-  return out;
-}
-/** 화면이 살아 있는 동안 ms마다 fn 실행(탭이 숨겨져 있으면 건너뜀). */
-function poll(ctx, fn, ms = 8000) {
-  let t = 0;
-  const tick = async () => {
-    if (!ctx.alive()) return;
-    if (!document.hidden) { try { await fn(); } catch { /* 일시 오류는 다음 주기에 재시도 */ } }
-    if (ctx.alive()) t = setTimeout(tick, ms);
-  };
-  tick();
-  return () => clearTimeout(t);
-}
+// ---------- 실시간 시세(브라우저에서 직접 연결: 업비트·빗썸 웹소켓, 끊기면 폴링) ----------
 const usd = (v) => (v == null ? "-" : "$" + (v >= 100 ? num(v) : v >= 1 ? num(v, 3) : num(v, 4)));
-/** 실시간 시세표: 코인 · 현재가 · 24h 등락 · 달러가 · 김치 프리미엄. 업비트 현재가 + Coinbase 달러가 + 집계 환율. */
+const MODE_TEXT = { ws: "실시간(웹소켓)", poll: "3초 간격 조회", down: "연결 끊김" };
+/** 실시간 시세표: 코인 · 업비트 현재가 · 전일대비 · 빗썸 · 해외가 · 김치 프리미엄. */
 function liveTable(ctx, snap, syms, { full = innerWidth >= 560 } = {}) {
   const g = snap.global || {}, cp = snap.coin_premium || {};
   const cells = {};
-  const head = full ? ["코인", "현재가(원)", "전일대비", "해외가", "김프"] : ["코인", "현재가(원)", "전일대비", "김프"];
+  const head = full ? ["코인", "업비트(원)", "전일대비", "빗썸(원)", "해외가", "김프"] : ["코인", "업비트(원)", "전일대비", "김프"];
   const body = syms.map((x) => {
-    const c = (cells[x] = { p: h("td", { class: "num" }, "-"), r: h("td", { class: "num" }, "-"), u: h("td", { class: "num" }, usd(cp[x]?.usd)), k: h("td", { class: "num" }, pct(cp[x]?.premium, 2, true)) });
-    return h("tr", null, h("td", null, h("b", null, x), full ? h("small", { class: "note" }, " " + (MAJOR_NAME[x] || "")) : null), c.p, c.r, full ? c.u : null, c.k);
+    const c = (cells[x] = { p: h("td", { class: "num" }, "-"), r: h("td", { class: "num" }, "-"), b: h("td", { class: "num" }, "-"), u: h("td", { class: "num" }, usd(cp[x]?.usd)), k: h("td", { class: "num" }, pct(cp[x]?.premium, 2, true)) });
+    return h("tr", null, h("td", null, h("b", null, x), full ? h("small", { class: "note" }, " " + (MAJOR_NAME[x] || "")) : null), c.p, c.r, full ? c.b : null, full ? c.u : null, c.k);
   });
   const stamp = h("span", { class: "cr-live" }, h("i"), "실시간 연결 중…");
-  const stop = poll(ctx, async () => {
-    const [up, us] = await Promise.all([liveUpbit(syms), liveUsd(syms).catch(() => ({}))]);
+  liveCrypto(ctx, syms, (st) => {
     for (const x of syms) {
-      const c = cells[x], q = up[x];
+      const c = cells[x], q = st.up[x], b = st.bi[x];
+      if (b && Number.isFinite(b.price)) c.b.textContent = price(b.price);
       if (!q) continue;
       c.p.textContent = price(q.price);
       c.r.textContent = pct(q.rate, 2, true);
       c.r.className = "num " + cls(q.rate);
-      const u = us[x] ?? cp[x]?.usd;
+      const u = st.usd[x] ?? cp[x]?.usd;
       c.u.textContent = usd(u);
       const pr = u && g.usdkrw ? q.price / (u * g.usdkrw) - 1 : cp[x]?.premium;
       c.k.textContent = pct(pr, 2, true);
       c.k.className = "num " + cls(pr);
     }
-    stamp.lastChild.textContent = "실시간 " + new Date().toTimeString().slice(0, 8) + " 갱신";
+    const m = st.mode.upbit || "down";
+    stamp.classList.toggle("off", m === "down");
+    stamp.lastChild.textContent = `${MODE_TEXT[m]} · ${new Date(st.at).toTimeString().slice(0, 8)} 수신` + (m === "ws" && st.mode.bithumb !== "ws" ? " (빗썸은 " + MODE_TEXT[st.mode.bithumb || "down"] + ")" : "");
   });
-  void stop;
   return h("div", { class: "stack" }, stamp,
     h("div", { class: "tbl-wrap" }, h("table", { class: "tbl cr-live-tbl" }, h("thead", null, h("tr", null, head.map((t, i) => h("th", { class: i ? "num" : "" }, t)))), h("tbody", null, body))),
-    note(`현재가=업비트 현재 체결가, 전일대비=업비트 전일 종가(09:00) 대비, 해외가=Coinbase(달러). 김프=원화가÷(해외가×환율)−1이며, 환율 ${num(g.usdkrw, 1)}원은 ${shortDate(snap.date || (snap.as_of || "").slice(0, 10))} 24시 집계 시점 값이라 실시간이 아닙니다. 약 8초마다 갱신.`));
+    note(`업비트·빗썸은 체결되는 즉시 웹소켓으로 받습니다(끊기면 3초마다 조회). 전일대비=업비트 전일 종가(09:00) 대비, 빗썸 값은 현재 체결가입니다. 해외가=Coinbase(달러, 5초 간격). 김프=원화가÷(해외가×환율)−1이며, 환율 ${num(g.usdkrw, 1)}원은 ${shortDate(snap.date || (snap.as_of || "").slice(0, 10))} 24시 집계 시점 값이라 실시간이 아닙니다.`));
 }
 
 // ---------- 공통 조각 ----------
