@@ -1025,3 +1025,4 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .cr-basis { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12.5px; color: var(--muted); background: var(--chip); border-radius: var(--r); padding: 8px 12px; }
 .cr-basis.stack { flex-direction: column; align-items: flex-start; }
 .cr-basis div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.cr-live.off i { background: #c0392b; animation: none; }

@@ -50,7 +50,7 @@ async function naverQuote(url) {
   else if (code === "3") change = 0;
   const previous = price - change;
   if (!(price > 0) || !(previous > 0)) throw new Error("가격 없음");
-  return { price, previous, market: o.marketStatus || "", time: o.localTradedAt || "" };
+  return { price, previous, market: o.marketStatus || "", time: o.localTradedAt || "", at: Date.parse(o.localTradedAt || "") || 0, source: "NAVER" };
 }
 
 async function yahooQuote(sym) {
@@ -70,13 +70,18 @@ async function yahooQuote(sym) {
       if (day(t) < latest && closes[i] > 0) previous = closes[i];
     });
   }
-  return { price, previous: Number.isFinite(previous) ? previous : null, market: meta.exchangeName || "", time: "" };
+  return { price, previous: Number.isFinite(previous) ? previous : null, market: meta.exchangeName || "", time: "", at: (meta.regularMarketTime || 0) * 1000, source: "Yahoo Finance" };
 }
 
-/** 현재가와 전일 종가. */
+/** 현재가 재사용 시간(서버 캐시도 3초라 이보다 짧게 두어도 더 새로워지지 않는다). */
+const QUOTE_TTL = 3_000;
+/** 시세 기준 시각이 이 시간보다 오래되면 ‘지연’으로 표시한다(장중·24시간 지표에서만 쓴다). */
+export const STALE_MS = 20 * 60_000;
+
+/** 현재가와 전일 종가. at=시세 기준 시각(ms), source=출처. */
 export function quote(raw) {
   const sym = checked(raw);
-  return cached("q:" + sym, 60_000, async () => {
+  return cached("q:" + sym, QUOTE_TTL, async () => {
     if (sym === "^KS11" || sym === "^KQ11") {
       return naverQuote(`https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/basic`).catch(() => yahooQuote(sym));
     }
@@ -148,7 +153,7 @@ const kstDay = (d = new Date()) => d.toLocaleDateString("en-CA", { timeZone: "As
  */
 export function intraday(raw, fallbackPrevious, price) {
   const sym = checked(raw);
-  return cached("i:" + sym, 60_000, async () => {
+  return cached("i:" + sym, 20_000, async () => {
     const path = naverPath(sym);
     const h24 = sym.endsWith("=X") || sym.endsWith("=F") || sym.endsWith("-USD");
     let days = [];
@@ -219,9 +224,11 @@ export function intraday(raw, fallbackPrevious, price) {
 }
 
 /** 코스피·코스닥 투자자별 순매수(억원). */
-export async function investors(sym) {
-  const o = await json(`https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/trend`);
-  return { bizdate: o.bizdate || "", personal: num(o.personalValue), foreign: num(o.foreignValue), institutional: num(o.institutionalValue) };
+export function investors(sym) {
+  return cached("inv:" + sym, 30_000, async () => {
+    const o = await json(`https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/trend`);
+    return { bizdate: o.bizdate || "", personal: num(o.personalValue), foreign: num(o.foreignValue), institutional: num(o.institutionalValue) };
+  });
 }
 
 /** 최근 9년 연말 종가(PER 계산용). */
