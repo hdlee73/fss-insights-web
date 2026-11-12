@@ -5,7 +5,7 @@ import { dialog, errorText, forget, h, icon, iconButton, store, toast } from "..
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
   loadKofia, loadStats, macroSelection, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
-  UP, DOWN,
+  UP, DOWN, STALE_MS,
 } from "../lib/market.js";
 
 /** 1년 전(첫 종가) 대비 현재가 방향 색. 현재가가 없으면 마지막 종가로 비교한다. */
@@ -27,6 +27,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
   const el = wide
     ? h("div", { class: "tile" }, h("div", { class: "tt" }, h("div", null, nm, px), chart), dl, inv)
     : h("div", { class: "tile" }, nm, px, dl, chart);
+  let live = false;
   async function update() {
     let q;
     try {
@@ -46,7 +47,12 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
         const d = await intraday(it.symbol, q.previous, q.price);
         // 앱처럼 전 거래일 흐름(회색)을 왼쪽에, 오늘 흐름을 오른쪽에 함께 그린다.
         chart.replaceChildren(sparkline(d.points, { height: 30, color, baseline: d.previous, prev: d.prevPoints, open: d.open, bars: d.live ? d.bars : 0 }));
-        nm.replaceChildren(it.name, d.status ? h("span", { class: "stag" + (d.status === "장중" ? " live" : "") }, d.status) : "");
+        live = !!d.live;
+        const age = Date.now() - (q.at || 0);
+        const stale = d.live && q.at && age > STALE_MS;
+        nm.replaceChildren(it.name, d.status ? h("span", { class: "stag" + (d.status === "장중" ? " live" : "") }, d.status) : "",
+          stale ? h("span", { class: "stag" }, "지연 " + Math.round(age / 60000) + "분") : "");
+        el.title = `${q.source || ""} · 시세 기준 ${q.at ? new Date(q.at).toLocaleString("ko-KR", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}`;
       } else {
         const hh = await history(it.symbol);
         // 1년 그래프는 1년 전 가격 대비(현재가 기준)로 색을 정한다: 올랐으면 빨강, 내렸으면 파랑.
@@ -67,7 +73,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     }
     return true;
   }
-  return { el, update };
+  return { el, update, get live() { return live; } };
 }
 
 function subhead(title, ...actions) {
@@ -131,6 +137,7 @@ export async function render(root, params, ctx) {
     })));
   const grid = h("div", { class: "watch" });
   const cells = [];
+  const watchLive = [];
   if (!watch.length) root.append(h("p", { class: "note card" }, "표시할 종목을 추가해 주세요."));
   else root.append(grid);
   watch.forEach((it, i) => {
@@ -153,6 +160,8 @@ export async function render(root, params, ctx) {
           }
         })) : null);
     grid.append(cell);
+    const wlive = { v: false };
+    watchLive.push(wlive);
     cells.push(async () => {
       try {
         const q = await quote(it.symbol);
@@ -163,6 +172,7 @@ export async function render(root, params, ctx) {
         const color = ch > 0 ? UP : ch < 0 ? DOWN : "var(--muted)";
         if (watchMode) {
           const d = await intraday(it.symbol, q.previous, q.price);
+          wlive.v = !!d.live;
           chart.replaceChildren(sparkline(d.points, { height: 26, color, baseline: d.previous, bars: d.live ? d.bars : 0 }));
         } else {
           const hh = await history(it.symbol);
@@ -195,22 +205,37 @@ export async function render(root, params, ctx) {
   })), kofia, h("p", { class: "note", style: { marginTop: "6px" } }, "금융투자협회 종합통계 포털 기준. 직전 영업일(신규펀드는 직전 조회일) 대비 증감."));
   drawKofia(kofia);
 
-  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER, 해외·환율은 Yahoo Finance."));
+  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER(실시간), 해외·환율은 Yahoo Finance(종목에 따라 지연될 수 있음). 각 칸에 마우스를 올리면 시세 기준 시각이 보입니다."));
+  const stamp = h("p", { class: "note", style: { margin: "0 0 4px" } }, "");
+  root.append(stamp);
 
   // 첫 표시 뒤 주기적으로 새로 읽는다(화면을 떠나면 멈춘다).
+  // 장중이거나 24시간 거래 지표가 있으면 현재가를 5초마다(그래프는 20초마다) 읽고, 모두 장 밖이면 30초마다만 읽는다.
   const all = () => Promise.all([...tiles.map((t) => t.update()), ...cells.map((f) => f())]);
+  const anyLive = () => tiles.some((t) => t.live) || watchLive.some((w) => w.v);
+  const stamped = () => {
+    const live = anyLive();
+    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 5초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
+  };
   await all();
-  let tick = 0;
-  const timer = setInterval(() => {
+  stamped();
+  let last = Date.now(), busy = false;
+  const timer = setInterval(async () => {
     if (!ctx.alive()) return clearInterval(timer);
-    if (document.hidden) return;
-    tick++;
-    forget("q:");
-    if (tick % 2 === 0) {
-      forget("i:");
-      all();
-    } else tiles.forEach((t) => t.update());
-  }, 10_000);
+    if (document.hidden || busy) return;
+    const live = anyLive();
+    const now = Date.now();
+    if (now - last < (live ? 5000 : 30_000) - 200) return;
+    busy = true;
+    last = now;
+    try {
+      forget("q:"); // 그래프(분봉)는 20초 캐시라 자동으로 그 간격으로만 다시 읽는다.
+      await all();
+      stamped();
+    } finally {
+      busy = false;
+    }
+  }, 1000);
 }
 
 export async function drawStats(box, ids, { compact = false, catalog = STAT_CATALOG, emptyText = "표시할 통계가 없습니다. ‘통계 선택’에서 고르세요." } = {}) {
