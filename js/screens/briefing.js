@@ -245,5 +245,5 @@ function greeting(now, w) {
   let x = (Math.floor(Date.UTC(now.y, now.m - 1, now.d) / 864e5) * 31 + b) >>> 0;
   x = Math.imul(x ^ (x >>> 16), 0x45d9f3b) >>> 0;
   x = Math.imul(x ^ (x >>> 16), 0x45d9f3b) >>> 0;
-  return pool[(x ^ (x >>> 16)) % pool.length];
+  return pool[((x ^ (x >>> 16)) >>> 0) % pool.length];
 }
