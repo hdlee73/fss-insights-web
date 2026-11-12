@@ -142,7 +142,7 @@ function buildMenu() {
               h("button", { class: "fav" + (fav ? " on" : ""), type: "button", "aria-pressed": String(fav), title: fav ? "즐겨찾기 해제" : "즐겨찾기에 추가", "aria-label": `${label} ${fav ? "즐겨찾기 해제" : "즐겨찾기에 추가"}`, onclick: () => toggleFav(id) }, icon("star")));
           }));
       })),
-    h("div", { class: "sidefoot" }, h("div", { class: "unofficial" }, "금융감독원 공식 사이트가 아닙니다"), `v${APP_VERSION} · 이현덕 with Claude`)
+    h("div", { class: "sidefoot" }, h("div", { class: "unofficial" }, "금융감독원 공식 사이트가 아닙니다"), `v${APP_VERSION}`)
   );
 }
 
