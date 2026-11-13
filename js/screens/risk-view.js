@@ -189,7 +189,7 @@ function assetTile(row, month) {
     h("div", { class: "note" }, ni != null ? `당기순이익(누계) ${Math.round(ni).toLocaleString("en-US")}억원` : "순이익 자료 없음"));
 }
 
-function govBody(dart) {
+export function govBody(dart) {
   if (!dart?.corp) return h("p", { class: "note" }, dart?.rel && dart.rel !== "본인" ? dart.rel + ". 전자공시(DART) 자료가 없는 회사입니다." : "전자공시(DART)에서 찾은 회사가 없습니다(비상장·외부감사 비대상 등). 개황·지배구조는 표시하지 않습니다.");
   const ci = dart.company || {};
   const rel = dart.rel && dart.rel !== "본인" ? h("p", { class: "note rk-rel" }, `이 회사의 DART 자료는 ${dart.rel}(${nameOnly(dart)})의 것입니다.`) : dart.match === "guess" ? h("p", { class: "note rk-rel" }, "DART 회사를 이름으로 추정해 연결했습니다. 아래 자료가 맞는지 확인하세요.") : null;

@@ -36,7 +36,7 @@ const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
   return rows.filter(Boolean);
 });
 
-async function dartOf(name) {
+export async function dartOf(name) {
   const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [clean(name), "본인"];
   const found = await cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).catch(() => ({ items: [] }));
   const { match, item } = pickDart(q, found.items || []);
