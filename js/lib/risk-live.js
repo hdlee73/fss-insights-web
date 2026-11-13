@@ -7,6 +7,7 @@ import { nameKey, pickDart } from "./risk.js";
 const TTL = 6 * 3600e3;
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
 const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
+const canonQuery = (n) => n.replace(/^에스비아이저축은행/, "교보에스비아이저축은행");
 // 금융지주 자회사(은행·카드 등)처럼 자체 DART 공시가 없는 회사는 모회사로 잇는다. 필요한 만큼 이 표에 더한다(검토 필요).
 export const PARENT_DART = { 국민은행: ["KB금융", "모회사(금융지주)"], 신한은행: ["신한지주", "모회사(금융지주)"], 하나은행: ["하나금융지주", "모회사(금융지주)"], 우리은행: ["우리금융지주", "모회사(금융지주)"], 농협은행: ["NH농협금융지주", "모회사(금융지주)"] };
 
@@ -37,7 +38,7 @@ const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
 });
 
 export async function dartOf(name) {
-  const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [clean(name), "본인"];
+  const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [canonQuery(clean(name)), "본인"];
   const found = await cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).catch(() => ({ items: [] }));
   const { match, item } = pickDart(q, found.items || []);
   if (!item) return { rel, match: "none" };
