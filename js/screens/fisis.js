@@ -314,7 +314,7 @@ async function overviewPane(body, co, sector, sectorLabel, ctx) {
   if (!ctx.alive()) return;
   body.replaceChildren(
     h("div", { class: "card" }, view.govBody(dart)),
-    h("p", { class: "note", style: { marginTop: "12px" } }, `자료출처: 금융감독원 전자공시시스템(DART). ${sectorLabel} 회사 이름으로 맞춘 자료라 다를 수 있습니다(금융지주 자회사는 모회사 자료).`));
+    h("p", { class: "note", style: { marginTop: "12px" } }, `자료출처: 금융감독원 전자공시시스템(DART). ${sectorLabel} 회사 이름으로 맞춘 자료라 다를 수 있습니다.`));
 }
 
 function financeTab(body, sector, profile, basis, month, onMonth) {
