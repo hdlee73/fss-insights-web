@@ -125,11 +125,12 @@ export async function render(root, params, ctx) {
 
 /** 리스크 대시보드(건전성 추이·지배구조·제재 이력, 업권 사분면·현황)를 이 메뉴 안에서 보여 준다. */
 async function riskPane(root, params, ctx, sector) {
+  if (params.co) return ctx.go({ sector: params.sector || sector, co: params.co }, { replace: true }); // 옛 #/risk 회사 주소
   const [view, live, core] = await Promise.all([import("./risk-view.js"), import("../lib/risk-live.js"), import("../core.js")]);
   const { tool, ...rest } = params;
   return view.mountRisk(root, rest, {
     provider: live.liveProvider(), setHeader, openUrl: core.openUrl,
-    go: (p) => ctx.go({ tool: "risk", ...p }),
+    go: (p) => (p.co ? ctx.go({ sector: p.sector || sector, co: p.co }) : ctx.go({ tool: "risk", ...p, view: "overview" })),
     // 앱(내장 화면)에서는 위쪽 탭을 앱이 그리므로 웹 탭 줄과 "회사 목록" 탭을 숨긴다.
     hideTabs: !!window.FssNative,
     extraTab: window.FssNative ? null : { label: "회사 목록", onSelect: () => ctx.go({ sector: SECTORS.some(([c]) => c === rest.sector) ? rest.sector : sector }) },
@@ -141,10 +142,10 @@ export async function renderOverview(root, params, ctx) {
   const label = SECTORS.find(([c]) => c === sector)[1];
   return overviewPane(root, { code: params.co, name: params.name || params.co }, sector, label, ctx);
 }
-/** 회사 목록·상세 화면 맨 위의 탭 줄: 회사 목록 / 리스크 대시보드 쪽 화면들. */
-const toolTabs = (ctx, sector, current = 0) => tabs(["회사 목록", "회사 대시보드", "업권 Peer 사분면", "업권 현황"], current, (i) => {
+/** 회사 목록 화면 맨 위의 탭 줄: 회사 목록 / 업권 현황(규모 순위·분포·Peer 사분면). */
+const toolTabs = (ctx, sector, current = 0) => tabs(["회사 목록", "업권 현황"], current, (i) => {
   if (i === 0) return ctx.go({ sector });
-  ctx.go({ tool: "risk", sector: i === 3 || !SECTORS_RISK.includes(sector) ? (i === 3 ? sector : "A") : sector, view: ["", "peer", "overview"][i - 1] || null });
+  ctx.go({ tool: "risk", sector, view: "overview" });
 });
 const SECTORS_RISK = ["A", "F", "H", "I", "C", "E"];
 
@@ -246,7 +247,6 @@ async function detail(root, params, ctx, sector) {
   const co = all.find((c) => c.code === params.co) || { code: params.co, name: params.name || params.co };
   setHeader(co.name, `${sectorLabel} · ${SOURCE}${sector === "F" || sector === "G" ? ", 금융투자협회(FreeSIS)" : ""}`, [
     h("button", { class: "pill", type: "button", title: "PDF·한글로 저장", onclick: () => saveCompany(sector, sectorLabel, co, params) }, icon("download"), h("span", { class: "lbl" }, "저장")),
-    SECTORS_RISK.includes(sector) ? h("button", { class: "pill", type: "button", title: "리스크 대시보드", onclick: () => ctx.go({ tool: "risk", sector, co: co.code }) }, icon("activity"), h("span", { class: "lbl" }, "리스크 대시보드")) : null,
     h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록")),
   ]);
   // 증권사·운용사는 금융투자협회의 펀드 순자산 탭을 더한다.
@@ -256,12 +256,13 @@ async function detail(root, params, ctx, sector) {
     const fm = await import("../lib/fundaum.js");
     showFund = await fm.loadFundAum().then((d) => !!fm.findCompany(d, co.name, "F"), () => false);
   }
-  const tabNames = ["개황", "재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역"];
+  const tabNames = [...(SECTORS_RISK.includes(sector) ? ["회사 대시보드"] : []), "개황", "재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역"];
   const tab = Math.min(+(params.tab || 0), tabNames.length - 1);
   const tabName = tabNames[tab];
   root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
   const body = h("div");
   root.append(body);
+  if (tabName === "회사 대시보드") return dashboardPane(body, params, co, sector, ctx);
   if (tabName === "개황") return overviewPane(body, co, sector, sectorLabel, ctx);
   if (tabName === "최근 제재내역") {
     const m = await import("./sanction.js");
@@ -291,6 +292,13 @@ async function detail(root, params, ctx, sector) {
     ratioTab(body, sector, profile, params.rm, +(params.span || 4), (p) => ctx.go({ ...params, ...p }, { replace: true }));
   }
   body.append(h("p", { class: "note", style: { marginTop: "12px" } }, `${SOURCE}. 금액은 억원 단위입니다. ${NOTICE}`));
+}
+
+/** 회사 대시보드: 건전성 추이·지배구조·제재 이력을 한 화면에(리스크 대시보드). 회사 상세의 첫 탭. */
+async function dashboardPane(body, params, co, sector, ctx) {
+  const [view, live, core] = await Promise.all([import("./risk-view.js"), import("../lib/risk-live.js"), import("../core.js")]);
+  const go = (p) => (p.co === params.co ? ctx.go({ ...params, ...p }, { replace: true }) : p.co ? ctx.go({ sector: p.sector || sector, co: p.co }) : ctx.go({ tool: "risk", ...p, view: "overview" }));
+  return view.dashboard(body, { sector, co: co.code, span: params.span }, { provider: live.liveProvider(), setHeader: () => {}, openUrl: core.openUrl, go }, sector);
 }
 
 /** 개황: 전자공시(DART) 기업 개황(대표이사·설립일·시장·주소)과 최대주주 지분. 금융통계(FISIS) 회사 이름으로 DART 회사를 맞춘다. */
