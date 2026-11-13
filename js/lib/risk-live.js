@@ -2,7 +2,8 @@
 //   /fisis/companies, /fisis/ranking, /fisis/profile (금융통계) · /dart/search, /dart/company, /dart/holders (전자공시) · 제재공시(sanction-data).
 import { api, cached } from "../core.js";
 import { casesOf, loadSanctions } from "./sanctions.js";
-import { nameKey, pickDart } from "./risk.js";
+import { nameKey } from "./risk.js";
+import { findDart } from "./dartmatch.js";
 
 const TTL = 6 * 3600e3;
 // 매일 새로 모아 올리는 사전수집 자료(GitHub Actions risk-data). 있으면 이걸 먼저 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
@@ -22,13 +23,13 @@ const preFresh = () => cached("risk:pre:ok", TTL, async () => {
 const prePeers = async (sector) => { await preFresh(); const d = await pre(`peers-${sector}.json`); if (!d.rows?.length) throw new Error("빈 자료"); return d.rows; };
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
 const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
-const canonQuery = (n) => n.replace(/^에스비아이저축은행/, "교보에스비아이저축은행");
 // 이름 검색으로는 같은 이름의 옛 법인(폐지·합병)과 섞이거나 공시회사명 목록에서 빠지는 회사의 DART 고유번호. DART 누리집에서 최근 사업보고서(또는 공시) 제출을 확인한 현행 법인만 둔다(2026-11-13 확인).
 // 국민은행(060000)·신한은행·하나은행·우리은행·농협은행·KB증권(공시회사명 케이비증권)은 모두 자체 DART 자료가 있어 모회사로 대신하지 않는다.
 export const OWN_DART = { 국민은행: "00386937", 신한은행: "00149293", 하나은행: "00158909", 우리은행: "00254045", 농협은행: "00908757", "KB증권": "00164876", "kb국민은행": "00386937", 케이비국민은행: "00386937", "nh농협은행": "00908757", 엔에이치농협은행: "00908757", "kb증권": "00164876", 케이비증권: "00164876" };
 // 자체 DART 자료가 정말 없는 금융지주 자회사만 여기에 두어 모회사로 잇는다(현재 없음). 형식: 회사명: [모회사 검색어, "모회사(금융지주)"]
 export const PARENT_DART = {};
 
+const ymd = (y) => { const d = new Date(); d.setFullYear(d.getFullYear() + y); return d.toISOString().slice(0, 10).replace(/-/g, ""); };
 async function pool(items, n, fn) {
   const out = new Array(items.length);
   let i = 0;
@@ -79,12 +80,16 @@ export async function dartOf(name, key) {
     const d = await loadDart(own);
     return { rel: "본인", match: "exact", corp: own, name: d.company?.name || clean(name), ...d };
   }
-  const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [canonQuery(clean(name)), "본인"];
-  const found = await cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).catch(() => ({ items: [] }));
-  const { match, item } = pickDart(q, found.items || []);
+  const hit = PARENT_DART[nameKey(name)] || PARENT_DART[name];
+  const search = (q) => cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).then((r) => r.items || []);
+  const detail = (c) => cached("dart.c:" + c, 3600e3, () => api("/dart/company", { corp: c }));
+  const recent = (c) => cached("dart.r:" + c, 6 * 3600e3, () => api("/dart/filings", { corp: c, type: "a", from: ymd(-2), to: ymd(0) })).then((r) => r.items?.[0]?.date || "");
+  // 이름 규칙(dartmatch.js): 영문↔한글 읽기·꼬리말·구 사명·정식명칭 확인, 같은 이름 법인이 여럿이면 최근 공시가 있는 현행 법인.
+  const { match, item } = hit ? await findDart(hit[0], search) : await findDart(clean(name), search, detail, recent);
+  const rel = hit ? hit[1] : "본인";
   if (!item) return { rel, match: "none" };
   const d = await loadDart(item.corp);
-  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: item.name, ...d };
+  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: d.company?.name || item.name, ...d };
 }
 
 export function liveProvider() {
