@@ -415,6 +415,8 @@ async function saveCompany(sector, sectorLabel, co, params) {
   await saveReport({
     title: `${co.name} 저장`,
     parts: [
+      ...(SECTORS_RISK.includes(sector) ? [{ id: "dash", label: "회사 대시보드 (핵심 지표·리스크 신호·건전성 추이)" }] : []),
+      { id: "ovw", label: "개황 (DART 기업 개황·최대주주)" },
       { id: "fin", label: "재무현황 (별도·연결)" },
       { id: "ratio", label: RATIO_ROWS[sector] ? "주요경영지표 (최근 8개 시점)" : "주요경영지표 (이 권역은 제공 안 함)", checked: !!RATIO_ROWS[sector] },
       { id: "sanction", label: "최근 제재내역 (2011년 이후 금감원 제재공시)" },
@@ -427,6 +429,26 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
   const profile = await profileOf(sector, co.code);
   const sections = [];
   const term = termLabel(profile.term) || "기준";
+  if (ids.has("dash") || ids.has("ovw")) {
+    // 회사 대시보드·개황: 리스크 대시보드와 같은 자료·같은 표를 그대로 쓴다(실패해도 나머지 저장은 계속).
+    try {
+      const [live, rd] = await Promise.all([import("../lib/risk-live.js"), import("../lib/risk-doc.js")]);
+      if (SECTORS_RISK.includes(sector)) {
+        const provider = live.liveProvider();
+        const [rows, info] = await Promise.all([provider.peers(sector), provider.company(sector, co.code)]);
+        const row = rows.find((r) => r.code === co.code);
+        const want = new Set([ids.has("dash") && row ? "sum" : null, ids.has("dash") && row ? "trend" : null, ids.has("ovw") ? "gov" : null].filter(Boolean));
+        if (want.size) {
+          const d = rd.dashboardDoc(want, { row: row || { code: co.code, name: co.name }, rows, sector, info });
+          const order = ["핵심 지표·리스크 신호", "건전성 추이", "기업 개황·지배구조"];
+          d.sections.sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
+          sections.push(...d.sections.map((x) => (x.title === "기업 개황·지배구조" ? { ...x, title: "개황" } : x)));
+        }
+      } else if (ids.has("ovw")) sections.push({ ...rd.govSection(await live.dartOf(co.name)), title: "개황" });
+    } catch (e) {
+      sections.push({ title: "회사 대시보드·개황", blocks: [{ text: "이 자료를 불러오지 못해 저장하지 못했습니다: " + errorText(e), gray: true }] });
+    }
+  }
   if (ids.has("fin")) {
     const funds = group(profile, "fund");
     const allFin = group(profile, "fin").filter((m) => m.basis);
