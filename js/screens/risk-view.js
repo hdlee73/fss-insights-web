@@ -80,7 +80,7 @@ async function peerView(root, params, env, sector) {
       h("p", { class: "note" }, `가로 ${cfg.x.label}(클수록 양호), 세로 ${cfg.y.label}(${cfg.y.higher ? "클수록" : "작을수록"} 양호). 점선은 업권 중앙값이고, 붉은 영역은 두 지표가 모두 중앙값보다 나쁜 쪽입니다. 점을 누르면 그 회사 대시보드로 이동합니다.`),
       svgBox(quadrantSvg({ points: q.points, xMean: q.xMean, yMean: q.yMean, xLabel: cfg.x.label, yLabel: cfg.y.label, yHigherBetter: cfg.y.higher }), "quad"),
       axisNote(sector)),
-    section("취약 구간 회사", `${cfg.x.label} 중앙값 미만 · ${cfg.y.label} ${cfg.y.higher ? "중앙값 미만" : "중앙값 초과"}`,
+    section("주의 구간 회사", `${cfg.x.label} 중앙값 미만 · ${cfg.y.label} ${cfg.y.higher ? "중앙값 미만" : "중앙값 초과"}`,
       h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
         h("thead", null, h("tr", null, h("th", null, "회사"), h("th", { class: "num" }, cfg.x.label), h("th", { class: "num" }, cfg.y.label))),
         h("tbody", null, (q.dangerIds.length ? q.points.filter((p) => q.dangerIds.includes(p.id)).sort((a, b) => a.x - b.x) : []).map((p) => h("tr", { class: "click", onclick: () => env.go({ sector, co: p.id }) }, h("td", null, h("b", null, p.name)), h("td", { class: "num" }, pctText(p.x)), h("td", { class: "num" }, pctText(p.y))))))),
