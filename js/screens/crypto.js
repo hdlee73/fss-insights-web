@@ -1,7 +1,7 @@
 // 가상자산 시장 동향: 국내 원화거래소 5곳 합산 시장 일보(VirtualAssets에서 옮겨 온 화면).
 // 자료는 FSS_insights 레포 crypto-data 브랜치(매일 24:00 KST 하루 한 번 집계한 JSON·PDF·HWPX와 거래소 재무, 워크플로 crypto-data.yml). 주요 코인 시세는 업비트·빗썸 웹소켓(끊기면 폴링)과 Coinbase를 브라우저에서 직접 읽는다. 별도 서버 없음.
 import { setHeader } from "../app.js";
-import { card, errorText, h, icon, loading, message, tabs } from "../core.js";
+import { card, errorText, h, icon, loading, message, reportError, tabs } from "../core.js";
 import { liveCrypto } from "../lib/livefeed.js";
 
 const BASE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/crypto-data";
@@ -481,7 +481,7 @@ function summary(root, data, goto, ctx) {
 /** 업비트 1분봉 최근 약 3시간 20분(200개, 오래된 것부터). 업비트가 브라우저 요청을 10초에 1회로 제한해 한 번에 받을 수 있는 최대치다. 실패하면 예외. */
 async function fetchDayCandles(sym) {
   const r = await fetch(`https://api.upbit.com/v1/candles/minutes/1?market=KRW-${sym}&count=200`);
-  if (!r.ok) throw new Error("upbit candles " + r.status);
+  if (!r.ok) { reportError("fetch:upbit-candles:" + r.status); throw new Error("upbit candles " + r.status); }
   const arr = (await r.json()).slice().reverse();
   if (arr.length < 2) throw new Error("candles empty");
   return arr.map((c) => ({ t: String(c.candle_date_time_kst || ""), o: c.opening_price, h: c.high_price, l: c.low_price, c: c.trade_price }));

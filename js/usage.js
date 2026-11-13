@@ -24,7 +24,33 @@ export function recordMenu(label) {
   const day = dayOf();
   p[day] = p[day] || {};
   p[day][label] = (p[day][label] || 0) + 1;
+  const hk = "~h:" + new Date().getHours(); // 시간대별 이용(기기 시계 기준 '시')
+  p[day][hk] = (p[day][hk] || 0) + 1;
   store.set("usage.pending", p);
+}
+
+/** 오류·실패 한 건(이름만, 주소·내용은 남기지 않는다). 예: "api:/news:503", "fetch:upbit". 같은 날 같은 이름은 횟수만 쌓는다. */
+export function recordError(name) {
+  if (!enabled() || !name) return;
+  const p = store.get("usage.pending", {});
+  const day = dayOf();
+  p[day] = p[day] || {};
+  const key = "~e:" + String(name).replace(/[^0-9A-Za-z:/._-]/g, "").slice(0, 40);
+  p[day][key] = Math.min(1000, (p[day][key] || 0) + 1);
+  store.set("usage.pending", p);
+}
+
+/** 접속 환경 대분류(기기 종류·브라우저·운영체제·화면 크기·설치 여부). 모델·정확한 버전·IP는 보내지 않는다. */
+export function envInfo() {
+  const ua = navigator.userAgent || "";
+  const mobile = /Android|iPhone|iPod/i.test(ua) || (/iPad/i.test(ua) || (navigator.maxTouchPoints > 1 && /Macintosh/i.test(ua)) ? "tablet" : false);
+  const dev = mobile === "tablet" ? "태블릿" : mobile ? "휴대폰" : "PC";
+  const br = /Edg\//.test(ua) ? "Edge" : /Whale/.test(ua) ? "Whale" : /SamsungBrowser/.test(ua) ? "Samsung" : /Firefox|FxiOS/.test(ua) ? "Firefox" : /OPR\//.test(ua) ? "Opera" : /Chrome|CriOS/.test(ua) ? "Chrome" : /Safari/.test(ua) ? "Safari" : "기타";
+  const os = /Windows/.test(ua) ? "Windows" : /Android/.test(ua) ? "Android" : /iPhone|iPad|iPod/.test(ua) ? "iOS" : /Macintosh/.test(ua) ? (navigator.maxTouchPoints > 1 ? "iOS" : "macOS") : /Linux|CrOS/.test(ua) ? "Linux" : "기타";
+  const w = window.innerWidth || 0;
+  const sc = w < 480 ? "480 미만" : w < 768 ? "480~767" : w < 1280 ? "768~1279" : "1280 이상";
+  const inst = matchMedia("(display-mode: standalone)").matches || navigator.standalone ? "설치형(PWA)" : "브라우저";
+  return { dev, br, os, sc, inst };
 }
 
 /** 끄면 아직 보내지 않은 기록을 지운다. */
@@ -47,7 +73,7 @@ export async function sendIfNeeded() {
   const days = [...past.map((d) => ({ d, m: pending[d] })), ...(includeToday ? [{ d: today, m: {} }] : [])];
   sending = true;
   try {
-    const res = await fetch(SERVER + "/usage/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, days }) });
+    const res = await fetch(SERVER + "/usage/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, env: envInfo(), days }) });
     if (res.ok) {
       const now = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
       past.forEach((d) => delete now[d]);

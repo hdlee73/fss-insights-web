@@ -1,6 +1,6 @@
 // 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
-import { cached, fetchSite, h, icon, skeleton, store } from "../core.js";
+import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
 import * as N from "../lib/news.js";
@@ -183,7 +183,7 @@ async function readWeather() {
   try {
     const r = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
     if (r.ok) return await r.json();
-  } catch { /* 아래에서 서버 경유로 다시 시도 */ }
+  } catch { reportError("fetch:open-meteo"); /* 아래에서 서버 경유로 다시 시도 */ }
   return JSON.parse((await fetchSite(WEATHER_URL)).text);
 }
 
