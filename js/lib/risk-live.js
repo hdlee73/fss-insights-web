@@ -5,11 +5,26 @@ import { casesOf, loadSanctions } from "./sanctions.js";
 import { nameKey, pickDart } from "./risk.js";
 
 const TTL = 6 * 3600e3;
+// 매일 새로 모아 올리는 사전수집 자료(GitHub Actions risk-data). 있으면 이걸 먼저 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
+const PRE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/risk-data/";
+const STALE_MS = 3 * 86400e3;
+const pre = (name) => cached("risk:pre:" + name, TTL, async () => {
+  const r = await fetch(PRE + name + "?r=1");
+  if (!r.ok) throw new Error("사전수집 자료 없음");
+  return r.json();
+});
+const preFresh = () => cached("risk:pre:ok", TTL, async () => {
+  const m = await pre("meta.json");
+  const t = Date.parse(String(m.updated || "").replace(" KST", "+09:00").replace(" ", "T"));
+  if (!(Date.now() - t < STALE_MS)) throw new Error("사전수집 자료가 오래됨");
+  return true;
+});
+const prePeers = async (sector) => { await preFresh(); const d = await pre(`peers-${sector}.json`); if (!d.rows?.length) throw new Error("빈 자료"); return d.rows; };
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
 const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
 const canonQuery = (n) => n.replace(/^에스비아이저축은행/, "교보에스비아이저축은행");
 // 금융지주 자회사(은행·카드 등)처럼 자체 DART 공시가 없는 회사는 모회사로 잇는다. 필요한 만큼 이 표에 더한다(검토 필요).
-export const PARENT_DART = { 국민은행: ["KB금융", "모회사(금융지주)"], 신한은행: ["신한지주", "모회사(금융지주)"], 하나은행: ["하나금융지주", "모회사(금융지주)"], 우리은행: ["우리금융지주", "모회사(금융지주)"], 농협은행: ["NH농협금융지주", "모회사(금융지주)"] };
+export const PARENT_DART = { 국민은행: ["KB금융", "모회사(금융지주)"], 신한은행: ["신한지주", "모회사(금융지주)"], 하나은행: ["하나금융지주", "모회사(금융지주)"], 우리은행: ["우리금융지주", "모회사(금융지주)"], 농협은행: ["농협금융지주", "모회사(금융지주)"], "KB증권": ["케이비증권", "본인"] };
 
 async function pool(items, n, fn) {
   const out = new Array(items.length);
@@ -19,6 +34,8 @@ async function pool(items, n, fn) {
 }
 
 const companies = (sector) => cached("risk:co:" + sector, TTL, async () => {
+  const rows = await prePeers(sector).catch(() => null);
+  if (rows) return rows.map((r) => ({ code: r.code, name: r.name, assets: r.assets })).sort((a, b) => b.assets - a.assets);
   const [co, rk] = await Promise.all([api("/fisis/companies", { sector }), api("/fisis/ranking", { sector, offset: 0 }).catch(() => ({}))]);
   const assets = rk.assets || {};
   return (co.items || []).map((c) => ({ code: c.code, name: clean(c.name), assets: assets[c.code]?.value ?? 0 })).filter((c) => c.code && c.name).sort((a, b) => b.assets - a.assets);
@@ -26,6 +43,8 @@ const companies = (sector) => cached("risk:co:" + sector, TTL, async () => {
 
 const FOREIGN = /지점|골드만|모간스탠리|모건스탠리|메릴린치|비엔피|BNP|씨엘에스에이|CLSA|크레디|노무라|맥쿼리|유비에스|UBS|제이피모간|JP모간|도이치|소시에테|나틱시스|다이와|미즈호|HSBC|에이치에스비씨|바클레이|스탠다드차타드|씨티|ING|아이엔지|SMBC|라자드|이스트스프링|아이씨엠|ICM|CMS|씨엠에스|에스지|SG|CGS|CIMB|씨아이엠비|글로벌마켓|알비에스|RBS|스미토모|미쓰비시|도쿄|SBI증권/;
 const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
+  const pc = await prePeers(sector).catch(() => null);
+  if (pc) return pc;
   const list = (await companies(sector)).filter((c) => !(sector === "F" && FOREIGN.test(c.name))); // 증권은 외국계 지점 제외, 전체 회사
   const rows = await pool(list, 6, async (c) => {
     const p = await api("/fisis/profile", { sector, finance: c.code });
@@ -37,7 +56,8 @@ const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
   return rows.filter(Boolean);
 });
 
-export async function dartOf(name) {
+export async function dartOf(name, key) {
+  if (key) { const t = await preFresh().then(() => pre("top.json")).catch(() => null); const hit = t?.companies?.[key]; if (hit?.dart) return hit.dart; }
   const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [canonQuery(clean(name)), "본인"];
   const found = await cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).catch(() => ({ items: [] }));
   const { match, item } = pickDart(q, found.items || []);
@@ -67,7 +87,7 @@ export function liveProvider() {
     async company(sector, code) {
       const row = (await companies(sector)).find((c) => c.code === code);
       const name = row?.name || "";
-      const [dart, san] = await Promise.all([dartOf(name), loadSanctions().catch(() => null)]);
+      const [dart, san] = await Promise.all([dartOf(name, sector + ":" + code), loadSanctions().catch(() => null)]);
       const cases = san ? casesOf(san, name).map((c) => ({ id: c.id, date: c.date, co: c.company, inst: c.inst, exec: c.exec, staff: c.staff, fine: c.fine, penalty: c.penalty, view: c.viewUrl, items: c.items.map((i) => ({ t: i.title, laws: i.laws })) })).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
       return { dart, sanctions: cases, nowYear: new Date().getFullYear() };
     },
