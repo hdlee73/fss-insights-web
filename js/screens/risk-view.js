@@ -3,7 +3,7 @@
 //   env = { provider, setHeader(title, sub, actions), go(params), openUrl(url) }
 import { h, icon, loading, message, tabs } from "../core.js";
 import { lineChartSvg, quadrantSvg, stackedBarsSvg } from "../lib/riskchart.js";
-import { SECTOR_CFG, SECTOR_ORDER, SEVERITY, latestMonth, monthsBack, nameKey, quadrantData, rankOf, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "../lib/risk.js";
+import { ncrBasis, SECTOR_CFG, SECTOR_ORDER, SEVERITY, latestMonth, monthsBack, nameKey, quadrantData, rankOf, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "../lib/risk.js";
 
 const SEV_CLASS = { 3: "red", 2: "orange", 1: "" };
 const LEVEL = { warn: ["주의", "red"], info: ["참고", "blue"], ok: ["양호", "green"] };
@@ -116,7 +116,7 @@ async function dashboard(root, params, env, sector) {
   const head = h("div", { class: "rk-head" },
     h("span", { class: "avatar big" }, row.name.slice(0, 1)),
     h("div", null, h("div", { class: "rk-name" }, row.name), h("div", { class: "rk-tags" },
-      h("span", { class: "tag blue" }, cfg.label), h("span", { class: "tag" }, `기준 ${monthText(month)}`),
+      h("span", { class: "tag blue" }, cfg.label), h("span", { class: "tag" }, `기준 ${monthText(month)}`), sector === "F" ? h("span", { class: "tag" }, `순자본비율 ${ncrBasis(row)}`) : null,
       dart?.corp ? h("span", { class: "tag " + (dart.match === "guess" ? "orange" : "green") }, `DART ${dart.match === "guess" ? "추정 일치" : dart.rel && dart.rel !== "본인" ? dart.rel : "일치"}: ${nameOnly(dart)}`) : h("span", { class: "tag" }, "DART 자료 없음"),
       cases.length ? h("span", { class: "tag " + (cases.some((c) => severityOf(c) === 3) ? "red" : "orange") }, `제재공시 ${cases.length}건`) : h("span", { class: "tag green" }, "제재공시 없음"))));
 

@@ -8,8 +8,8 @@ export const SECTOR_CFG = {
     names: { bis: "BIS 자기자본비율", npl: "고정이하여신비율", delinq: "연체율", lcr: "유동성커버리지비율" } },
   E: { label: "저축은행", x: { key: "bis", label: "BIS 자기자본비율", higher: true }, y: { key: "npl", label: "고정이하여신비율", higher: false }, trend: ["bis", "npl", "delinq"],
     names: { bis: "BIS 자기자본비율", npl: "고정이하여신비율", delinq: "연체율", liq: "유동성비율" } },
-  F: { label: "증권", x: { key: "ncr", label: "순자본비율(개별)", higher: true }, y: { key: "lev", label: "레버리지비율", higher: false }, trend: ["ncr", "lev", "liq"],
-    names: { ncr: "순자본비율(개별)", lev: "레버리지비율", liq: "유동성비율" } },
+  F: { label: "증권", x: { key: "ncr", label: "순자본비율(연결 우선)", higher: true }, y: { key: "lev", label: "레버리지비율", higher: false }, trend: ["ncr", "lev", "liq"],
+    names: { ncr: "순자본비율(연결 우선)", lev: "레버리지비율", liq: "유동성비율" } },
   H: { label: "생보", x: { key: "solv", label: "지급여력비율", higher: true }, y: { key: "roa", label: "자산 대비 당기순이익(누계)", higher: true }, trend: ["solv", "roa"],
     names: { solv: "지급여력비율", roa: "자산 대비 당기순이익(누계)" } },
   I: { label: "손보", x: { key: "solv", label: "지급여력비율", higher: true }, y: { key: "roa", label: "자산 대비 당기순이익(누계)", higher: true }, trend: ["solv", "roa"],
@@ -27,8 +27,11 @@ const ptsOf = (row, key) => {
     const as = new Map(row.assetsSeries || []);
     return (row.netincome_cum || []).map(([m, v]) => (num(v) && as.get(m) > 0 ? [m, (v / as.get(m)) * 100] : null)).filter(Boolean);
   }
+  // 증권 순자본비율: 연결이 있는 회사는 연결, 없으면 개별(FISIS ncr_c 우선, 없으면 ncr)
+  if (key === "ncr") { const c = (row.ratios?.ncr_c || []).filter((p) => num(p[1])); return c.length ? row.ratios.ncr_c : row.ratios?.ncr || []; }
   return row.ratios?.[key] || [];
 };
+export const ncrBasis = (row) => ((row.ratios?.ncr_c || []).some((p) => num(p[1])) ? "연결" : "개별");
 export const valueAt = (row, key, month) => { const p = ptsOf(row, key).find((x) => x[0] === month); return p && num(p[1]) ? p[1] : null; };
 export const seriesOf = (row, key, months) => months.map((m) => [m, valueAt(row, key, m)]);
 
@@ -70,7 +73,7 @@ export function rankOf(rows, row, key, month, higher) {
 export function quadrantData(rows, sector, month, selfCode = null) {
   const cfg = SECTOR_CFG[sector];
   const m = month || latestMonth(rows, cfg.x.key);
-  const pts = rows.map((r) => ({ id: r.code, name: r.name, x: valueAt(r, cfg.x.key, m), y: valueAt(r, cfg.y.key, m), big: r.assets || 0, self: r.code === selfCode }))
+  const pts = rows.map((r) => ({ id: r.code, name: sector === "F" && cfg.x.key === "ncr" ? `${r.name} (${ncrBasis(r)})` : r.name, x: valueAt(r, cfg.x.key, m), y: valueAt(r, cfg.y.key, m), big: r.assets || 0, self: r.code === selfCode }))
     .filter((p) => num(p.x) && num(p.y));
   // 증권 순자본비율처럼 극단값이 큰 업권이 있어 평균 대신 중앙값을 기준선으로 쓴다.
   const xMean = pts.length ? median(pts.map((p) => p.x)) : 0;
