@@ -353,10 +353,34 @@ export function splitAdminArticles(block) {
 // ------------------------------------------------------------------ 저장소 (서버 /law 중계)
 
 const TTL = 30 * 60 * 1000;
+// 매일 새로 모아 올리는 금융 관련 법령 사전수집 자료(GitHub Actions law-data). 같은 요청이 있으면 서버 왕복 없이 이것을 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
+const PRE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/law-data/";
+const PRE_STALE = 3 * 86400e3;
+const preIndex = () => cached("law:pre:index", 6 * 3600e3, async () => {
+  const r = await fetch(PRE + "index.json");
+  if (!r.ok) throw new Error("사전수집 없음");
+  const d = await r.json();
+  const t = Date.parse(String(d.updated || "").replace(" KST", "+09:00").replace(" ", "T"));
+  if (!(Date.now() - t < PRE_STALE)) throw new Error("사전수집이 오래됨");
+  return d.keys || {};
+});
+const preKey = (endpoint, p) => {
+  const q = { ...p }; delete q.JO; // 조문 한 개만 달라는 요청도 법령 전체 본문에서 찾으면 되므로 조문 번호는 뺀다(받는 쪽이 번호로 고른다)
+  return "law:" + endpoint + "?" + new URLSearchParams(Object.entries(q).filter(([, v]) => v != null)).toString();
+};
+const preText = async (endpoint, p) => {
+  const name = (await preIndex().catch(() => ({})))[preKey(endpoint, p)];
+  if (!name) return null;
+  return cached("law:pre:" + name, TTL, async () => {
+    const r = await fetch(PRE + name);
+    if (!r.ok) throw new Error("사전수집 파일 오류");
+    return r.text();
+  }).catch(() => null);
+};
 const drf = (endpoint, params) => {
   const p = { type: "XML", ...params };
   const key = "law:" + endpoint + "?" + new URLSearchParams(Object.entries(p).filter(([, v]) => v != null)).toString();
-  return cached(key, TTL, () => apiText("/law/DRF/" + endpoint, p));
+  return cached(key, TTL, async () => (await preText(endpoint, p)) ?? apiText("/law/DRF/" + endpoint, p));
 };
 const compact = (s) => (s || "").replace(/ /g, "");
 
