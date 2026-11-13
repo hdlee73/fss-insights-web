@@ -89,7 +89,7 @@ export async function dartOf(name, key) {
   const rel = hit ? hit[1] : "본인";
   if (!item) return { rel, match: "none" };
   const d = await loadDart(item.corp);
-  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: d.company?.name || item.name, ...d };
+  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: item.name, ...d };
 }
 
 export function liveProvider() {
