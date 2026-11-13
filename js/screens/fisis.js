@@ -130,8 +130,16 @@ async function riskPane(root, params, ctx, sector) {
   return view.mountRisk(root, rest, {
     provider: live.liveProvider(), setHeader, openUrl: core.openUrl,
     go: (p) => ctx.go({ tool: "risk", ...p }),
-    extraTab: { label: "회사 목록", onSelect: () => ctx.go({ sector: SECTORS.some(([c]) => c === rest.sector) ? rest.sector : sector }) },
+    // 앱(내장 화면)에서는 위쪽 탭을 앱이 그리므로 웹 탭 줄과 "회사 목록" 탭을 숨긴다.
+    hideTabs: !!window.FssNative,
+    extraTab: window.FssNative ? null : { label: "회사 목록", onSelect: () => ctx.go({ sector: SECTORS.some(([c]) => c === rest.sector) ? rest.sector : sector }) },
   });
+}
+/** 앱 전용: 앱이 회사 상세의 "개황" 탭 자리에 넣는 화면. 회사 코드·이름을 받아 개황만 그린다. */
+export async function renderOverview(root, params, ctx) {
+  const sector = SECTORS.some(([c]) => c === params.sector) ? params.sector : "A";
+  const label = SECTORS.find(([c]) => c === sector)[1];
+  return overviewPane(root, { code: params.co, name: params.name || params.co }, sector, label, ctx);
 }
 /** 회사 목록·상세 화면 맨 위의 탭 줄: 회사 목록 / 리스크 대시보드 쪽 화면들. */
 const toolTabs = (ctx, sector, current = 0) => tabs(["회사 목록", "회사 대시보드", "업권 Peer 사분면", "업권 현황"], current, (i) => {

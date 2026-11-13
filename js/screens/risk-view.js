@@ -23,7 +23,7 @@ export async function mountRisk(root, params, env) {
   const vname = ["", "peer", "overview"][view] || null;
   const names = ["회사 대시보드", "업권 Peer 사분면", "업권 현황"];
   const off = env.extraTab ? 1 : 0; // 금융회사 주요 현황 안에서는 맨 앞에 "회사 목록" 탭이 더해진다
-  root.append(tabs([...(env.extraTab ? [env.extraTab.label] : []), ...names], view + off, (i) => {
+  if (!env.hideTabs) root.append(tabs([...(env.extraTab ? [env.extraTab.label] : []), ...names], view + off, (i) => {
     if (off && i === 0) return env.extraTab.onSelect();
     const k = i - off;
     env.go({ sector: k === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][k] || null });
