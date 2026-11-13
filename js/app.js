@@ -17,7 +17,6 @@ export const MENU = [
   ["금융회사 현황 및 검사", "landmark", [
     ["fisis", "금융회사 주요 현황", "building-2"],
     ["sanction", "금융회사 제재 공시", "gavel"],
-    ["risk", "금융사 리스크 대시보드", "activity"],
     ["finsim", "(베타)제재 양정 시뮬레이터", "calculator"],
   ]],
   ["기업공시 및 회계", "bar-chart-3", [
@@ -51,7 +50,6 @@ const loaders = {
   market: () => import("./screens/market.js"),
   fisis: () => import("./screens/fisis.js"),
   sanction: () => import("./screens/sanction.js"),
-  risk: () => import("./screens/risk.js"),
   dart: () => import("./screens/dart.js"),
   disclosure: () => import("./screens/disclosure.js"),
   audit: () => import("./screens/audit.js"),
@@ -75,8 +73,10 @@ const loaders = {
 export function currentRoute() {
   const raw = location.hash.replace(/^#\/?/, "");
   const [path, qs] = raw.split("?");
+  const params = Object.fromEntries(new URLSearchParams(qs || ""));
+  if (path === "risk") return { id: "fisis", params: { tool: "risk", ...params } }; // 옛 주소 호환
   const id = ROUTES[path] ? path : "briefing";
-  return { id, params: Object.fromEntries(new URLSearchParams(qs || "")) };
+  return { id, params };
 }
 
 /** 다른 화면(또는 같은 화면의 다른 상태)으로 이동. replace면 기록을 늘리지 않는다. */

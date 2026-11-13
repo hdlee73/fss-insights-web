@@ -40,7 +40,7 @@ async function draw() {
   const box = document.createElement("div");
   root.replaceChildren(box);
   window.scrollTo(0, 0);
-  try { await mountRisk(box, parse(), { provider, setHeader, go, openUrl: (u) => window.open(u, "_blank", "noopener") }); }
+  try { await mountRisk(box, parse(), { provider, setHeader, go, extraTab: { label: "회사 목록", onSelect: () => { document.getElementById("rk-root").innerHTML = "<div style=\"padding:30px;color:#5b6b86\">(실제 화면에서는 금융회사 주요 현황의 회사 목록으로 이동합니다)</div>"; } }, openUrl: (u) => window.open(u, "_blank", "noopener") }); }
   catch (e) { console.error(e); if (my === seq) box.textContent = "화면 오류: " + e.message; }
 }
 window.addEventListener("hashchange", draw);

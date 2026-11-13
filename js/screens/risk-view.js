@@ -21,7 +21,13 @@ export async function mountRisk(root, params, env) {
   if (params.co) return dashboard(root, params, env, sector);
   const view = params.view === "peer" ? 1 : overview ? 2 : 0;
   const vname = ["", "peer", "overview"][view] || null;
-  root.append(tabs(["회사 대시보드", "업권 Peer 사분면", "업권 현황"], view, (i) => env.go({ sector: i === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][i] || null })));
+  const names = ["회사 대시보드", "업권 Peer 사분면", "업권 현황"];
+  const off = env.extraTab ? 1 : 0; // 금융회사 주요 현황 안에서는 맨 앞에 "회사 목록" 탭이 더해진다
+  root.append(tabs([...(env.extraTab ? [env.extraTab.label] : []), ...names], view + off, (i) => {
+    if (off && i === 0) return env.extraTab.onSelect();
+    const k = i - off;
+    env.go({ sector: k === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][k] || null });
+  }));
   const order = view === 2 ? OVERVIEW_ORDER : SECTOR_ORDER;
   const pills = h("div", { class: "row-gap", style: { margin: "10px 0" } }, order.map((c) => h("button", { class: "pill" + (c === sector ? " on" : ""), type: "button", onclick: () => env.go({ sector: c, view: vname }) }, SECTOR_NAME[c])));
   root.append(pills);
