@@ -23,8 +23,11 @@ const prePeers = async (sector) => { await preFresh(); const d = await pre(`peer
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
 const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
 const canonQuery = (n) => n.replace(/^에스비아이저축은행/, "교보에스비아이저축은행");
-// 금융지주 자회사(은행·카드 등)처럼 자체 DART 공시가 없는 회사는 모회사로 잇는다. 필요한 만큼 이 표에 더한다(검토 필요).
-export const PARENT_DART = { 국민은행: ["KB금융", "모회사(금융지주)"], 신한은행: ["신한지주", "모회사(금융지주)"], 하나은행: ["하나금융지주", "모회사(금융지주)"], 우리은행: ["우리금융지주", "모회사(금융지주)"], 농협은행: ["농협금융지주", "모회사(금융지주)"], "KB증권": ["케이비증권", "본인"] };
+// 이름 검색으로는 같은 이름의 옛 법인(폐지·합병)과 섞이거나 공시회사명 목록에서 빠지는 회사의 DART 고유번호. DART 누리집에서 최근 사업보고서(또는 공시) 제출을 확인한 현행 법인만 둔다(2026-11-13 확인).
+// 국민은행(060000)·신한은행·하나은행·우리은행·농협은행·KB증권(공시회사명 케이비증권)은 모두 자체 DART 자료가 있어 모회사로 대신하지 않는다.
+export const OWN_DART = { 국민은행: "00386937", 신한은행: "00149293", 하나은행: "00158909", 우리은행: "00254045", 농협은행: "00908757", "KB증권": "00164876", "kb국민은행": "00386937", 케이비국민은행: "00386937", "nh농협은행": "00908757", 엔에이치농협은행: "00908757", "kb증권": "00164876", 케이비증권: "00164876" };
+// 자체 DART 자료가 정말 없는 금융지주 자회사만 여기에 두어 모회사로 잇는다(현재 없음). 형식: 회사명: [모회사 검색어, "모회사(금융지주)"]
+export const PARENT_DART = {};
 
 async function pool(items, n, fn) {
   const out = new Array(items.length);
@@ -56,17 +59,32 @@ const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
   return rows.filter(Boolean);
 });
 
+const loadDart = async (corp) => {
+  const [company, holders] = await Promise.all([
+    cached("dart.c:" + corp, 3600e3, () => api("/dart/company", { corp })).catch(() => null),
+    cached("dart.h:" + corp, 3600e3, () => api("/dart/holders", { corp })).catch(() => null),
+  ]);
+  return { company, holders };
+};
+
 export async function dartOf(name, key) {
-  if (key) { const t = await preFresh().then(() => pre("top.json")).catch(() => null); const hit = t?.companies?.[key]; if (hit?.dart) return hit.dart; }
+  const own = OWN_DART[nameKey(name)] || OWN_DART[name];
+  if (key) {
+    const t = await preFresh().then(() => pre("top.json")).catch(() => null);
+    const hit = t?.companies?.[key]?.dart;
+    // 사전수집에 모회사 자료(rel)가 남아 있거나, 확인된 자체 고유번호와 다른 회사가 담겼으면 쓰지 않고 실시간으로 조회한다.
+    if (hit && (!hit.rel || hit.rel === "본인") && (!own || hit.corp === own)) return hit;
+  }
+  if (own) {
+    const d = await loadDart(own);
+    return { rel: "본인", match: "exact", corp: own, name: d.company?.name || clean(name), ...d };
+  }
   const [q, rel] = PARENT_DART[nameKey(name)] || PARENT_DART[name] || [canonQuery(clean(name)), "본인"];
   const found = await cached("risk:ds:" + q, 600e3, () => api("/dart/search", { q })).catch(() => ({ items: [] }));
   const { match, item } = pickDart(q, found.items || []);
   if (!item) return { rel, match: "none" };
-  const [company, holders] = await Promise.all([
-    cached("dart.c:" + item.corp, 3600e3, () => api("/dart/company", { corp: item.corp })).catch(() => null),
-    cached("dart.h:" + item.corp, 3600e3, () => api("/dart/holders", { corp: item.corp })).catch(() => null),
-  ]);
-  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: item.name, company, holders };
+  const d = await loadDart(item.corp);
+  return { rel, match: rel === "본인" ? match : "exact", corp: item.corp, name: item.name, ...d };
 }
 
 export function liveProvider() {
