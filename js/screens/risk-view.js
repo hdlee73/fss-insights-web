@@ -21,7 +21,13 @@ export async function mountRisk(root, params, env) {
   if (params.co) return dashboard(root, params, env, sector);
   const view = params.view === "peer" ? 1 : overview ? 2 : 0;
   const vname = ["", "peer", "overview"][view] || null;
-  root.append(tabs(["회사 대시보드", "업권 Peer 사분면", "업권 현황"], view, (i) => env.go({ sector: i === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][i] || null })));
+  const names = ["회사 대시보드", "업권 Peer 사분면", "업권 현황"];
+  const off = env.extraTab ? 1 : 0; // 금융회사 주요 현황 안에서는 맨 앞에 "회사 목록" 탭이 더해진다
+  root.append(tabs([...(env.extraTab ? [env.extraTab.label] : []), ...names], view + off, (i) => {
+    if (off && i === 0) return env.extraTab.onSelect();
+    const k = i - off;
+    env.go({ sector: k === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][k] || null });
+  }));
   const order = view === 2 ? OVERVIEW_ORDER : SECTOR_ORDER;
   const pills = h("div", { class: "row-gap", style: { margin: "10px 0" } }, order.map((c) => h("button", { class: "pill" + (c === sector ? " on" : ""), type: "button", onclick: () => env.go({ sector: c, view: vname }) }, SECTOR_NAME[c])));
   root.append(pills);
@@ -74,7 +80,7 @@ async function peerView(root, params, env, sector) {
       h("p", { class: "note" }, `가로 ${cfg.x.label}(클수록 양호), 세로 ${cfg.y.label}(${cfg.y.higher ? "클수록" : "작을수록"} 양호). 점선은 업권 중앙값이고, 붉은 영역은 두 지표가 모두 중앙값보다 나쁜 쪽입니다. 점을 누르면 그 회사 대시보드로 이동합니다.`),
       svgBox(quadrantSvg({ points: q.points, xMean: q.xMean, yMean: q.yMean, xLabel: cfg.x.label, yLabel: cfg.y.label, yHigherBetter: cfg.y.higher }), "quad"),
       axisNote(sector)),
-    section("취약 구간 회사", `${cfg.x.label} 중앙값 미만 · ${cfg.y.label} ${cfg.y.higher ? "중앙값 미만" : "중앙값 초과"}`,
+    section("주의 구간 회사", `${cfg.x.label} 중앙값 미만 · ${cfg.y.label} ${cfg.y.higher ? "중앙값 미만" : "중앙값 초과"}`,
       h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
         h("thead", null, h("tr", null, h("th", null, "회사"), h("th", { class: "num" }, cfg.x.label), h("th", { class: "num" }, cfg.y.label))),
         h("tbody", null, (q.dangerIds.length ? q.points.filter((p) => q.dangerIds.includes(p.id)).sort((a, b) => a.x - b.x) : []).map((p) => h("tr", { class: "click", onclick: () => env.go({ sector, co: p.id }) }, h("td", null, h("b", null, p.name)), h("td", { class: "num" }, pctText(p.x)), h("td", { class: "num" }, pctText(p.y))))))),
@@ -183,7 +189,7 @@ function assetTile(row, month) {
     h("div", { class: "note" }, ni != null ? `당기순이익(누계) ${Math.round(ni).toLocaleString("en-US")}억원` : "순이익 자료 없음"));
 }
 
-function govBody(dart) {
+export function govBody(dart) {
   if (!dart?.corp) return h("p", { class: "note" }, dart?.rel && dart.rel !== "본인" ? dart.rel + ". 전자공시(DART) 자료가 없는 회사입니다." : "전자공시(DART)에서 찾은 회사가 없습니다(비상장·외부감사 비대상 등). 개황·지배구조는 표시하지 않습니다.");
   const ci = dart.company || {};
   const rel = dart.rel && dart.rel !== "본인" ? h("p", { class: "note rk-rel" }, `이 회사의 DART 자료는 ${dart.rel}(${nameOnly(dart)})의 것입니다.`) : dart.match === "guess" ? h("p", { class: "note rk-rel" }, "DART 회사를 이름으로 추정해 연결했습니다. 아래 자료가 맞는지 확인하세요.") : null;

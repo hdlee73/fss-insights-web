@@ -141,7 +141,8 @@ export function pickDart(fisisName, items) {
   const k = nameKey(fisisName);
   const ex = items.find((i) => nameKey(i.name) === k);
   if (ex) return { match: "exact", item: ex };
-  const g = items.find((i) => { const o = nameKey(i.name); return o && (o.includes(k) || k.includes(o)); });
+  // 앞부분이 같은 경우만 추정으로 본다(다른 회사 이름 속에 우연히 들어 있는 경우를 걸러냄: 예 "교보에스비아이저축은행" ≠ "에스비아이저축은행")
+  const g = items.find((i) => { const o = nameKey(i.name); return o && (o.startsWith(k) || k.startsWith(o)); });
   return g ? { match: "guess", item: g } : { match: "none", item: null };
 }
 
