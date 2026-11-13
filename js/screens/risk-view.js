@@ -177,11 +177,9 @@ function sanctionBody(cases, nowYear, env) {
   if (!cases.length) return h("p", { class: "note" }, "이 회사 이름으로 찾은 제재공시가 없습니다. (이름이 달라 누락됐을 수 있어 제재 공시 화면에서 한 번 더 검색해 보세요.)");
   const years = sanctionYears(cases, nowYear, 8);
   const bars = years.map((y) => ({ label: String(y.year).slice(2), parts: [{ value: y.high, color: "var(--danger)", title: "중징계·영업제한" }, { value: y.mid, color: "var(--warm)", title: "금전·주의" }, { value: y.low, color: "#9fb0cb", title: "경미" }] }));
-  let shown = 6;
   const list = h("div", { class: "rk-tl" });
-  const more = h("button", { class: "btn ghost sm", type: "button", onclick: () => { shown += 10; draw(); } }, "더 보기");
   const draw = () => {
-    list.replaceChildren(...cases.slice(0, shown).map((c) => {
+    list.replaceChildren(...cases.map((c) => {
       const sv = severityOf(c);
       const acts = [c.inst && `기관: ${c.inst}`, c.exec && `임원: ${c.exec}`, c.staff && `직원: ${c.staff}`, c.fine > 0 && `과태료 ${wonText(c.fine)}`, c.penalty > 0 && `과징금 ${wonText(c.penalty)}`].filter(Boolean);
       return h("div", { class: "rk-ti" }, h("div", { class: "rk-dot s" + sv }),
@@ -189,12 +187,11 @@ function sanctionBody(cases, nowYear, env) {
           h("div", { class: "note" }, acts.join(" · ") || "조치내용 없음"),
           (c.items || []).length ? h("div", { class: "rk-ci" }, (c.items || []).slice(0, 3).map((i) => h("div", null, "· ", i.t))) : null));
     }));
-    more.hidden = shown >= cases.length;
   };
   draw();
   return h("div", null,
     h("div", { class: "rk-legend2" }, [["var(--danger)", "중징계·영업제한 등"], ["var(--warm)", "금전제재·주의"], ["#9fb0cb", "경미"]].map(([c, t]) => h("span", null, h("i", { style: { background: c } }), t))),
-    svgBox(stackedBarsSvg({ bars })), list, more,
+    svgBox(stackedBarsSvg({ bars })), list,
     h("p", { class: "note" }, "조치 무게는 조치 문구(영업정지·기관경고·과태료 등)로 분류한 것으로 공식 구분이 아닙니다."));
 }
 
