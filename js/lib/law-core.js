@@ -364,10 +364,7 @@ const preIndex = () => cached("law:pre:index", 6 * 3600e3, async () => {
   if (!(Date.now() - t < PRE_STALE)) throw new Error("사전수집이 오래됨");
   return d.keys || {};
 });
-const preKey = (endpoint, p) => {
-  const q = { ...p }; delete q.JO; // 조문 한 개만 달라는 요청도 법령 전체 본문에서 찾으면 되므로 조문 번호는 뺀다(받는 쪽이 번호로 고른다)
-  return "law:" + endpoint + "?" + new URLSearchParams(Object.entries(q).filter(([, v]) => v != null)).toString();
-};
+const preKey = (endpoint, p) => endpoint + "?" + Object.entries(p).filter(([k, v]) => v != null && k !== "type" && k !== "JO").map(([k, v]) => `${k}=${v}`).sort().join("&"); // 서버의 build_law.mjs keyOf와 같은 규칙(JO는 빼고 전체 본문에서 번호로 고른다)
 const preText = async (endpoint, p) => {
   const name = (await preIndex().catch(() => ({})))[preKey(endpoint, p)];
   if (!name) return null;
