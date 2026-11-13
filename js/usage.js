@@ -1,5 +1,6 @@
 // 익명 사용 통계(앱 UsageStats.kt와 같은 방식). 하루 한 번 서버에 (랜덤 기기ID, 웹 버전, 날짜, 메뉴별 이용 횟수)만 보낸다.
 // 이름·계정·검색어는 보내지 않으며 앱 정보에서 끌 수 있다. 지난 날짜는 메뉴 횟수와 함께, 오늘은 '사용함'만 보낸다.
+// 사용자별 하루 방문 횟수·사용 시간(화면이 보인 시간)도 함께 보낸다(아래 '방문 횟수·사용 시간').
 // 서버의 관리자 화면(/admin)에서 버전 이름 'web-…'으로 앱과 구분된다.
 import { APP_VERSION, SERVER, store } from "./core.js";
 
@@ -53,33 +54,130 @@ export function envInfo() {
   return { dev, br, os, sc, inst };
 }
 
+// ---- 방문 횟수·사용 시간 ----
+// 화면을 열 때마다(처음 열기·숨겼다가 다시 보기) 방문 1회, 화면이 보이는 동안 1분마다 시간을 쌓는다(숨기면 멈춤).
+// 날짜별 '누적값'(v=방문, s=초)을 이 브라우저에 두고, 서버에는 그 누적값을 보낸다(서버가 최댓값으로 받아 중복 전송해도 안전).
+// 서버가 이 기능을 지원한다고 알려 준 뒤(응답의 live)에만 추가로 보내므로, 서버가 아직 옛 버전이어도 부담·오류가 없다.
+const TICK_MS = 60_000;
+const LIVE_PUSH_MS = 10 * 60_000; // 보는 동안 서버에 올리는 간격(변동이 있을 때만)
+const MAX_GAP_MS = 90_000; // 절전·타이머 지연으로 한 번에 크게 늘어나는 것을 막는다
+const sigOf = (x) => `${x.v || 0}:${x.s || 0}`;
+let tickTimer = 0, lastTick = 0, lastPush = 0;
+
+function bumpStat(fn) {
+  const st = store.get("usage.stat", {});
+  const day = dayOf();
+  st[day] = st[day] || { v: 0, s: 0 };
+  fn(st[day]);
+  const cutoff = dayOf(new Date(Date.now() - KEEP_DAYS * 86400000));
+  for (const d of Object.keys(st)) if (d < cutoff) delete st[d];
+  store.set("usage.stat", st);
+}
+function tick(push = true) {
+  const now = Date.now();
+  const gap = Math.min(now - lastTick, MAX_GAP_MS);
+  lastTick = now;
+  if (gap > 0) bumpStat((x) => (x.s = Math.min(86400, (x.s || 0) + Math.round(gap / 1000))));
+  if (push && now - lastPush >= LIVE_PUSH_MS) {
+    lastPush = now;
+    sendIfNeeded();
+  }
+}
+function startVisible(countVisit) {
+  if (countVisit) bumpStat((x) => (x.v = Math.min(2000, (x.v || 0) + 1)));
+  lastTick = Date.now();
+  if (!tickTimer) tickTimer = setInterval(tick, TICK_MS);
+}
+function stopVisible() {
+  if (tickTimer) {
+    clearInterval(tickTimer);
+    tickTimer = 0;
+    tick(false);
+  }
+}
+/** 앱 시작 때 한 번. 화면 표시 여부에 따라 방문·시간을 기록한다. */
+export function trackActivity() {
+  if (!enabled()) return;
+  lastPush = Date.now(); // 연 직후에는 하루 한 번 보내는 기본 전송이 먼저 나간다
+  if (document.visibilityState === "visible") startVisible(true);
+  document.addEventListener("visibilitychange", () => {
+    if (!enabled()) return;
+    if (document.visibilityState === "visible") {
+      if (!tickTimer) startVisible(true);
+    } else {
+      stopVisible();
+      sendIfNeeded(true);
+    }
+  });
+  addEventListener("pagehide", () => {
+    if (!enabled()) return;
+    stopVisible();
+    sendIfNeeded(true);
+  });
+}
+
 /** 끄면 아직 보내지 않은 기록을 지운다. */
 export function setEnabled(on) {
   store.set("usageStats", !!on);
-  if (!on) store.set("usage.pending", {});
+  if (!on) {
+    store.set("usage.pending", {});
+    store.set("usage.stat", {});
+    store.set("usage.acked", {});
+    if (tickTimer) clearInterval(tickTimer), (tickTimer = 0);
+  } else if (document.visibilityState === "visible" && !tickTimer) {
+    startVisible(false);
+  }
   window["ga-disable-G-FL8LM4E0Y1"] = !on;
 }
 
 let sending = false;
-/** 오늘 아직 보내지 않았거나 지난 날짜 기록이 남아 있으면 보낸다. 실패하면 다음에 다시. */
-export async function sendIfNeeded() {
+/**
+ * 오늘 아직 보내지 않았거나 지난 날짜 기록이 남아 있거나(서버가 지원하면) 방문·시간 누적값이 바뀌었으면 보낸다. 실패하면 다음에 다시.
+ * keepalive 는 화면을 닫는 순간에도 요청이 끝까지 가도록 한다.
+ */
+export async function sendIfNeeded(keepalive = false) {
   if (!enabled() || sending || !navigator.onLine) return;
   const today = dayOf();
   const cutoff = dayOf(new Date(Date.now() - KEEP_DAYS * 86400000));
   const pending = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
   const past = Object.keys(pending).filter((d) => d < today).sort().slice(-10);
   const includeToday = store.get("usage.last", "") !== today || store.get("usage.lastV", "") !== APP_VERSION; // 같은 날 새 버전으로 바뀐 경우도 한 번 더 알린다
-  if (!past.length && !includeToday) return;
-  const days = [...past.map((d) => ({ d, m: pending[d] })), ...(includeToday ? [{ d: today, m: {} }] : [])];
+  const live = store.get("usage.live", false); // 서버가 방문·시간 수집을 지원한다고 알려 준 적이 있는지
+  const stat = store.get("usage.stat", {});
+  const acked = store.get("usage.acked", {});
+  const changed = Object.keys(stat).filter((d) => sigOf(stat[d]) !== acked[d]).sort().slice(-10);
+  const extra = live ? changed : [];
+  if (!past.length && !includeToday && !extra.length) return;
+  const map = new Map();
+  past.forEach((d) => map.set(d, { d, m: pending[d] }));
+  if (includeToday) map.set(today, { d: today, m: {} });
+  extra.forEach((d) => !map.has(d) && map.set(d, { d, m: {} }));
+  const sentSig = {};
+  for (const [d, o] of map) {
+    if (stat[d]) {
+      o.vis = stat[d].v || 0;
+      o.sec = stat[d].s || 0;
+      sentSig[d] = sigOf(stat[d]);
+    }
+  }
+  const days = [...map.values()].sort((a, b) => (a.d < b.d ? -1 : 1)).slice(-10);
   sending = true;
   try {
-    const res = await fetch(SERVER + "/usage/ping", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, env: envInfo(), days }) });
+    const res = await fetch(SERVER + "/usage/ping", { method: "POST", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, env: envInfo(), days }) });
     if (res.ok) {
       const now = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
       past.forEach((d) => delete now[d]);
       store.set("usage.pending", now);
       store.set("usage.last", today);
       store.set("usage.lastV", APP_VERSION);
+      const body = await res.json().catch(() => null);
+      if (body?.live) {
+        store.set("usage.live", true);
+        // 누적값은 서버가 최댓값으로 받으므로, 보낸 값과 같은 서명만 기록해 두면 이후 변동분만 다시 보낸다
+        const a = Object.fromEntries(Object.entries(store.get("usage.acked", {})).filter(([d]) => d >= cutoff));
+        Object.assign(a, sentSig);
+        store.set("usage.acked", a);
+      }
     }
   } catch {
     // 오프라인·서버 오류는 다음에 다시
