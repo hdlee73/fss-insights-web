@@ -248,12 +248,7 @@ async function overviewView(root, params, env, sector) {
     more.hidden = shown >= rk.rows.length;
   };
   draw();
-  const kpis = h("div", { class: "kpis" },
-    h("div", { class: "kpi" }, h("small", null, "회사 수"), h("b", null, `${rk.n}곳`), h("div", { class: "note" }, rk.missing ? `규모 자료 없음 ${rk.missing}곳 제외` : ov.scope || "")),
-    h("div", { class: "kpi hl" }, h("small", null, `${ov.basis} 합계`), h("b", null, eokText(rk.total)), h("div", { class: "note" }, `기준 ${ov.asOf}`)),
-    h("div", { class: "kpi" }, h("small", null, "상위 5사 점유율"), h("b", null, (rk.top5Share * 100).toFixed(1) + "%"), h("div", { class: "note" }, rk.rows.slice(0, 5).map((r) => r.name).join(", "))),
-    h("div", { class: "kpi" }, h("small", null, "중앙값 규모"), h("b", null, eokText(rk.median)), h("div", { class: "note" }, rk.rows[0] ? `1위 ${rk.rows[0].name} ${eokText(rk.rows[0].value)}` : "")));
-  const parts = [kpis, section(`${ov.basis} 순위`, `${ov.asOf} 기준${canOpen ? " · 회사를 누르면 대시보드" : ""}`, list, more)];
+  const parts = [section(`${ov.basis} 순위`, `${ov.asOf} 기준${canOpen ? " · 회사를 누르면 대시보드" : ""}`, list, more)];
   if (cfg && ov.rows) {
     const month = latestMonth(ov.rows, cfg.x.key);
     const keys = Object.keys(cfg.names).filter((k) => ov.rows.some((r) => valueAt(r, k, month) != null));
