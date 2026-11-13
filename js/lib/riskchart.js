@@ -139,3 +139,25 @@ export function quadrantSvg({ points, xMean, yMean, xLabel, yLabel, xUnit = "%",
   return svg + dots.join("") + labels.join("") + "</svg>";
 }
 
+
+/** 분포 히스토그램(distribution() 결과). 사분위 범위를 띠로, 중앙값을 선으로 표시한다. */
+export function histogramSvg({ dist, unit = "%", width = 520, height = 150, highlight = null }) {
+  if (!dist) return `<svg viewBox="0 0 ${width} 60" class="rk-chart"><text x="${width / 2}" y="34" text-anchor="middle" class="rk-t">자료가 없습니다</text></svg>`;
+  const ml = 30, mr = 10, mt = 14, mb = 24;
+  const w = width - ml - mr, h = height - mt - mb;
+  const max = Math.max(1, ...dist.bins.map((b) => b.n));
+  const X = (v) => ml + ((Math.min(dist.hi, Math.max(dist.lo, v)) - dist.lo) / (dist.hi - dist.lo)) * w;
+  const bw = w / dist.bins.length;
+  let svg = `<svg viewBox="0 0 ${width} ${height}" class="rk-chart" role="img" aria-label="분포">`;
+  svg += `<line x1="${ml}" x2="${width - mr}" y1="${mt + h}" y2="${mt + h}" class="rk-grid"/>`;
+  svg += `<rect x="${X(dist.q1)}" y="${mt}" width="${Math.max(1, X(dist.q3) - X(dist.q1))}" height="${h}" class="rk-iqr"/>`;
+  dist.bins.forEach((b, i) => {
+    const bh = (b.n / max) * h;
+    svg += `<rect x="${(ml + bw * i + 1).toFixed(1)}" y="${(mt + h - bh).toFixed(1)}" width="${(bw - 2).toFixed(1)}" height="${bh.toFixed(1)}" rx="2" class="rk-bar"><title>${fmtTick(b.x0)}~${fmtTick(b.x1)}${esc(unit)}: ${b.n}곳</title></rect>`;
+    if (b.n) svg += `<text x="${(ml + bw * i + bw / 2).toFixed(1)}" y="${(mt + h - bh - 3).toFixed(1)}" text-anchor="middle" class="rk-t">${b.n}</text>`;
+  });
+  svg += `<line x1="${X(dist.med)}" x2="${X(dist.med)}" y1="${mt - 4}" y2="${mt + h}" class="rk-mean"/>`;
+  if (highlight != null && Number.isFinite(highlight)) svg += `<path d="M${X(highlight)} ${mt + h + 2} l-5 8 h10 z" class="rk-hl"/>`;
+  for (const t of niceTicks(dist.lo, dist.hi, 5)) svg += `<text x="${X(t)}" y="${height - 6}" text-anchor="middle" class="rk-t">${fmtTick(t)}</text>`;
+  return svg + "</svg>";
+}

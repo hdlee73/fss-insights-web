@@ -11,13 +11,14 @@ const get = async (p, q) => {
 };
 const pool = async (items, n, fn) => { const out = []; let i = 0; await Promise.all(Array.from({ length: n }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k]); } })); return out; };
 const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
-const SECTORS = { A: 40, E: 25, F: 25, H: 25, I: 25, C: 12 };   // 권역: 총자산 상위 N개
+const SECTORS = { A: 999, E: 999, F: 999, H: 999, I: 999, C: 999 };   // 권역: 전체 회사(외국계 지점 제외)
+const FOREIGN = /지점|골드만|모간스탠리|모건스탠리|메릴린치|비엔피|BNP|씨엘에스에이|CLSA|크레디|노무라|맥쿼리|유비에스|UBS|제이피모간|JP모간|도이치|소시에테|나틱시스|다이와|미즈호|HSBC|에이치에스비씨|바클레이|스탠다드차타드|씨티|ING|아이엔지|SMBC|라자드|이스트스프링|아이씨엠|ICM|CMS|씨엠에스|에스지|SG|CGS|CIMB|씨아이엠비|글로벌마켓|알비에스|RBS|스미토모|미쓰비시|도쿄|SBI증권/;
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
 const out = { generatedAt: new Date().toISOString(), sectors: {}, demo: {} };
 for (const [sec, top] of Object.entries(SECTORS)) {
   const [co, rk] = await Promise.all([get("/fisis/companies", { sector: sec }), get("/fisis/ranking", { sector: sec, offset: 0 })]);
   const assets = rk?.assets || {};
-  const list = (co?.items || []).map((c) => ({ code: c.code, name: clean(c.name), a: assets[c.code]?.value ?? 0 })).sort((x, y) => y.a - x.a).slice(0, top);
+  const list = (co?.items || []).map((c) => ({ code: c.code, name: clean(c.name), a: assets[c.code]?.value ?? 0 })).filter((c) => !(sec === "F" && FOREIGN.test(c.name))).sort((x, y) => y.a - x.a).slice(0, top);
   const rows = await pool(list, 6, async (c) => {
     const p = await get("/fisis/profile", { sector: sec, finance: c.code });
     if (!p) return null;
@@ -28,6 +29,13 @@ for (const [sec, top] of Object.entries(SECTORS)) {
   });
   out.sectors[sec] = rows.filter(Boolean);
   console.error(sec, out.sectors[sec].length);
+}
+// 운용사: FISIS 회사 목록 + 금융투자협회 펀드 순자산(fund-data)
+{
+  const co = await get("/fisis/companies", { sector: "G" });
+  out.sectors_G = (co?.items || []).map((c) => ({ code: c.code, name: clean(c.name) }));
+  out.fund = await (await fetch("https://raw.githubusercontent.com/hdlee73/FSS_insights/fund-data/fund-aum.json")).json();
+  console.error("G", out.sectors_G.length, out.fund.companies?.length);
 }
 // 개별 회사 대시보드 시연용: DART 개황·최대주주 + FISIS 코드 + 제재(실제 공시)
 // [권역, FISIS 회사명, DART 검색어(없으면 null), DART와의 관계, 제재공시 별칭들]

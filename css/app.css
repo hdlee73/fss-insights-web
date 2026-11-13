@@ -1097,8 +1097,8 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .rk-kv span { word-break: break-all; }
 .rk-rel { background: var(--chip); border-radius: 8px; padding: 6px 10px; margin: 0 0 10px; }
 .rk-hrow { display: grid; grid-template-columns: minmax(110px, 190px) 1fr 58px; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--line2); }
-.rk-hrow .bar { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; }
-.rk-hrow .bar span { display: block; height: 100%; background: var(--acc); }
+.rk-hrow .rb { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; }
+.rk-hrow .rb span { display: block; height: 100%; background: var(--acc); }
 .rk-hrow .pc { text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
 .rk-tl { margin: 10px 0 8px; }
 .rk-ti { display: flex; gap: 10px; padding: 0 0 12px; position: relative; }
@@ -1112,6 +1112,18 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .rk-ci { font-size: 12.5px; margin-top: 3px; color: var(--fg); }
 @media (max-width: 720px) {
   .rk-hrow { grid-template-columns: 1fr 50px; }
-  .rk-hrow .bar { grid-column: 1 / -1; grid-row: 2; }
+  .rk-hrow .rb { grid-column: 1 / -1; grid-row: 2; }
   .rk-name { font-size: 18px; }
 }
+.rk-chart .rk-bar { fill: var(--acc); fill-opacity: .75; }
+.rk-chart .rk-iqr { fill: var(--acc-soft); opacity: .7; }
+.rk-chart .rk-hl { fill: var(--danger); }
+.rk-rank { display: grid; grid-template-columns: 28px minmax(100px, 200px) 1fr 96px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line2); font-size: 13px; }
+.rk-rank.click { cursor: pointer; } .rk-rank.click:hover { background: #f6f9ff; }
+.rk-rank .n { color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.rk-rank .rb { height: 8px; background: var(--chip); border-radius: 4px; overflow: hidden; }
+.rk-rank .rb span { display: block; height: 100%; background: var(--acc); }
+.rk-rank .v { white-space: nowrap; text-align: right; font-variant-numeric: tabular-nums; font-weight: 700; }
+.rk-stats { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--muted); margin-top: 4px; }
+.rk-stats b { color: var(--fg); }
+@media (max-width: 720px) { .rk-rank { grid-template-columns: 24px 1fr 110px; } .rk-rank .rb { grid-column: 2 / -1; grid-row: 2; } }

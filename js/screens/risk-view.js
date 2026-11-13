@@ -2,8 +2,8 @@
 // 실제 서버 자료(risk-live.js)로도, 시뮬레이션용 스냅샷으로도 같은 화면이 나온다.
 //   env = { provider, setHeader(title, sub, actions), go(params), openUrl(url) }
 import { h, icon, loading, message, tabs } from "../core.js";
-import { lineChartSvg, quadrantSvg, stackedBarsSvg } from "../lib/riskchart.js";
-import { ncrBasis, SECTOR_CFG, SECTOR_ORDER, SEVERITY, latestMonth, monthsBack, nameKey, quadrantData, rankOf, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "../lib/risk.js";
+import { histogramSvg, lineChartSvg, quadrantSvg, stackedBarsSvg } from "../lib/riskchart.js";
+import { OVERVIEW_ORDER, SECTOR_NAME, distribution, rankSize, ncrBasis, SECTOR_CFG, SECTOR_ORDER, SEVERITY, latestMonth, monthsBack, nameKey, quadrantData, rankOf, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "../lib/risk.js";
 
 const SEV_CLASS = { 3: "red", 2: "orange", 1: "" };
 const LEVEL = { warn: ["주의", "red"], info: ["참고", "blue"], ok: ["양호", "green"] };
@@ -15,13 +15,17 @@ const section = (title, sub, ...kids) => h("section", { class: "card rk-sec" }, 
 
 export async function mountRisk(root, params, env) {
   const { provider } = env;
-  const sector = SECTOR_CFG[params.sector] ? params.sector : "A";
+  const overview = params.view === "overview";
+  const sector = SECTOR_CFG[params.sector] || (overview && params.sector === "G") ? params.sector : "A";
   root.append(banner(provider.info));
   if (params.co) return dashboard(root, params, env, sector);
-  const view = params.view === "peer" ? 1 : 0;
-  root.append(tabs(["회사 대시보드", "업권 Peer 사분면"], view, (i) => env.go({ sector, view: i ? "peer" : null })));
-  const pills = h("div", { class: "row-gap", style: { margin: "10px 0" } }, SECTOR_ORDER.map((c) => h("button", { class: "pill" + (c === sector ? " on" : ""), type: "button", onclick: () => env.go({ sector: c, view: view ? "peer" : null }) }, sectorLabel(c))));
+  const view = params.view === "peer" ? 1 : overview ? 2 : 0;
+  const vname = ["", "peer", "overview"][view] || null;
+  root.append(tabs(["회사 대시보드", "업권 Peer 사분면", "업권 현황"], view, (i) => env.go({ sector: i === 2 || SECTOR_CFG[sector] ? sector : "A", view: ["", "peer", "overview"][i] || null })));
+  const order = view === 2 ? OVERVIEW_ORDER : SECTOR_ORDER;
+  const pills = h("div", { class: "row-gap", style: { margin: "10px 0" } }, order.map((c) => h("button", { class: "pill" + (c === sector ? " on" : ""), type: "button", onclick: () => env.go({ sector: c, view: vname }) }, SECTOR_NAME[c])));
   root.append(pills);
+  if (view === 2) return overviewView(root, params, env, sector);
   return view ? peerView(root, params, env, sector) : landing(root, params, env, sector);
 }
 
@@ -191,7 +195,7 @@ function govBody(dart) {
     h("div", { class: "rk-sh2" }, "최대주주 및 특수관계인 지분", total != null ? h("span", { class: "note" }, ` 합계 ${total.toFixed(2)}%`) : null),
     hold.length ? h("div", { class: "rk-hold" }, hold.slice(0, 6).map((x) => h("div", { class: "rk-hrow" },
       h("div", { class: "nm" }, h("b", null, x.name), x.relation && x.relation !== "-" ? h("div", { class: "note" }, x.relation) : null),
-      h("div", { class: "bar" }, h("span", { style: { width: Math.max(1, Math.min(100, x.common?.ratio || 0)) + "%" } })),
+      h("div", { class: "rb" }, h("span", { style: { width: Math.max(1, Math.min(100, x.common?.ratio || 0)) + "%" } })),
       h("div", { class: "pc" }, x.common?.ratio != null ? x.common.ratio.toFixed(2) + "%" : "-"))))
       : h("p", { class: "note" }, "정기보고서에서 최대주주 현황을 찾지 못했습니다."));
 }
@@ -220,4 +224,48 @@ function sanctionBody(cases, nowYear, env) {
     h("div", { class: "rk-legend2" }, [["var(--danger)", "중징계·영업제한 등"], ["var(--warm)", "금전제재·주의"], ["#9fb0cb", "경미"]].map(([c, t]) => h("span", null, h("i", { style: { background: c } }), t))),
     svgBox(stackedBarsSvg({ bars })), list, more,
     h("p", { class: "note" }, "조치 무게는 조치 문구(영업정지·기관경고·과태료 등)로 분류한 것으로 공식 구분이 아닙니다."));
+}
+
+// ---------- 업권 현황: 규모 순위 + 비율 분포 ----------
+const eokText = (v) => (v >= 10000 ? `${Math.floor(v / 10000).toLocaleString("en-US")}조${v % 10000 ? ` ${Math.round(v % 10000).toLocaleString("en-US")}억` : ""}` : `${Math.round(v).toLocaleString("en-US")}억`);
+async function overviewView(root, params, env, sector) {
+  const cfg = SECTOR_CFG[sector];
+  const name = SECTOR_NAME[sector];
+  env.setHeader("업권 현황", `${name} · 규모 순위와 경영지표 분포`, []);
+  const body = h("div", null, loading(`${name} 전체 회사 자료를 불러오는 중…`));
+  root.append(body);
+  let ov;
+  try { ov = await env.provider.overview(sector); } catch (e) { return body.replaceChildren(message("업권 자료를 불러오지 못했습니다.", { error: true })); }
+  const rk = rankSize(ov.items);
+  const canOpen = !!cfg;
+  let shown = 15;
+  const list = h("div");
+  const more = h("button", { class: "btn ghost sm", type: "button", onclick: () => { shown += 25; draw(); } }, "더 보기");
+  const draw = () => {
+    const max = rk.rows[0]?.value || 1;
+    list.replaceChildren(...rk.rows.slice(0, shown).map((r) => h("div", { class: "rk-rank" + (canOpen ? " click" : ""), onclick: canOpen ? () => env.go({ sector, co: r.code }) : null },
+      h("div", { class: "n" }, r.rank), h("div", null, h("b", null, r.name)), h("div", { class: "rb" }, h("span", { style: { width: Math.max(1, (r.value / max) * 100) + "%" } })), h("div", { class: "v" }, eokText(r.value), h("div", { class: "note" }, (r.share * 100).toFixed(1) + "%")))));
+    more.hidden = shown >= rk.rows.length;
+  };
+  draw();
+  const kpis = h("div", { class: "kpis" },
+    h("div", { class: "kpi" }, h("small", null, "회사 수"), h("b", null, `${rk.n}곳`), h("div", { class: "note" }, rk.missing ? `규모 자료 없음 ${rk.missing}곳 제외` : ov.scope || "")),
+    h("div", { class: "kpi hl" }, h("small", null, `${ov.basis} 합계`), h("b", null, eokText(rk.total)), h("div", { class: "note" }, `기준 ${ov.asOf}`)),
+    h("div", { class: "kpi" }, h("small", null, "상위 5사 점유율"), h("b", null, (rk.top5Share * 100).toFixed(1) + "%"), h("div", { class: "note" }, rk.rows.slice(0, 5).map((r) => r.name).join(", "))),
+    h("div", { class: "kpi" }, h("small", null, "중앙값 규모"), h("b", null, eokText(rk.median)), h("div", { class: "note" }, rk.rows[0] ? `1위 ${rk.rows[0].name} ${eokText(rk.rows[0].value)}` : "")));
+  const parts = [kpis, section(`${ov.basis} 순위`, `${ov.asOf} 기준${canOpen ? " · 회사를 누르면 대시보드" : ""}`, list, more)];
+  if (cfg && ov.rows) {
+    const month = latestMonth(ov.rows, cfg.x.key);
+    const keys = Object.keys(cfg.names).filter((k) => ov.rows.some((r) => valueAt(r, k, month) != null));
+    const cards = keys.map((k) => {
+      const dist = distribution(ov.rows.map((r) => valueAt(r, k, month)));
+      return h("div", { class: "rk-chartcard" }, h("div", { class: "rk-ct" }, h("b", null, cfg.names[k]), h("span", { class: "note" }, `${dist?.n || 0}곳`)),
+        svgBox(histogramSvg({ dist })),
+        dist ? h("div", { class: "rk-stats" }, h("span", null, "중앙값 ", h("b", null, dist.med.toFixed(2) + "%")), h("span", null, "사분위 ", h("b", null, `${dist.q1.toFixed(2)}~${dist.q3.toFixed(2)}%`)), h("span", null, "범위 ", h("b", null, `${dist.min.toFixed(2)}~${dist.max.toFixed(2)}%`)),
+          dist.below + dist.above ? h("span", null, `축 밖 ${dist.below + dist.above}곳(가장자리 칸에 포함)`) : null) : null);
+    });
+    parts.push(section(`경영지표 분포 (${monthText(month)})`, "막대=회사 수, 옅은 띠=사분위 범위, 점선=중앙값", h("div", { class: "rk-grid2" }, cards),
+      sector === "F" ? h("p", { class: "note" }, "순자본비율은 연결 우선(없으면 개별)입니다. 외국계 증권사 지점은 제외했습니다.") : null));
+  } else parts.push(h("p", { class: "note" }, "운용사는 금융통계에 건전성 비율이 없어 펀드 순자산 규모 순위만 제공합니다."));
+  body.replaceChildren(...parts);
 }

@@ -23,9 +23,9 @@ const companies = (sector) => cached("risk:co:" + sector, TTL, async () => {
   return (co.items || []).map((c) => ({ code: c.code, name: clean(c.name), assets: assets[c.code]?.value ?? 0 })).filter((c) => c.code && c.name).sort((a, b) => b.assets - a.assets);
 });
 
-const TOP = { A: 30, E: 30, F: 30, H: 30, I: 30, C: 15 };
+const FOREIGN = /지점|골드만|모간스탠리|모건스탠리|메릴린치|비엔피|BNP|씨엘에스에이|CLSA|크레디|노무라|맥쿼리|유비에스|UBS|제이피모간|JP모간|도이치|소시에테|나틱시스|다이와|미즈호|HSBC|에이치에스비씨|바클레이|스탠다드차타드|씨티|ING|아이엔지|SMBC|라자드|이스트스프링|아이씨엠|ICM|CMS|씨엠에스|에스지|SG|CGS|CIMB|씨아이엠비|글로벌마켓|알비에스|RBS|스미토모|미쓰비시|도쿄|SBI증권/;
 const peers = (sector) => cached("risk:peers:" + sector, TTL, async () => {
-  const list = (await companies(sector)).slice(0, TOP[sector] || 30);
+  const list = (await companies(sector)).filter((c) => !(sector === "F" && FOREIGN.test(c.name))); // 증권은 외국계 지점 제외, 전체 회사
   const rows = await pool(list, 6, async (c) => {
     const p = await api("/fisis/profile", { sector, finance: c.code });
     const ratios = {};
@@ -53,6 +53,16 @@ export function liveProvider() {
     info: null,
     companies,
     peers,
+    async overview(sector) {
+      if (sector === "G") {
+        const fm = await import("./fundaum.js");
+        const [list, fund] = await Promise.all([companies("G"), fm.loadFundAum()]);
+        const items = list.map((c) => { const f = fm.findCompany(fund, c.name, "G"); return { code: c.code, name: c.name, value: f ? f.pub[0] + f.pri[0] : 0 }; });
+        return { items, rows: null, basis: "펀드 순자산(공모+사모)", asOf: fm.dateLabel(fund.asOf.recent), scope: "금융투자협회 자료" };
+      }
+      const rows = await peers(sector);
+      return { items: rows.map((r) => ({ code: r.code, name: r.name, value: r.assets })), rows, basis: "총자산", asOf: "최근 분기말", scope: sector === "F" ? "외국계 지점 제외" : "" };
+    },
     async company(sector, code) {
       const row = (await companies(sector)).find((c) => c.code === code);
       const name = row?.name || "";

@@ -144,3 +144,29 @@ export function pickDart(fisisName, items) {
   const g = items.find((i) => { const o = nameKey(i.name); return o && (o.includes(k) || k.includes(o)); });
   return g ? { match: "guess", item: g } : { match: "none", item: null };
 }
+
+// ---- 업권 현황: 규모 순위·비율 분포 ----
+export const OVERVIEW_ORDER = [...SECTOR_ORDER, "G"];
+export const SECTOR_NAME = { ...Object.fromEntries(Object.entries(SECTOR_CFG).map(([k, v]) => [k, v.label])), G: "운용" };
+/** 분위수(선형 보간). 정렬된 배열 기준. */
+const quant = (sorted, f) => { const i = (sorted.length - 1) * f; const lo = Math.floor(i), hi = Math.ceil(i); return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo); };
+/** 분포: 값 목록 → 통계와 히스토그램 칸(극단값은 2~98% 범위 밖이면 가장자리 칸에 모아 센다). */
+export function distribution(values, binCount = 12) {
+  const v = values.filter(num).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const st = { n: v.length, min: v[0], max: v[v.length - 1], q1: quant(v, 0.25), med: quant(v, 0.5), q3: quant(v, 0.75) };
+  let lo = quant(v, 0.02), hi = quant(v, 0.98);
+  if (!(hi > lo)) { lo = st.min; hi = st.max > st.min ? st.max : st.min + 1; }
+  const w = (hi - lo) / binCount;
+  const bins = Array.from({ length: binCount }, (_, i) => ({ x0: lo + w * i, x1: lo + w * (i + 1), n: 0 }));
+  let below = 0, above = 0;
+  for (const x of v) { if (x < lo) { below++; bins[0].n++; } else if (x > hi) { above++; bins[binCount - 1].n++; } else bins[Math.min(binCount - 1, Math.floor((x - lo) / w))].n++; }
+  return { ...st, bins, lo, hi, below, above };
+}
+/** 규모 순위: [{ code, name, value }] 를 값 큰 순으로, 점유율·누적 상위5 점유율 계산. */
+export function rankSize(list) {
+  const rows = list.filter((r) => num(r.value) && r.value > 0).sort((a, b) => b.value - a.value || a.name.localeCompare(b.name, "ko"));
+  const total = rows.reduce((s, r) => s + r.value, 0);
+  const top5 = rows.slice(0, 5).reduce((s, r) => s + r.value, 0);
+  return { rows: rows.map((r, i) => ({ ...r, rank: i + 1, share: total ? r.value / total : 0 })), total, top5Share: total ? top5 / total : 0, n: rows.length, missing: list.length - rows.length, median: rows.length ? median(rows.map((r) => r.value)) : 0 };
+}
