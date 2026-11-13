@@ -390,5 +390,6 @@ if (!store.get("disclaimer.ok")) {
 import("./alerts-check.js").then((m) => m.checkInBackground()).catch(() => {});
 // 익명 사용 통계: 시작할 때와 다시 볼 때 하루 한 번 보낸다.
 const sendUsage = () => import("./usage.js").then((u) => u.sendIfNeeded()).catch(() => {});
+import("./usage.js").then((u) => u.trackActivity()).catch(() => {}); // 방문 횟수·사용 시간(화면이 보이는 동안 1분마다)
 setTimeout(sendUsage, 3000);
 document.addEventListener("visibilitychange", () => document.visibilityState === "visible" && sendUsage());
