@@ -7,7 +7,7 @@ import { nameKey, pickDart } from "./risk.js";
 const TTL = 6 * 3600e3;
 // 매일 새로 모아 올리는 사전수집 자료(GitHub Actions risk-data). 있으면 이걸 먼저 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
 const PRE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/risk-data/";
-const STALE_MS = 3 * 86400e3;
+const STALE_MS = 5 * 86400e3;
 const pre = (name) => cached("risk:pre:" + name, TTL, async () => {
   const r = await fetch(PRE + name + "?r=1");
   if (!r.ok) throw new Error("사전수집 자료 없음");

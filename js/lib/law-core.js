@@ -355,7 +355,7 @@ export function splitAdminArticles(block) {
 const TTL = 30 * 60 * 1000;
 // 매일 새로 모아 올리는 금융 관련 법령 사전수집 자료(GitHub Actions law-data). 같은 요청이 있으면 서버 왕복 없이 이것을 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
 const PRE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/law-data/";
-const PRE_STALE = 3 * 86400e3;
+const PRE_STALE = 5 * 86400e3;
 const preIndex = () => cached("law:pre:index", 6 * 3600e3, async () => {
   const r = await fetch(PRE + "index.json");
   if (!r.ok) throw new Error("사전수집 없음");
