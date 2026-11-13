@@ -262,7 +262,7 @@ async function detail(root, params, ctx, sector) {
   root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
   const body = h("div");
   root.append(body);
-  if (tabName === "회사 대시보드") return dashboardPane(body, params, co, sector, ctx);
+  if (tabName === "회사 대시보드") return dashboardPane(body, params, co, sector, ctx, () => saveCompany(sector, sectorLabel, co, params));
   if (tabName === "개황") return overviewPane(body, co, sector, sectorLabel, ctx);
   if (tabName === "최근 제재내역") {
     const m = await import("./sanction.js");
@@ -295,10 +295,10 @@ async function detail(root, params, ctx, sector) {
 }
 
 /** 회사 대시보드: 건전성 추이·지배구조·제재 이력을 한 화면에(리스크 대시보드). 회사 상세의 첫 탭. */
-async function dashboardPane(body, params, co, sector, ctx) {
+async function dashboardPane(body, params, co, sector, ctx, saveAll) {
   const [view, live, core] = await Promise.all([import("./risk-view.js"), import("../lib/risk-live.js"), import("../core.js")]);
   const go = (p) => (p.co === params.co ? ctx.go({ ...params, ...p }, { replace: true }) : p.co ? ctx.go({ sector: p.sector || sector, co: p.co }) : ctx.go({ tool: "risk", ...p, view: "overview" }));
-  return view.dashboard(body, { sector, co: co.code, span: params.span }, { provider: live.liveProvider(), setHeader: () => {}, openUrl: core.openUrl, go }, sector);
+  return view.dashboard(body, { sector, co: co.code, span: params.span }, { provider: live.liveProvider(), setHeader: () => {}, openUrl: core.openUrl, go, saveAll }, sector);
 }
 
 /** 개황: 전자공시(DART) 기업 개황(대표이사·설립일·시장·주소)과 최대주주 지분. 금융통계(FISIS) 회사 이름으로 DART 회사를 맞춘다. */
