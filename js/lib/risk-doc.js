@@ -72,9 +72,9 @@ export function dashboardDoc(ids, { row, rows, sector, info, span = 8 }) {
     else {
       const years = sanctionYears(cases, nowYear, 8);
       blocks.push({ table: { head: ["연도", "중징계·영업제한", "금전·주의", "경미"], rows: years.map((y) => [String(y.year), String(y.high), String(y.mid), String(y.low)]), weights: [1, 1, 1, 1] } });
-      blocks.push({ heading: `제재공시 ${cases.length}건` }, { table: { head: ["공시일", "수준", "조치", "지적 사항"], rows: cases.slice(0, 40).map((c) => [dot(c.date), SEVERITY[severityOf(c)][0],
+      blocks.push({ heading: `제재공시 ${cases.length}건` }, { table: { head: ["공시일", "수준", "조치", "지적 사항"], rows: cases.map((c) => [dot(c.date), SEVERITY[severityOf(c)][0],
         [c.inst && `기관: ${c.inst}`, c.exec && `임원: ${c.exec}`, c.staff && `직원: ${c.staff}`, c.fine > 0 && `과태료 ${wonText(c.fine)}`, c.penalty > 0 && `과징금 ${wonText(c.penalty)}`].filter(Boolean).join(" / "),
-        (c.items || []).slice(0, 2).map((i) => i.t).join(" / ")]), weights: [1, 1, 3, 4] } });
+        (c.items || []).map((i) => i.t).join(" / ")]), weights: [1, 1, 3, 4] } });
     }
     sections.push({ title: "제재 이력", note: "금융감독원 제재공시(2011년 이후)", blocks });
   }

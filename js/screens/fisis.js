@@ -415,11 +415,11 @@ async function saveCompany(sector, sectorLabel, co, params) {
   await saveReport({
     title: `${co.name} 저장`,
     parts: [
-      ...(SECTORS_RISK.includes(sector) ? [{ id: "dash", label: "회사 대시보드 (핵심 지표·리스크 신호·건전성 추이)" }] : []),
       { id: "ovw", label: "개황 (DART 기업 개황·최대주주)" },
-      { id: "fin", label: "재무현황 (별도·연결)" },
+      { id: "fin", label: "재무·손익현황 (별도·연결)" },
       { id: "ratio", label: RATIO_ROWS[sector] ? "주요경영지표 (최근 8개 시점)" : "주요경영지표 (이 권역은 제공 안 함)", checked: !!RATIO_ROWS[sector] },
-      { id: "sanction", label: "최근 제재내역 (2011년 이후 금감원 제재공시)" },
+      ...(SECTORS_RISK.includes(sector) ? [{ id: "dash", label: "회사 대시보드 (핵심 지표·리스크 신호·건전성 추이)" }] : []),
+      { id: "sanction", label: "제재공시 (2011년 이후 금감원 제재공시 전체)" },
     ],
     build: (ids) => companyDoc(ids, sector, sectorLabel, co, params),
   });
@@ -428,6 +428,7 @@ async function saveCompany(sector, sectorLabel, co, params) {
 async function companyDoc(ids, sector, sectorLabel, co, params) {
   const profile = await profileOf(sector, co.code);
   const sections = [];
+  const ovwSecs = [], dashSecs = [];
   const term = termLabel(profile.term) || "기준";
   if (ids.has("dash") || ids.has("ovw")) {
     // 회사 대시보드·개황: 리스크 대시보드와 같은 자료·같은 표를 그대로 쓴다(실패해도 나머지 저장은 계속).
@@ -442,13 +443,14 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
           const d = rd.dashboardDoc(want, { row: row || { code: co.code, name: co.name }, rows, sector, info });
           const order = ["핵심 지표·리스크 신호", "건전성 추이", "기업 개황·지배구조"];
           d.sections.sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
-          sections.push(...d.sections.map((x) => (x.title === "기업 개황·지배구조" ? { ...x, title: "개황" } : x)));
+          d.sections.forEach((x) => (x.title === "기업 개황·지배구조" ? ovwSecs : dashSecs).push(x.title === "기업 개황·지배구조" ? { ...x, title: "개황" } : x));
         }
-      } else if (ids.has("ovw")) sections.push({ ...rd.govSection(await live.dartOf(co.name)), title: "개황" });
+      } else if (ids.has("ovw")) ovwSecs.push({ ...rd.govSection(await live.dartOf(co.name)), title: "개황" });
     } catch (e) {
-      sections.push({ title: "회사 대시보드·개황", blocks: [{ text: "이 자료를 불러오지 못해 저장하지 못했습니다: " + errorText(e), gray: true }] });
+      (ids.has("ovw") ? ovwSecs : dashSecs).push({ title: ids.has("ovw") ? "개황" : "회사 대시보드", blocks: [{ text: "이 자료를 불러오지 못해 저장하지 못했습니다: " + errorText(e), gray: true }] });
     }
   }
+  sections.push(...ovwSecs);
   if (ids.has("fin")) {
     const funds = group(profile, "fund");
     const allFin = group(profile, "fin").filter((m) => m.basis);
@@ -481,7 +483,7 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
     }
     if (funds.length) blocks.push({ heading: "펀드 설정원본 · 순자산" }, { table: { head: ["항목", "금액"], rows: funds.map((m) => [m.label, at(m, month)?.value != null ? valueText(at(m, month).value, m.unit) : "-"]), weights: [2, 1] } });
     if (!blocks.length) blocks.push({ text: "재무 자료가 없습니다.", gray: true });
-    sections.push({ title: "재무현황", note: `기준 시점: ${month ? monthLabel(month) : "-"} (${term})`, blocks });
+    sections.push({ title: "재무·손익현황", note: `기준 시점: ${month ? monthLabel(month) : "-"} (${term})`, blocks });
   }
   if (ids.has("ratio")) {
     const rows = RATIO_ROWS[sector];
@@ -503,6 +505,7 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
         : [{ text: "이 권역은 주요경영지표를 제공하지 않거나 자료가 없습니다.", gray: true }],
     });
   }
+  sections.push(...dashSecs);
   if (ids.has("sanction")) {
     const S = await import("../lib/sanctions.js");
     const data = await S.loadSanctions();
@@ -527,7 +530,7 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
       else blocks.push({ text: S.whyText(c), gray: true, indent: 1 });
       if (c.viewUrl) blocks.push({ text: "원문: " + c.viewUrl, gray: true, indent: 1 });
     });
-    sections.push({ title: "최근 제재내역", note: `${data.fromYear}년 이후 금감원 제재공시 ${cases.length}건 · 회사명으로 맞춘 참고 자료이니 업무에는 원문을 확인하세요.`, blocks });
+    sections.push({ title: "제재공시", note: `${data.fromYear}년 이후 금감원 제재공시 전체 ${cases.length}건 · 회사명으로 맞춘 참고 자료이니 업무에는 원문을 확인하세요.`, blocks });
   }
   return {
     title: co.name,
