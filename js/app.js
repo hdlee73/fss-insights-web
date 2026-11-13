@@ -17,6 +17,7 @@ export const MENU = [
   ["금융회사 현황 및 검사", "landmark", [
     ["fisis", "금융회사 주요 현황", "building-2"],
     ["sanction", "금융회사 제재 공시", "gavel"],
+    ["risk", "금융사 리스크 대시보드", "activity"],
     ["finsim", "(베타)제재 양정 시뮬레이터", "calculator"],
   ]],
   ["기업공시 및 회계", "bar-chart-3", [
@@ -50,6 +51,7 @@ const loaders = {
   market: () => import("./screens/market.js"),
   fisis: () => import("./screens/fisis.js"),
   sanction: () => import("./screens/sanction.js"),
+  risk: () => import("./screens/risk.js"),
   dart: () => import("./screens/dart.js"),
   disclosure: () => import("./screens/disclosure.js"),
   audit: () => import("./screens/audit.js"),
