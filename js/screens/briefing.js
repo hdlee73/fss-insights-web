@@ -1,6 +1,6 @@
 // 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
-import { cached, h, icon, skeleton, store } from "../core.js";
+import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
 import * as N from "../lib/news.js";
@@ -176,10 +176,19 @@ function drawHero(hero, w) {
     h("p", { class: "br-greet" }, greeting(now, w)));
 }
 
+const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1";
+
+// 직장 망처럼 외부 날씨 사이트(open-meteo)를 막는 곳이 있어, 직접 읽기가 안 되면 서버(/fetch)를 거쳐 읽는다.
+async function readWeather() {
+  try {
+    const r = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
+    if (r.ok) return await r.json();
+  } catch { reportError("fetch:open-meteo"); /* 아래에서 서버 경유로 다시 시도 */ }
+  return JSON.parse((await fetchSite(WEATHER_URL)).text);
+}
+
 async function loadWeather() {
-  const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1");
-  if (!r.ok) throw new Error("weather");
-  const j = await r.json();
+  const j = await readWeather();
   const [emoji, summary] = describe(j.current.weather_code);
   const rain = j.daily.precipitation_probability_max?.[0];
   return { emoji, summary, temp: Math.round(j.current.temperature_2m), min: Math.round(j.daily.temperature_2m_min[0]), max: Math.round(j.daily.temperature_2m_max[0]), rain: rain == null ? null : rain };

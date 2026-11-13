@@ -135,6 +135,14 @@ async function list(root, params, ctx, sector) {
 
   let all = [];
   let assets = {};
+  // 운용사(G)는 총자산이 아니라 금융투자협회 펀드 순자산(최근일자 공모+사모) 기준으로 순위를 매긴다. 자료가 없는 회사는 맨 뒤.
+  let fundMod = null;
+  let fundData = null;
+  const fundOf = (c) => {
+    const f = fundData && fundMod.findCompany(fundData, c.name, "G");
+    const v = f ? f.pub[0] + f.pri[0] : 0;
+    return v > 0 ? v : null;
+  };
   const drawInfo = () => {
     const ps = picks().filter((p) => p.sector === sector);
     info.replaceChildren(
@@ -150,6 +158,12 @@ async function list(root, params, ctx, sector) {
       const fa = sector === "F" && FOREIGN_BROKER.test(a.name) ? 1 : 0;
       const fb = sector === "F" && FOREIGN_BROKER.test(b.name) ? 1 : 0;
       if (fa !== fb) return fa - fb;
+      if (fundData) {
+        const na = fundOf(a), nb = fundOf(b);
+        if ((na == null) !== (nb == null)) return na == null ? 1 : -1;
+        if (na !== nb) return nb - na;
+        return a.name.localeCompare(b.name, "ko");
+      }
       const va = assets[a.code] ? won(assets[a.code].value, assets[a.code].unit) : -Infinity;
       const vb = assets[b.code] ? won(assets[b.code].value, assets[b.code].unit) : -Infinity;
       if (va !== vb) return vb - va;
@@ -159,6 +173,7 @@ async function list(root, params, ctx, sector) {
     const ps = new Set(picks().filter((p) => p.sector === sector).map((p) => p.code));
     body.replaceChildren(...(shown.length ? shown.map((c, i) => {
       const a = assets[c.code];
+      const fv = fundData ? fundOf(c) : null;
       const cb = h("input", { type: "checkbox", title: "비교에 담기", "aria-label": `${c.name} 비교에 담기` });
       cb.checked = ps.has(c.code);
       cb.addEventListener("click", (e) => e.stopPropagation());
@@ -168,13 +183,23 @@ async function list(root, params, ctx, sector) {
       });
       return h("div", { class: "item co-row", onclick: () => ctx.go({ sector, co: c.code }) },
         h("span", { class: "avatar" }, c.name.replace(/^(주식회사|㈜)/, "").trim().slice(0, 1)),
-        h("div", { class: "body" }, h("div", { class: "t" }, c.name), a ? h("div", { class: "m" }, `${q ? "" : `${i + 1}위 · `}총자산 ${valueText(a.value, a.unit)} (${monthLabel(a.month)})`) : null),
+        h("div", { class: "body" }, h("div", { class: "t" }, c.name), fundData
+          ? h("div", { class: "m" }, fv != null ? `${q ? "" : `${i + 1}위 · `}펀드 순자산 ${fundMod.eokText(fv)}원 (${fundMod.dateLabel(fundData.asOf.recent)})` : "펀드 순자산 자료 없음")
+          : a ? h("div", { class: "m" }, `${q ? "" : `${i + 1}위 · `}총자산 ${valueText(a.value, a.unit)} (${monthLabel(a.month)})`) : null),
         h("label", { class: "acts", onclick: (e) => e.stopPropagation() }, cb));
     }) : [message("검색 결과가 없습니다.")]));
   };
   input.addEventListener("input", draw);
   try {
     [all, assets] = await Promise.all([companies(sector), ranking(sector).then((r) => r.assets || {}).catch(() => ({}))]);
+    if (sector === "G") {
+      try {
+        fundMod = await import("../lib/fundaum.js");
+        fundData = await fundMod.loadFundAum();
+      } catch {
+        fundData = null; // 자료를 못 받으면 총자산 순서로 대신 보여 준다
+      }
+    }
     if (ctx.alive()) draw();
   } catch (e) {
     body.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => ctx.go({ sector }, { replace: true }) }));

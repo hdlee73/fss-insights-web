@@ -1,7 +1,7 @@
 // 가상자산 시장 동향: 국내 원화거래소 5곳 합산 시장 일보(VirtualAssets에서 옮겨 온 화면).
 // 자료는 FSS_insights 레포 crypto-data 브랜치(매일 24:00 KST 하루 한 번 집계한 JSON·PDF·HWPX와 거래소 재무, 워크플로 crypto-data.yml). 주요 코인 시세는 업비트·빗썸 웹소켓(끊기면 폴링)과 Coinbase를 브라우저에서 직접 읽는다. 별도 서버 없음.
 import { setHeader } from "../app.js";
-import { card, errorText, h, icon, loading, message, tabs } from "../core.js";
+import { card, errorText, h, icon, loading, message, reportError, tabs } from "../core.js";
 import { liveCrypto } from "../lib/livefeed.js";
 
 const BASE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/crypto-data";
@@ -478,10 +478,10 @@ function summary(root, data, goto, ctx) {
 
 
 // ---------- 종목 차트(실시간) ----------
-/** 업비트 30분봉 최근 24시간(오래된 것부터). 실패하면 null. */
+/** 업비트 1분봉 최근 약 3시간 20분(200개, 오래된 것부터). 업비트가 브라우저 요청을 10초에 1회로 제한해 한 번에 받을 수 있는 최대치다. 실패하면 예외. */
 async function fetchDayCandles(sym) {
-  const r = await fetch(`https://api.upbit.com/v1/candles/minutes/30?market=KRW-${sym}&count=48`);
-  if (!r.ok) throw new Error("upbit candles " + r.status);
+  const r = await fetch(`https://api.upbit.com/v1/candles/minutes/1?market=KRW-${sym}&count=200`);
+  if (!r.ok) { reportError("fetch:upbit-candles:" + r.status); throw new Error("upbit candles " + r.status); }
   const arr = (await r.json()).slice().reverse();
   if (arr.length < 2) throw new Error("candles empty");
   return arr.map((c) => ({ t: String(c.candle_date_time_kst || ""), o: c.opening_price, h: c.high_price, l: c.low_price, c: c.trade_price }));
@@ -489,7 +489,7 @@ async function fetchDayCandles(sym) {
 
 /**
  * 종목 차트 카드. 현재가·변동률·고저가는 업비트 웹소켓(끊기면 3초 폴링)으로 실시간 갱신하고,
- * 당일 차트는 업비트 30분봉(최근 24시간)을 직접 불러 마지막 점을 현재가로 잇는다(2분마다 봉 다시 조회).
+ * 당일 차트는 업비트 1분봉(최근 약 3시간)을 직접 불러 마지막 점을 현재가로 잇는다(1분마다 봉 다시 조회).
  * 1년 차트는 하루 한 번 집계한 주봉이며 마지막 점만 현재가로 바꾼다. 캔들을 못 받으면 집계본으로 대신 그린다.
  */
 function coinChartCard(ctx, cs, coin, year, params) {
@@ -501,6 +501,7 @@ function coinChartCard(ctx, cs, coin, year, params) {
   const body = h("div", { class: "stack" }, tabs(["당일", "1년"], year ? 1 : 0, (i) => ctx.go({ ...params, range: i ? "year" : null }, { replace: true }), "seg"), stats);
   const stampEl = h("span", { class: "cr-live" }, h("i"), "실시간 연결 중…");
   const badgeBox = h("span", null);
+  const span = () => { const n = candles?.length || 0; const m = n * 1; return m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? " " + (m % 60) + "분" : ""}` : "24시간"; };
   const axisDay = (t) => (t && t.length >= 16 ? t.slice(11, 16) : "");
   const axisYear = (t) => (t && t.length >= 7 ? t.slice(2, 7).replace("-", ".") : "");
   const col = (rate) => ((rate ?? 0) >= 0 ? "#e5484d" : "#1f6feb");
@@ -540,12 +541,12 @@ function coinChartCard(ctx, cs, coin, year, params) {
     const noteTxt = year
       ? `주봉 종가 기준 최근 1년(업비트)은 ${shortDate(cs.date)} 24시 집계본이고, 마지막 점·고저가·변동률만 실시간 현재가로 이어집니다. 변동률은 1년 전 첫 주 시가 대비 현재가입니다.`
       : v.candles
-        ? "업비트 30분봉을 직접 불러온 최근 24시간(2분마다 갱신)이며 마지막 점은 실시간 현재가입니다. 당일은 달력상 하루가 아니라 최근 24시간이고, 변동률은 24시간 전 시가 대비 현재가입니다."
-        : `30분봉을 불러오지 못해 ${shortDate(cs.date)} 24시 집계본(수집 ${cs.collected_at || "-"} 직전 24시간)을 보여 줍니다. 마지막 점·고저가·변동률만 실시간 현재가로 이어집니다.`;
+        ? "업비트 1분봉을 직접 불러온 최근 ${span()}(1분마다 갱신)이며 마지막 점은 실시간 현재가입니다. 당일은 달력상 하루가 아니라 최근 ${span()}이고, 변동률·고저가도 이 구간 기준(첫 봉 시가 대비 현재가)입니다."
+        : `1분봉을 불러오지 못해 ${shortDate(cs.date)} 24시 집계본(수집 ${cs.collected_at || "-"} 직전 24시간)을 보여 줍니다. 마지막 점·고저가·변동률만 실시간 현재가로 이어집니다.`;
     stats.replaceChildren(
-      h("div", null, h("small", { class: "note" }, year ? "1년 변동" : "24시간 변동"), h("div", null, chg(v.rate))),
-      h("div", null, h("small", { class: "note" }, year ? "1년 고가" : "24시간 고가"), h("div", null, price(v.high))),
-      h("div", null, h("small", { class: "note" }, year ? "1년 저가" : "24시간 저가"), h("div", null, price(v.low))));
+      h("div", null, h("small", { class: "note" }, year ? "1년 변동" : `${v.candles ? span() : "24시간"} 변동`), h("div", null, chg(v.rate))),
+      h("div", null, h("small", { class: "note" }, year ? "1년 고가" : `${v.candles ? span() : "24시간"} 고가`), h("div", null, price(v.high))),
+      h("div", null, h("small", { class: "note" }, year ? "1년 저가" : `${v.candles ? span() : "24시간"} 저가`), h("div", null, price(v.low))));
     chartBox.replaceChildren(lineChart([{ name: year ? "1년" : "당일", color: col(v.rate), data: v.pts }], v.labels, { format: price }));
     noteEl.textContent = noteTxt;
   };
@@ -560,7 +561,7 @@ function coinChartCard(ctx, cs, coin, year, params) {
     if (ctx.alive()) draw();
   });
 
-  // 당일 30분봉(2분마다 갱신, 화면이 숨겨져 있으면 건너뜀)
+  // 당일 1분봉(1분마다 갱신, 화면이 숨겨져 있으면 건너뜀)
   if (!year) {
     let timer = 0;
     const load = async () => {
@@ -571,8 +572,8 @@ function coinChartCard(ctx, cs, coin, year, params) {
         if (!ctx.alive()) return;
         draw();
       }
-      // 업비트 REST는 Origin 기준 10초에 1회 제한이라 실패하면 11초 뒤 다시, 성공하면 2분마다(마지막 점은 실시간이라 충분).
-      timer = setTimeout(load, candleErr ? 11000 : 120000);
+      // 업비트 REST는 Origin 기준 10초에 1회 제한이라 실패하면 11초 뒤 다시, 성공하면 1분마다(마지막 점은 실시간이라 충분).
+      timer = setTimeout(load, candleErr ? 11000 : 60000);
     };
     load();
   }

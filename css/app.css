@@ -1036,3 +1036,15 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .cr-basis.stack { flex-direction: column; align-items: flex-start; }
 .cr-basis div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
 .cr-live.off i { background: #c0392b; animation: none; }
+
+/* 공지 회전 배너(맨 위) */
+.notice-bar { padding: 8px 24px 0; }
+.nb { background: var(--acc-soft); color: var(--acc-fg); border-radius: 20px; padding: 2px 6px 2px 14px; font-size: 13.5px; }
+.nb.urgent { background: var(--urgent-soft); color: var(--danger); }
+.nb-row { display: flex; align-items: center; gap: 6px; min-height: 34px; }
+.nb-t { flex: 1; min-width: 0; text-align: left; background: none; border: 0; color: inherit; font: inherit; padding: 6px 0; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nb-nav, .nb-hide { background: none; border: 0; color: inherit; font: inherit; cursor: pointer; padding: 6px 8px; border-radius: 12px; }
+.nb-hide { font-size: 12px; opacity: .85; }
+.nb-cnt { font-size: 12px; opacity: .8; }
+.nb-body { padding: 0 8px 10px 0; white-space: pre-wrap; font-size: 13px; line-height: 1.55; }
+@media (max-width: 860px) { .notice-bar { padding: 8px 14px 0; } }
