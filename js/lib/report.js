@@ -1,6 +1,6 @@
 // 회사 정보 같은 화면 내용을 PDF(인쇄 창) 또는 한글(HWPX)로 저장한다.
 // doc 모양은 hwpx.js의 hwpxReport 설명을 따른다. 저장 범위는 sections의 id로 고른다.
-import { APP_NAME, APP_VERSION, dialog, download, errorText, h, toast } from "../core.js";
+import { APP_NAME, APP_VERSION, dialog, download, errorText, h, shareFile, toast } from "../core.js";
 
 export const footerLine = () => `${APP_NAME} v${APP_VERSION} · 만든이: 이현덕 with Claude (hdlee73@gmail.com)`;
 const safeName = (s) => String(s).replace(/[\\/:*?"<>|\s]+/g, "_");
@@ -76,6 +76,14 @@ export function printReport(doc, base) {
   // 화면에 저장용 문서만 보이는 미리보기를 띄운 뒤 인쇄한다(휴대폰 브라우저는 print 전용 CSS를 따르지 않고 화면을 그대로 찍는 일이 있다).
   const bar = h("div", { class: "rp-bar" }, h("span", null, "저장 미리보기"),
     h("button", { type: "button", class: "primary", onclick: () => window.print() }, "PDF로 저장(인쇄)"),
+    // PDF는 브라우저 인쇄 기능으로만 만들어져 파일을 넘길 수 없으므로, 같은 내용을 한글(HWPX) 파일로 만들어 공유한다.
+    navigator.share ? h("button", { type: "button", onclick: async () => {
+      try {
+        toast("공유할 한글(HWPX) 파일을 만드는 중…");
+        const { hwpxReport } = await import("./hwpx.js");
+        await shareFile(await hwpxReport(doc), base + ".hwpx", doc.title);
+      } catch (e) { toast("공유할 파일을 만들지 못했어요: " + errorText(e)); }
+    } }, "공유(한글 파일)") : null,
     h("button", { type: "button", onclick: () => done() }, "닫기"));
   const done = () => (el.remove(), bar.remove(), style.remove(), document.body.classList.remove("printing", "rp-view"), (document.title = prevTitle), vp && prevVp != null && vp.setAttribute("content", prevVp), removeEventListener("afterprint", onAfter));
   // 컴퓨터는 인쇄 창을 닫으면 미리보기도 닫고, 휴대폰(터치)은 다시 저장할 수 있게 미리보기를 남겨 둔다.
