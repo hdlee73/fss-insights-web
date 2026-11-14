@@ -478,37 +478,34 @@ function compareView(root, tree, ctx, params) {
   draw();
 }
 
-/** 비교표 표: 하위 규정 칸은 법률 칸에서 위임한 줄과 같은 높이에서 시작한다. */
+/**
+ * 비교표 표: 위임 근거가 되는 법률 항·호·목의 줄에서 하위 규정이 시작되도록,
+ * 한 행을 "근거 앞 법률 본문"과 "근거 줄 + 하위 규정" 두 줄(tr)로 나눈다.
+ * 줄바꿈 높이를 계산하지 않고 표 자체가 정렬하므로 화면·PDF·창 너비와 무관하게 맞는다.
+ */
 function compareTable(rootN, chosen) {
   const levels = L.compareColumns(chosen);
   const rows = L.compareRows(rootN, chosen);
+  const body = [];
+  for (const r of rows) {
+    const cut = r.cells.size ? Math.max(0, Math.min(r.anchorStart, r.lawText.length)) : 0;
+    const before = r.lawText.slice(0, cut).replace(/\s+$/, "");
+    const rest = before ? r.lawText.slice(cut) : r.lawText;
+    if (before) body.push(h("tr", { class: "pre" }, h("td", null, before), levels.slice(1).map(() => h("td", null))));
+    body.push(h("tr", { class: before ? "post" : "" }, h("td", null, rest), levels.slice(1).map((lv) => {
+      const nodes = r.cells.get(lv) || [];
+      const td = h("td", null);
+      nodes.forEach((n, i) => {
+        if (i) td.append(h("br"));
+        td.append(...[h("b", null, L.displayHeading(n) || n.sourceName), lv >= L.SUP ? h("small", null, n.sourceName) : null, h("div", null, n.article.body)].filter(Boolean));
+      });
+      return td;
+    })));
+  }
   return h("table", { class: "lw-cmp" },
     h("thead", null, h("tr", null, levels.map((lv) => h("th", { class: "l" + lv }, L.LEVELS[lv].label)))),
-    h("tbody", null, rows.map((r) => {
-      const lead = r.cells.size ? r.lawText.slice(0, r.anchorStart).split("\n").length - 1 : 0;
-      const law = h("td", null, r.lawText);
-      return h("tr", null, law, levels.slice(1).map((lv) => {
-        const nodes = r.cells.get(lv) || [];
-        const td = h("td", { "data-lead": lead });
-        nodes.forEach((n, i) => {
-          if (i) td.append(h("br"));
-          td.append(...[h("b", null, L.displayHeading(n) || n.sourceName), lv >= L.SUP ? h("small", null, n.sourceName) : null, h("div", null, n.article.body)].filter(Boolean));
-        });
-        return td;
-      }));
-    })));
+    h("tbody", null, body));
 }
-// 같은 줄 맞추기: 법률 칸에서 위임한 줄이 시작하는 높이만큼 하위 칸을 내린다(그린 뒤 실제 줄 높이로 계산).
-function alignCompare(table) {
-  for (const tr of table.querySelectorAll("tbody tr")) {
-    const law = tr.cells[0];
-    const lead = +(tr.cells[1]?.dataset.lead || 0);
-    if (!lead) continue;
-    const lh = parseFloat(getComputedStyle(law).lineHeight) || 18;
-    for (const td of [...tr.cells].slice(1)) if (td.childNodes.length) td.style.paddingTop = 8 + lead * lh + "px";
-  }
-}
-new MutationObserver(() => document.querySelectorAll(".lw-cmp:not([data-aligned])").forEach((t) => (t.dataset.aligned = "1", requestAnimationFrame(() => alignCompare(t))))).observe(document.body, { childList: true, subtree: true });
 
 // ------------------------------------------------------------------ 저장(PDF·한글)
 
