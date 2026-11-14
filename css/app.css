@@ -551,6 +551,8 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
 .lw-cmp th { position: sticky; top: 0; color: #fff; background: var(--l0); padding: 7px 10px; text-align: left; min-width: 280px; z-index: 1; }
 .lw-cmp th.l1 { background: var(--l1); } .lw-cmp th.l2 { background: var(--l2); } .lw-cmp th.l3 { background: var(--l3); } .lw-cmp th.l4 { background: var(--l4); }
 .lw-cmp td { border: 1px solid var(--line); vertical-align: top; padding: 8px 10px; white-space: pre-wrap; width: 320px; min-width: 280px; }
+.lw-cmp tr.pre td { border-bottom: 0; padding-bottom: 0; }
+.lw-cmp tr.post td { border-top: 0; padding-top: 0; }
 .lw-cmp td small { display: block; color: var(--muted); }
 .lw-cmp td b { display: block; }
 .lw-hl { border-color: var(--acc); background: linear-gradient(var(--acc-soft), var(--card) 60px); }
