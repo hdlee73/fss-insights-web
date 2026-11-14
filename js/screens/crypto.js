@@ -1,7 +1,7 @@
 // 가상자산 시장 동향: 국내 원화거래소 5곳 합산 시장 일보(VirtualAssets에서 옮겨 온 화면).
 // 자료는 FSS_insights 레포 crypto-data 브랜치(매일 24:00 KST 하루 한 번 집계한 JSON·PDF·HWPX와 거래소 재무, 워크플로 crypto-data.yml). 주요 코인 시세는 업비트·빗썸 웹소켓(끊기면 폴링)과 Coinbase를 브라우저에서 직접 읽는다. 별도 서버 없음.
 import { setHeader } from "../app.js";
-import { card, errorText, h, icon, loading, message, reportError, tabs } from "../core.js";
+import { card, errorText, h, icon, loading, message, reportError, shareFile, tabs } from "../core.js";
 import { liveCrypto } from "../lib/livefeed.js";
 
 const BASE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/crypto-data";
@@ -771,6 +771,10 @@ function saveCard(data) {
     document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
     status.textContent = "HTML 파일로 저장했습니다. 한글·워드에서 열거나 브라우저에서 인쇄해 PDF로 만들 수 있습니다.";
   };
+  const sh = async () => {
+    if (!picked().size) { status.textContent = "공유할 항목을 하나 이상 선택해 주세요."; return; }
+    await shareFile(new Blob([make()], { type: "text/html;charset=utf-8" }), `가상자산시장일보_${data.snapshot.date}.html`, "가상자산 시장일보");
+  };
   const pr = () => {
     if (!picked().size) { status.textContent = "저장할 항목을 하나 이상 선택해 주세요."; return; }
     const w = window.open("", "_blank");
@@ -779,7 +783,7 @@ function saveCard(data) {
   };
   return card("일보 저장 — 포함할 항목 선택", "download", h("div", { class: "stack" },
     h("div", { class: "cr-picks" }, boxes.map((b) => b.el)),
-    h("div", { class: "cr-links" }, h("button", { type: "button", class: "btn sm", onclick: dl }, "HTML로 저장"), h("button", { type: "button", class: "btn ghost sm", onclick: pr }, "PDF로 저장(인쇄)")),
+    h("div", { class: "cr-links" }, h("button", { type: "button", class: "btn sm", onclick: dl }, "HTML로 저장"), h("button", { type: "button", class: "btn ghost sm", onclick: pr }, "PDF로 저장(인쇄)"), h("button", { type: "button", class: "btn ghost sm", onclick: sh }, "공유")),
     status, note("선택한 항목만 담은 문서를 최신 집계로 만듭니다. 제목은 크게 표시됩니다. 아래 PDF·HWPX는 전체 항목 고정본입니다.")));
 }
 function reportView(root, data) {
