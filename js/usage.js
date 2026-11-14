@@ -7,7 +7,16 @@ import { APP_VERSION, SERVER, store } from "./core.js";
 const KEEP_DAYS = 14;
 const pad = (n) => String(n).padStart(2, "0");
 const dayOf = (d = new Date()) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
-export const enabled = () => store.get("usageStats", true);
+// 자동화 브라우저(테스트·점검용: HeadlessChrome·Playwright·Puppeteer, navigator.webdriver)나 주소에 ?notrack=1 로 한 번 연 브라우저는 통계를 보내지 않는다(?notrack=0 으로 다시 켠다).
+try {
+  const nt = new URLSearchParams(location.search).get("notrack");
+  if (nt === "1") store.set("usage.notrack", true);
+  else if (nt === "0") store.set("usage.notrack", false);
+} catch {
+  // 주소를 못 읽어도 통계 동작에는 영향 없음
+}
+const automated = () => navigator.webdriver === true || /HeadlessChrome|Playwright|Puppeteer|PhantomJS/i.test(navigator.userAgent || "") || store.get("usage.notrack", false) === true;
+export const enabled = () => store.get("usageStats", true) && !automated();
 
 function installId() {
   let id = store.get("usage.id", "");
