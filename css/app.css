@@ -1211,3 +1211,6 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .rk-stats b { color: var(--fg); }
 @media (max-width: 720px) { .rk-rank { grid-template-columns: 24px 1fr 110px; } .rk-rank .rb { grid-column: 2 / -1; grid-row: 2; } }
 .rk-save { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.tbl .stmt-link { cursor: pointer; }
+.tbl td.stmt-link:hover { background: #f6f9ff; text-decoration: underline dotted; }
+.modal.wide .modal-body { max-height: 70vh; overflow: auto; }

@@ -1,7 +1,7 @@
 // 금융회사 주요 현황(FISIS): 권역 → 총자산 순 회사 목록(검색·비교 선택) → 회사 상세(대시보드·개황·재무손익·주요경영지표·최근 제재내역) / 비교.
 // 앱의 FisisScreen.kt·FisisApi.kt를 옮겼다. 자료는 서버(/fisis)가 금융통계정보시스템 Open API에서 받아 준다.
 import { setHeader } from "../app.js";
-import { api, cached, errorText, h, icon, loading, message, store, tabs, toast } from "../core.js";
+import { api, cached, dialog, errorText, h, icon, loading, message, store, tabs, toast } from "../core.js";
 
 const SOURCE = "자료출처: 금융감독원 금융통계정보시스템";
 const NOTICE = "원본 오류로 인해 일부 수치가 잘못 표시되어 있을 수 있습니다.";
@@ -12,6 +12,10 @@ const BASES = ["별도", "연결"];
 export const SECTORS = [
   ["F", "증권"], ["G", "운용"], ["A", "은행"], ["H", "생보"], ["I", "손보"], ["C", "카드"], ["E", "저축은행"], ["M", "부신사"], ["L", "금융지주"],
 ];
+// 투자자문·일임사(ADV)는 서버가 FISIS에서 회사별 자료를 찾아 둔 경우에만 권역 목록에 더한다.
+const sectorsReady = api("/fisis/sectors").then((r) => {
+  if ((r.sectors || []).includes("ADV") && !SECTORS.some(([c]) => c === "ADV")) SECTORS.push(["ADV", "자문일임"]);
+}).catch(() => {});
 const CARD_PL_LABELS = { revenue: "수익합계", expense: "비용합계", netincome: "당기순이익(손실)" };
 const DEFAULT_PL_KEYS = ["revenue", "expense", "opinc", "netincome"];
 const CARD_PL_KEYS = ["revenue", "expense", "netincome"];
@@ -116,6 +120,7 @@ function togglePick(sector, c) {
 }
 
 export async function render(root, params, ctx) {
+  await sectorsReady;
   const sector = SECTORS.some(([c]) => c === params.sector) ? params.sector : store.get("fisis.sector", "F");
   if (params.tool === "risk") return riskPane(root, params, ctx, sector);
   if (params.co) return detail(root, params, ctx, sector);
@@ -326,13 +331,15 @@ function finCompare(profile, sector, basis) {
   const current = { H: "당반기", Y: "당기" }[profile.term] || "당분기";
   const end = { H: "반기말", Y: "연말" }[profile.term] || "분기말";
   const bsMonths = [latest, ...fys];
+  const plMonths = [latest, latest, ...fys];
   const ratio = (mo) => {
     const l = at(metric("liab"), mo)?.value, e = at(metric("equity"), mo)?.value;
     return l != null && e > 0 ? ((l / e) * 100).toFixed(1) + "%" : "-";
   };
   const keys = card ? CARD_PL_KEYS : DEFAULT_PL_KEYS;
   return {
-    basis, latest,
+    basis, latest, bsMonths, plMonths,
+    bsKeys: ["assets", "liab", "equity"], plKeys: keys,
     bsHead: ["구분", `${monthLabel(latest)} (최근 ${end})`, ...fys.map(monthLabel)],
     bsRows: [...["assets", "liab", "equity"].map((k) => [FINANCE_LABELS[k], ...bsMonths.map((m) => amt(k, m))]), ["부채비율(부채÷자기자본)", ...bsMonths.map(ratio)]],
     plHead: ["구분", `${monthLabel(latest)} ${current}`, `${monthLabel(latest)} 누적`, ...fys.map((m) => `${m.slice(0, 4)}년 연간`)],
@@ -357,9 +364,49 @@ async function dartFinanceOf(name, basis) {
 }
 const dartSourceText = (basis, d) => `금융통계정보시스템(FISIS)에 ${basis} 재무제표가 없어 전자공시시스템(DART) 정기보고서의 ${basis} 재무제표로 대신 표시합니다. DART 회사: ${d.name || d.company?.name || "-"}(고유번호 ${d.corp})${d.match === "guess" ? " · 회사 이름으로 추정해 맞춘 자료라 다를 수 있습니다" : ""}.`;
 
-const cmpTable = (head, rows, bold) => h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+// pick(행, 열)을 주면 항목 이름과 금액을 눌러 재무제표를 볼 수 있다.
+const cmpTable = (head, rows, bold, pick) => h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
   h("thead", null, h("tr", null, head.map((x, i) => h("th", { class: i ? "num" : "" }, x)))),
-  h("tbody", null, rows.map((r, ri) => h("tr", { class: bold?.(ri) ? "bold" : "" }, r.map((v, i) => i ? h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v) : h("td", null, v)))))));
+  h("tbody", null, rows.map((r, ri) => h("tr", { class: bold?.(ri) ? "bold" : "" }, r.map((v, i) => {
+    const click = pick && ri < (pick.rows ?? rows.length) ? { class: "stmt-link", title: "눌러서 이 시점의 재무제표 보기", onclick: () => pick(ri, Math.max(0, i - 1)) } : null;
+    return i ? h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") + (click ? " stmt-link" : ""), ...(click ? { title: click.title, onclick: click.onclick } : {}) }, v) : h("td", click || null, v);
+  }))))));
+
+const stmtNum = (v) => (v == null ? "-" : Math.abs(v) >= 10 ? Math.round(v).toLocaleString("en-US") : String(+v.toFixed(2)));
+const stmtTitle = (t) => String(t || "").replace(/\(\d{2}\.\d{2}월 (이후|이전)\)/g, "").trim();
+const statementOfCo = (sector, code, basis) => cached(`fisis:stmt:${sector}:${code}:${basis}`, 6 * 3600e3, () => api("/fisis/statement", { sector, finance: code, basis }));
+
+/** 재무손익 표의 항목·금액을 눌렀을 때: 그 시점의 재무제표(FISIS가 주는 요약 재무상태표·손익계산서의 모든 계정)를 창으로 보여 준다. */
+async function openStatement(sector, co, basis, month, focus) {
+  const body = h("div", null, loading("재무제표를 불러오는 중…"));
+  let dlg = dialog({ title: `${co.name} 재무제표 (${basis})`, body, ok: "닫기", cancel: null, wide: true });
+  let data;
+  try {
+    data = await statementOfCo(sector, co.code, basis);
+  } catch (e) {
+    return void body.replaceChildren(message(errorText(e), { error: true }));
+  }
+  const months = [...new Set(data.sections.flatMap((x) => x.months))].sort().reverse();
+  let cur = months.includes(month) ? month : months[0];
+  const draw = () => {
+    body.replaceChildren(
+      h("div", { class: "row-gap", style: { marginBottom: "8px" } }, months.slice(0, 12).map((m) => h("button", { class: "pill" + (m === cur ? " on" : ""), type: "button", onclick: () => ((cur = m), draw()) }, monthLabel(m)))),
+      ...data.sections.map((sec) => {
+        const rows = sec.rows.filter((r) => r.p[cur]);
+        if (!rows.length) return null;
+        const multi = sec.columns.length > 1;
+        return h("div", null, sectionHeader(stmtTitle(sec.title)),
+          h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+            multi ? h("thead", null, h("tr", null, h("th", null, "계정"), sec.columns.map((c) => h("th", { class: "num" }, c)))) : null,
+            h("tbody", null, rows.map((r) => h("tr", { class: focus && r.name.replace(/\s/g, "").includes(focus) ? "bold" : "" },
+              h("td", { style: { paddingLeft: 8 + Math.min(r.indent, 8) * 6 + "px" } }, r.name),
+              r.p[cur].map((v) => h("td", { class: "num" + (v != null && v < 0 ? " neg" : "") }, stmtNum(v)))))))));
+      }),
+      h("p", { class: "note", style: { marginTop: "10px" } }, `${SOURCE}. 금융통계정보시스템이 제공하는 요약 재무상태표·손익계산서 범위이며, 금액은 억원 단위입니다(손익은 당기·누계 열). ${NOTICE}`));
+  };
+  draw();
+  return dlg;
+}
 
 /** 재무손익 탭: 최근 분기 + 직전 3개 사업연도 비교. FISIS에 없는 재무제표(주로 연결)는 DART에서 찾고 출처를 밝힌다. */
 async function financePane(body, params, co, sector, sectorLabel, ctx) {
@@ -378,9 +425,9 @@ async function financePane(body, params, co, sector, sectorLabel, ctx) {
   const homeLink = h("a", { class: "btn ghost", href: home.url, target: "_blank", rel: "noopener", style: { marginTop: "14px" } }, icon("external-link"), home.known ? `홈페이지 열기 (${home.url.replace("https://", "")})` : "공식 홈페이지 검색하기");
   const cmp = profile?.metrics?.length ? finCompare(profile, sector, basis) : null;
   if (cmp) {
-    body.replaceChildren(pills, sectionHeader(`재무상태 (${basis})`), cmpTable(cmp.bsHead, cmp.bsRows),
-      sectionHeader(`손익 (${basis})`), cmpTable(cmp.plHead, cmp.plRows, cmp.plBold),
-      h("p", { class: "note" }, "연간 열은 해당 사업연도 말까지의 누적 값입니다. 최근 분기 열은 그 분기만의 값과 올해 누적 값을 함께 보여 줍니다."));
+    body.replaceChildren(pills, sectionHeader(`재무상태 (${basis})`), cmpTable(cmp.bsHead, cmp.bsRows, null, Object.assign((ri, ci) => openStatement(sector, co, basis, cmp.bsMonths[ci], cmp.bsRows[ri][0]), { rows: cmp.bsKeys.length })),
+      sectionHeader(`손익 (${basis})`), cmpTable(cmp.plHead, cmp.plRows, cmp.plBold, (ri, ci) => openStatement(sector, co, basis, cmp.plMonths[ci], cmp.plRows[ri][0])),
+      h("p", { class: "note" }, "항목 이름이나 금액을 누르면 그 시점의 재무제표를 볼 수 있습니다. 연간 열은 해당 사업연도 말까지의 누적 값입니다. 최근 분기 열은 그 분기만의 값과 올해 누적 값을 함께 보여 줍니다."));
     const funds = group(profile, "fund");
     if (funds.length) {
       body.append(sectionHeader("펀드 설정원본 · 순자산", null), h("div", { class: "card list" }, funds.map((m) => {
