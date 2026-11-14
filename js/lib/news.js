@@ -19,7 +19,8 @@ export function saveSettings(patch) {
   if (patch.scope) store.set("news.scope", patch.scope);
   if (patch.range) store.set("news.range", patch.range);
 }
-const rangeOf = (id) => RANGES.find((r) => r[0] === id) || RANGES[1];
+const RANGE_EXTRA = [["DAY3", "3일", "when:3d", 3]]; // 회사별 뉴스 탭 전용(필터 목록에는 안 보임)
+const rangeOf = (id) => RANGES.find((r) => r[0] === id) || RANGE_EXTRA.find((r) => r[0] === id) || RANGES[1];
 export const rangeLabel = (id) => rangeOf(id)[1];
 export const scopeLabel = (id) => (SCOPES.find((s) => s[0] === id) || SCOPES[1])[1];
 
@@ -277,6 +278,26 @@ export async function home(s = settings()) {
   const fetched = res.flatMap((r, i) => (r.status === "fulfilled" ? r.value.articles.filter((a) => !isExcluded(`${a.title} ${a.summary}`, jobs[i].excluded)) : []));
   const terms = [...new Set(s.keywords.flatMap((k) => { try { return parseQuery(k).terms; } catch { return [k]; } }))];
   return { ...refine(fetched, s, terms), fetched: fetched.length, hasMore: false, nextStart: 1, note: noteText(note), failed };
+}
+
+/** 회사별 뉴스: 최근 3일, 회사명이 제목·요약에 든 기사만(언론 범위는 전체). */
+const coCache = new Map();
+export const companySearchName = (name) => String(name || "").replace(/\(주\)|㈜|주식회사/g, "").replace(/\s+/g, " ").trim();
+export async function companyNews(name) {
+  const key = companySearchName(name);
+  if (!key) return { articles: [], note: "", failed: 0 };
+  const hit = coCache.get(key);
+  if (hit && Date.now() - hit.at < 3 * 60 * 1000) return hit.page;
+  const note = {};
+  const page = await naverFirst(`"${key}"`, "DAY3", 1, 100, note);
+  const compact = (t) => t.replace(/\s+/g, "").toLowerCase();
+  const k = compact(key);
+  const cutoff = Date.now() - 3 * 864e5;
+  const raw = page.articles.filter((a) => a.at >= cutoff && compact(`${a.title} ${a.summary}`).includes(k));
+  const r = refine(raw, { scope: "ALL" }, [key]);
+  const out = { articles: r.articles, note: noteText(note), failed: 0 };
+  coCache.set(key, { at: Date.now(), page: out });
+  return out;
 }
 
 // ---- 키워드 모니터링(최근 7일 기사 수) ----

@@ -256,7 +256,7 @@ async function detail(root, params, ctx, sector) {
     const fm = await import("../lib/fundaum.js");
     showFund = await fm.loadFundAum().then((d) => !!fm.findCompany(d, co.name, "F"), () => false);
   }
-  const tabNames = [...(SECTORS_RISK.includes(sector) ? ["회사 대시보드"] : []), "개황", "재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역"];
+  const tabNames = [...(SECTORS_RISK.includes(sector) ? ["회사 대시보드"] : []), "개황", "재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역", "뉴스"];
   const tab = Math.min(+(params.tab || 0), tabNames.length - 1);
   const tabName = tabNames[tab];
   root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
@@ -264,6 +264,10 @@ async function detail(root, params, ctx, sector) {
   root.append(body);
   if (tabName === "회사 대시보드") return dashboardPane(body, params, co, sector, ctx, () => saveCompany(sector, sectorLabel, co, params));
   if (tabName === "개황") return overviewPane(body, co, sector, sectorLabel, ctx);
+  if (tabName === "뉴스") {
+    const m = await import("./news.js");
+    return m.companyPane(body, co.name);
+  }
   if (tabName === "최근 제재내역") {
     const m = await import("./sanction.js");
     return m.companyPane(body, co.name);
