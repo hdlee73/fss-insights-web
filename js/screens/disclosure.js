@@ -3,6 +3,7 @@
 // 항목마다 「기업개황 등」(DART 검색)·「세부내용」 버튼을 두고, 위반 조문을 누르면 스마트 법령검색이 열린다.
 import { setHeader } from "../app.js";
 import { errorText, h, icon, loading, message } from "../core.js";
+import { linkLaws } from "../lib/lawlink.js";
 import { caseButtons, dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
 import { Format } from "../lib/yangjeong.js";
 
@@ -116,9 +117,9 @@ function detail(root, c) {
       h("section", { class: "card" }, h("div", { class: "ch" }, icon("list"), h("h3", null, `위반행위 ${(c.violations || []).length}건`)),
         h("div", { class: "list" }, (c.violations || []).map((v, i) => h("div", { class: "item" }, h("div", { style: { flex: 1 } },
           h("div", { class: "t" }, `${i + 1}. ${v.title || "위반 내용"}`),
-          (v.facts || []).map((x) => h("p", { style: { margin: "6px 0 0" } }, x))))))),
+          (v.facts || []).map((x) => h("p", { style: { margin: "6px 0 0" } }, linkLaws(x)))))))),
       (c.laws || []).length ? h("section", { class: "card" }, h("div", { class: "ch" }, icon("scale"), h("h3", null, "관련 법규")),
-        (c.laws || []).map((x) => h("p", { class: "note", style: { margin: "0 0 4px" } }, x)),
+        (c.laws || []).map((x) => h("p", { class: "note", style: { margin: "0 0 4px" } }, linkLaws(x))),
         (c.lawRefs || []).length ? [h("div", { class: "note", style: { margin: "8px 0 4px" } }, "스마트 법령검색으로 조문 열기"),
           h("div", { class: "lw-chips" }, c.lawRefs.map((r) => h("a", { class: "pill sm", href: "#/law?q=" + encodeURIComponent(r) }, r.replace("자본시장과 금융투자업에 관한 법률", "자본시장법"))))] : null) : null,
       h("p", { class: "note" }, DISCLAIMER))));

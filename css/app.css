@@ -1223,3 +1223,14 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .tbl .stmt-link { cursor: pointer; }
 .tbl td.stmt-link:hover { background: #f6f9ff; text-decoration: underline dotted; }
 .modal.wide .modal-body { max-height: 70vh; overflow: auto; }
+
+/* 표 복사·CSV·엑셀 단추 줄 */
+.tt-bar { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; margin: 4px 0 6px; }
+.tt-bar .btn { padding: 4px 10px; font-size: 12px; }
+@media print { .tt-bar { display: none !important; } }
+
+/* 법령 문서(위임 트리·비교표)도 저장 미리보기(rp-view)에서 종이처럼 보이게 한다 */
+body.rp-view .print-doc.rp-law { display: block; box-sizing: border-box; max-width: 210mm; margin: 64px auto 28px; padding: 14mm 12mm; background: #fff; color: #000; font-size: 9.5pt; line-height: 1.55; box-shadow: 0 2px 14px rgba(20, 40, 80, .18); }
+body.rp-view .print-doc.rp-law.land { max-width: 297mm; }
+@media print { body.rp-view .print-doc.rp-law { margin: 0; padding: 0; max-width: none; box-shadow: none; } }
+a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; text-underline-offset: 2px; }

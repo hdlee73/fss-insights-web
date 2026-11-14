@@ -74,8 +74,16 @@ export function printReport(doc, base) {
   }
   (doc.footer || []).filter(Boolean).forEach((l) => el.append(h("p", { class: "foot" }, l)));
 
+  previewPrint(el, base, { title: doc.title, doc });
+}
+
+/**
+ * 저장용 문서(el)를 미리보기 바(PDF로 저장·PDF 공유)와 함께 띄우고 인쇄한다. 법령 비교표처럼 문서 모양이 다른 화면도 같은 바를 쓴다.
+ * opt: { title, pageCss: "@page {…}", landscape, doc(있으면 한글 파일 공유 단추도 보인다) }
+ */
+export function previewPrint(el, base, { title = base, pageCss, landscape = false, doc = null } = {}) {
   document.querySelectorAll(".print-doc, .rp-bar").forEach((e) => e.remove()); // 앞서 남은 인쇄용 문서
-  const style = h("style", null, "@page { size: 210mm 297mm; margin: 17mm; }");
+  const style = h("style", null, pageCss || "@page { size: 210mm 297mm; margin: 17mm; }");
   document.head.append(style);
   const prevTitle = document.title;
   // 휴대폰은 화면 폭(약 360px)대로 배치되면 표가 찌그러지므로, 미리보기·인쇄 동안만 폭 820px 기준으로 배치한다.
@@ -90,14 +98,14 @@ export function printReport(doc, base) {
       try {
         toast("공유할 PDF 파일을 만드는 중…");
         const { elementToPdf } = await import("./pdfshare.js");
-        await shareReady(await elementToPdf(el), base + ".pdf", doc.title);
+        await shareReady(await elementToPdf(el, { landscape }), base + ".pdf", title);
       } catch (e) { toast("공유할 PDF를 만들지 못했어요: " + errorText(e)); }
     } }, "PDF 공유") : null,
-    navigator.share ? h("button", { type: "button", onclick: async () => {
+    navigator.share && doc ? h("button", { type: "button", onclick: async () => {
       try {
         toast("공유할 한글(HWPX) 파일을 만드는 중…");
         const { hwpxReport } = await import("./hwpx.js");
-        await shareReady(await hwpxReport(doc), base + ".hwpx", doc.title);
+        await shareReady(await hwpxReport(doc), base + ".hwpx", title);
       } catch (e) { toast("공유할 파일을 만들지 못했어요: " + errorText(e)); }
     } }, "공유(한글 파일)") : null,
     h("button", { type: "button", onclick: () => done() }, "닫기"));

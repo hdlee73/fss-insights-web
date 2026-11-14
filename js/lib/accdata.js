@@ -1,6 +1,7 @@
 // 회계 자료(기준서 목록·게시판 색인·감리 조치) 읽기. 앱과 같은 순서: ① 매일 갱신되는 원격 최신본 → ② 웹에 같이 올린 내장본.
 import { cached, h } from "../core.js";
 
+const LOCAL_ONLY = new Set(["standards"]);
 const REMOTE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/accounting-data/";
 
 async function getJson(url, ms) {
@@ -18,11 +19,14 @@ async function getJson(url, ms) {
 /** name: board_index | audit_actions | disclosure_sanctions | standards. 실패하면 내장본, 그것도 없으면 예외. */
 export function loadData(name) {
   return cached("accdata:" + name, 30 * 60 * 1000, async () => {
-    try {
-      const d = await getJson(REMOTE + name + ".json", 6000);
-      if (Array.isArray(d?.items) && d.items.length) return { ...d, from: "최신" };
-    } catch {
-      /* 원격 자료가 아직 없거나 막힘: 내장본 사용 */
+    // 기준서 목록(standards)은 매일 수집하는 자료가 아니라 원격 파일이 없다(404). 괜한 요청 없이 내장본을 쓴다.
+    if (!LOCAL_ONLY.has(name)) {
+      try {
+        const d = await getJson(REMOTE + name + ".json", 6000);
+        if (Array.isArray(d?.items) && d.items.length) return { ...d, from: "최신" };
+      } catch {
+        /* 원격 자료가 아직 없거나 막힘: 내장본 사용 */
+      }
     }
     const d = await getJson("data/" + name + ".json", 30000);
     return { ...d, items: Array.isArray(d?.items) ? d.items : [], from: "내장" };
