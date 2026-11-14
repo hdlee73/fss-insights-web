@@ -401,13 +401,16 @@ async function openStatement(sector, co, basis, month, focus) {
       ...data.sections.map((sec) => {
         const rows = sec.rows.filter((r) => r.p[cur]);
         if (!rows.length) return null;
-        const multi = sec.columns.length > 1;
+        // 구성비 같은 비율 열은 금액이 아니어서 뺀다.
+        const idx = sec.columns.map((c, i) => (/구성비|비중|비율|%/.test(c) ? -1 : i)).filter((i) => i >= 0);
+        const cols = idx.length ? idx : sec.columns.map((_, i) => i);
+        const multi = cols.length > 1;
         return h("div", null, sectionHeader(stmtTitle(sec.title)),
           h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
-            multi ? h("thead", null, h("tr", null, h("th", null, "계정"), sec.columns.map((c) => h("th", { class: "num" }, c)))) : null,
-            h("tbody", null, rows.map((r) => h("tr", { class: focus && r.name.replace(/\s/g, "").includes(focus) ? "bold" : "" },
-              h("td", { style: { paddingLeft: 8 + Math.min(r.indent, 8) * 6 + "px" } }, r.name),
-              r.p[cur].map((v) => h("td", { class: "num" + (v != null && v < 0 ? " neg" : "") }, stmtNum(v)))))))));
+            multi ? h("thead", null, h("tr", null, h("th", null, "계정"), cols.map((i) => h("th", { class: "num" }, sec.columns[i])))) : null,
+            h("tbody", null, rows.map((r) => h("tr", { class: focus && r.name.split("_").pop().replace(/\s/g, "").replace(/^[\dⅠ-Ⅻ가-하]+[.)]/, "").startsWith(focus.replace(/\s/g, "")) ? "bold" : "" },
+              h("td", { style: { paddingLeft: 8 + Math.min(r.indent + r.name.split("_").length - 1, 8) * 10 + "px" } }, r.name.split("_").pop()),
+              cols.map((i) => r.p[cur][i]).map((v) => h("td", { class: "num" + (v != null && v < 0 ? " neg" : "") }, stmtNum(v)))))))));
       }),
       h("p", { class: "note", style: { marginTop: "10px" } }, `${SOURCE}. 금융통계정보시스템이 제공하는 요약 재무상태표·손익계산서 범위이며, 금액은 억원 단위입니다(손익은 당기·누계 열). ${NOTICE}`));
   };
