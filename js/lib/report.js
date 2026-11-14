@@ -58,7 +58,7 @@ export function printReport(doc, base) {
         el.append(h("table", { class: "rp-tbl" },
           h("thead", null, h("tr", null, t.head.map((x, c) => h("th", { class: num(c) ? "num" : "" }, x)))),
           h("tbody", null, t.rows.map((r, i) => h("tr", { class: t.bold?.(i) ? "b" : "" }, r.map((x, c) => h("td", { class: num(c) ? "num" : "" }, x ?? "")))))));
-      } else if (b.image) el.append(h("img", { class: "rp-img", src: b.image.dataUrl, alt: "그래프" }));
+      } else if (b.image) el.append(h("img", { class: "rp-img" + (b.half ? " half" : ""), src: b.image.dataUrl, alt: "그래프" }));
       else if (b.heading) el.append(h("div", { class: "ph" }, b.heading));
       else if (b.text != null) el.append(h("div", { class: "pb" + (b.gray ? " gray" : ""), style: b.indent ? { marginLeft: b.indent * 14 + "pt" } : null }, b.text));
     }

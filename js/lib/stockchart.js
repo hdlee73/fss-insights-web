@@ -91,7 +91,7 @@ export async function stockSection(stock, cls) {
     const first = closes[0], last = closes[closes.length - 1];
     const r = ((last / first - 1) * 100).toFixed(1);
     const blocks = [];
-    if (img) blocks.push({ image: img });
+    if (img) blocks.push({ image: { ...img, wide: true } });
     blocks.push({ table: { head: ["시작일 종가", "마지막 종가", "기간 등락", "52주 최고", "52주 최저"], weights: [1, 1, 1, 1, 1], num: () => true,
       rows: [[`${dot(dates[0])}\n${n0(first)}원`, `${dot(dates[dates.length - 1])}\n${n0(last)}원`, `${r > 0 ? "+" : ""}${r}%`, `${n0(hist.high)}원`, `${n0(hist.low)}원`]] } });
     return { title, note: `종목코드 ${stock} · 일별 종가 기준 · 시세 제공처 자료로 지연·오차가 있을 수 있습니다`, blocks };

@@ -600,6 +600,8 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc.rp .rp-tbl tbody tr:nth-child(even) td { background: #f6f8fc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-doc.rp .rp-tbl tr.b td { background: #e8eef9 !important; }
   .print-doc.rp .rp-img { margin: 6pt 0 8pt; border: .6pt solid #dfe4ee; border-radius: 3pt; }
+  .print-doc.rp .rp-img.half { display: inline-block; width: 49%; margin-right: 1%; vertical-align: top; }
+  .print-doc.rp .rp-tbl, .print-doc.rp .rp-kv { break-inside: avoid; }
   .print-doc.rp .foot { color: #7a8497; font-size: 8pt; margin-top: 4pt; }
   .print-doc.rp .foot:first-of-type { margin-top: 18pt; padding-top: 6pt; border-top: .6pt solid #cfd6e2; }
   .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -649,6 +651,8 @@ body.rp-view .print-doc.rp .rp-tbl th { background: #1f3a68; border-bottom: 0; f
 body.rp-view .print-doc.rp .rp-tbl tbody tr:nth-child(even) td { background: #f6f8fc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body.rp-view .print-doc.rp .rp-tbl tr.b td { background: #e8eef9 !important; }
 body.rp-view .print-doc.rp .rp-img { margin: 6pt 0 8pt; border: .6pt solid #dfe4ee; border-radius: 3pt; }
+body.rp-view .print-doc.rp .rp-img.half { display: inline-block; width: 49%; margin-right: 1%; vertical-align: top; }
+body.rp-view .print-doc.rp .rp-tbl, body.rp-view .print-doc.rp .rp-kv { break-inside: avoid; }
 body.rp-view .print-doc.rp .foot { color: #7a8497; font-size: 8pt; margin-top: 4pt; }
 body.rp-view .print-doc.rp .foot:first-of-type { margin-top: 18pt; padding-top: 6pt; border-top: .6pt solid #cfd6e2; }
 body.rp-view .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
