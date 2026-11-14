@@ -275,7 +275,7 @@ function reportTable(b, t, pageW) {
       const head = r === 0;
       const char = head ? C_HDR : t.bold?.(r - 1) ? C_CELL_BOLD : cellChar;
       const para = head ? P_CENTER : isNum(c) ? P_RIGHT : pIndent(0);
-      sb.push(`<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${head ? 4 : 3}">`);
+      sb.push(`<hp:tc name="" header="${head ? 1 : 0}" hasMargin="0" protect="0" editable="0" dirty="0" borderFillIDRef="${head ? 4 : r % 2 === 0 && t.zebra !== false ? 9 : 3}">`);
       sb.push(`<hp:subList id="" textDirection="HORIZONTAL" lineWrap="BREAK" vertAlign="CENTER" linkListIDRef="0" linkListNextIDRef="0" textWidth="0" textHeight="0" hasTextRef="0" hasNumRef="0">`);
       String(v ?? "").split("\n").forEach((l) => sb.push(pXml(b.next(), l, char, para)));
       sb.push("</hp:subList>");

@@ -2,6 +2,7 @@
 // 차트는 그림 대신 같은 값을 표로 담는다(앱 WebView에서도 한글 문서로 저장되고, PDF는 인쇄 창을 쓰므로).
 import { SECTOR_CFG, SEVERITY, distribution, latestMonth, monthsBack, ncrBasis, quadrantData, rankOf, rankSize, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "./risk.js";
 import { SECTOR_NAME } from "./risk.js";
+import { trendImage } from "./dashchart.js";
 
 const pct = (v) => (v == null ? "-" : v.toFixed(2) + "%");
 const ym = (m) => (m ? `${m.slice(0, 4)}.${m.slice(4)}` : "-");
@@ -30,14 +31,14 @@ export function govSection(d) {
     const ci = d.company || {};
     if (d.rel && d.rel !== "본인") blocks.push({ text: `이 회사의 DART 자료는 ${d.rel}(${d.name})의 것입니다.`, gray: true });
     else if (d.match === "guess") blocks.push({ text: "DART 회사를 이름으로 추정해 연결했습니다. 맞는지 확인하세요.", gray: true });
-    blocks.push({ kv: [["대표이사", ci.ceo], ["설립일", ci.established], ["시장·종목", ci.marketName ? `${ci.marketName}${ci.stock ? " " + ci.stock : ""}` : ci.stock], ["홈페이지", ci.homepage], ["주소", ci.address]] });
+    blocks.push({ kv: [["대표이사", ci.ceo], ["설립일", /^\d{8}$/.test(ci.established || "") ? `${ci.established.slice(0, 4)}.${ci.established.slice(4, 6)}.${ci.established.slice(6)}` : ci.established], ["시장·종목", ci.marketName ? `${ci.marketName}${ci.stock ? " " + ci.stock : ""}` : ci.stock], ["홈페이지", ci.homepage], ["주소", ci.address]] });
     const hold = d.holders?.items || [];
     if (hold.length) blocks.push({ heading: "최대주주 및 특수관계인 지분" }, { table: { head: ["성명", "관계", "보통주 지분율"], rows: hold.slice(0, 10).map((x) => [x.name, x.relation && x.relation !== "-" ? x.relation : "", x.common?.ratio != null ? x.common.ratio.toFixed(2) + "%" : "-"]), weights: [2, 2, 1] } });
   }
   return { title: "기업 개황·지배구조", note: "전자공시시스템(DART)", blocks };
 }
 
-export function dashboardDoc(ids, { row, rows, sector, info, span = 8 }) {
+export function dashboardDoc(ids, { row, rows, sector, info, span = 8, charts = false }) {
   const cfg = SECTOR_CFG[sector];
   const month = latestMonth(rows, cfg.x.key);
   const nowYear = info.nowYear || new Date().getFullYear();
@@ -60,10 +61,17 @@ export function dashboardDoc(ids, { row, rows, sector, info, span = 8 }) {
   }
   if (ids.has("trend")) {
     const keys = cfg.trend.filter((k) => seriesOf(row, k, months).some((p) => p[1] != null));
-    sections.push({ title: "건전성 추이", note: `최근 ${span}분기 · 회사 값과 업권 중앙값`, blocks: keys.flatMap((k) => [
-      { heading: cfg.names[k] || k },
-      { table: { head: ["시점", row.name, "업권 중앙값"], rows: months.map((m) => [ym(m), pct(valueAt(row, k, m)), pct(sectorStat(rows, k, m)?.median)]), weights: [1, 1, 1] } },
-    ]) });
+    sections.push({ title: "건전성 추이", note: `최근 ${span}분기 · 회사 값과 업권 중앙값`, blocks: keys.flatMap((k) => {
+      const img = charts ? trendImage({ title: cfg.names[k] || k, months, series: [
+        { name: "업권 중앙값", color: "#8a94a6", dash: true, pts: months.map((m) => [m, sectorStat(rows, k, m)?.median ?? null]) },
+        { name: row.name, color: "#1f64d8", pts: seriesOf(row, k, months) },
+      ] }) : null;
+      if (img) return [{ image: img }];
+      return [
+        { heading: cfg.names[k] || k },
+        { table: { head: ["시점", row.name, "업권 중앙값"], rows: months.map((m) => [ym(m), pct(valueAt(row, k, m)), pct(sectorStat(rows, k, m)?.median)]), weights: [1, 1, 1] } },
+      ];
+    }) });
   }
   if (ids.has("gov")) sections.push(govSection(info.dart));
   if (ids.has("sanc")) {

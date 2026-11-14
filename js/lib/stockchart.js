@@ -1,5 +1,6 @@
 // 저장 문서(PDF·한글)에 넣을 최근 1년 주가 그래프(PNG). 상장사(종목코드 6자리)만 만든다.
 import { history } from "./market.js";
+import { pngOf } from "./dashchart.js";
 
 const dot = (d) => `${d.slice(0, 4)}.${d.slice(4, 6)}.${d.slice(6, 8)}`;
 const n0 = (v) => Math.round(v).toLocaleString("en-US");
@@ -72,10 +73,7 @@ function drawPng(dates, closes, W = 1200, H = 480) {
   tag(iMax, `최고 ${n0(hi0)}`, true);
   if (iMin !== iMax) tag(iMin, `최저 ${n0(lo0)}`, false);
   tag(closes.length - 1, `종가 ${n0(closes[closes.length - 1])}`, closes[closes.length - 1] >= (hi0 + lo0) / 2);
-  const dataUrl = cv.toDataURL("image/png");
-  const bin = atob(dataUrl.split(",")[1]);
-  const png = Uint8Array.from(bin, (c) => c.charCodeAt(0));
-  return { png, dataUrl, width: W, height: H };
+  return pngOf(cv);
 }
 
 /**
