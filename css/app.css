@@ -611,6 +611,64 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc .rp-tbl tr { break-inside: avoid; }
 }
 
+body.rp-view .print-doc h1 { font-size: 17pt; margin-bottom: 4pt; }
+body.rp-view .print-doc h2 { font-size: 13pt; margin-bottom: 6pt; }
+body.rp-view .print-doc h3 { font-size: 12pt; margin: 14pt 0 4pt; border-bottom: 1px solid #999; }
+body.rp-view .print-doc p { margin: 2pt 0; }
+body.rp-view .print-doc .meta { color: #444; font-size: 8.5pt; }
+body.rp-view .print-doc .gray { color: #777; font-size: 8.5pt; }
+body.rp-view .print-doc .foot { color: #666; font-size: 8pt; margin-top: 8pt; }
+body.rp-view .print-doc .pl { font-weight: 700; font-size: 9pt; margin-top: 8pt; color: var(--l0); }
+body.rp-view .print-doc .pl.l1 { color: var(--l1); } body.rp-view .print-doc .pl.l2 { color: var(--l2); } body.rp-view .print-doc .pl.l3 { color: var(--l3); } body.rp-view .print-doc .pl.l4 { color: var(--l4); }
+body.rp-view .print-doc .ph { font-weight: 700; font-size: 10.5pt; margin: 2pt 0; }
+body.rp-view .print-doc .pb { white-space: pre-wrap; }
+body.rp-view .print-doc .pg { font-weight: 700; font-size: 8.5pt; color: #444; margin-top: 6pt; }
+body.rp-view .print-doc .pk { font-weight: 700; margin-top: 4pt; }
+body.rp-view .print-doc .pn { break-inside: avoid-page; }
+body.rp-view .print-doc .lw-cmp { width: 100%; table-layout: fixed; font-size: 8.5pt; }
+body.rp-view .print-doc .lw-cmp th { position: static; min-width: 0; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.rp-view .print-doc .lw-cmp td { min-width: 0; width: auto; }
+body.rp-view .print-doc .lw-cmp thead { display: table-header-group; }
+body.rp-view .print-doc .rp-kv, body.rp-view .print-doc .rp-tbl { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9pt; }
+body.rp-view .print-doc .rp-kv th, body.rp-view .print-doc .rp-kv td, body.rp-view .print-doc .rp-tbl th, body.rp-view .print-doc .rp-tbl td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
+body.rp-view .print-doc .rp-img { display: block; width: 100%; max-width: 100%; height: auto; margin: 4pt 0 6pt; break-inside: avoid; }
+body.rp-view .print-doc.rp { font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: 9.5pt; line-height: 1.6; color: #1a2233; }
+body.rp-view .print-doc.rp .rp-kicker { color: #2a6bd6; font-weight: 700; font-size: 9.5pt; letter-spacing: .04em; margin-bottom: 2pt; }
+body.rp-view .print-doc.rp h1 { font-size: 22pt; color: #1f3a68; margin: 0 0 4pt; padding-bottom: 8pt; border-bottom: 2.5pt solid #1f3a68; }
+body.rp-view .print-doc.rp .meta { color: #5a6577; font-size: 9pt; }
+body.rp-view .print-doc.rp h3 { font-size: 13pt; color: #1f3a68; margin: 20pt 0 6pt; padding: 4pt 8pt; background: #eef3fb; border-left: 4pt solid #1f3a68; border-bottom: 0; break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.rp-view .print-doc.rp h3 + .meta { margin-top: -2pt; margin-bottom: 4pt; break-after: avoid; }
+body.rp-view .print-doc.rp .rp-tbl, body.rp-view .print-doc.rp .rp-kv { break-before: avoid; }
+body.rp-view .print-doc.rp .ph { color: #1f3a68; font-size: 10.5pt; margin: 10pt 0 3pt; break-after: avoid; }
+body.rp-view .print-doc.rp .pb { margin: 1pt 0; }
+body.rp-view .print-doc.rp .gray { color: #6b7587; }
+body.rp-view .print-doc.rp .rp-kv, body.rp-view .print-doc.rp .rp-tbl { margin: 3pt 0 8pt; font-size: 9pt; border: 0; }
+body.rp-view .print-doc.rp .rp-kv th, body.rp-view .print-doc.rp .rp-kv td, body.rp-view .print-doc.rp .rp-tbl th, body.rp-view .print-doc.rp .rp-tbl td { border: 0; border-bottom: .6pt solid #cfd6e2; padding: 4pt 6pt; }
+body.rp-view .print-doc.rp .rp-kv th { background: #f3f6fb; color: #33405a; }
+body.rp-view .print-doc.rp .rp-tbl th { background: #1f3a68; border-bottom: 0; font-weight: 600; }
+body.rp-view .print-doc.rp .rp-tbl tbody tr:nth-child(even) td { background: #f6f8fc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.rp-view .print-doc.rp .rp-tbl tr.b td { background: #e8eef9 !important; }
+body.rp-view .print-doc.rp .rp-img { margin: 6pt 0 8pt; border: .6pt solid #dfe4ee; border-radius: 3pt; }
+body.rp-view .print-doc.rp .foot { color: #7a8497; font-size: 8pt; margin-top: 4pt; }
+body.rp-view .print-doc.rp .foot:first-of-type { margin-top: 18pt; padding-top: 6pt; border-top: .6pt solid #cfd6e2; }
+body.rp-view .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.rp-view .print-doc .rp-tbl th { background: #1f3a68; color: #fff; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body.rp-view .print-doc .rp-tbl .num { text-align: right; white-space: nowrap; }
+body.rp-view .print-doc .rp-tbl th.num { text-align: center; }
+body.rp-view .print-doc .rp-tbl tr.b td { font-weight: 700; }
+body.rp-view .print-doc .rp-tbl thead { display: table-header-group; }
+body.rp-view .print-doc .rp-tbl tr { break-inside: avoid; }
+/* 휴대폰 브라우저는 인쇄할 때 print 미디어 CSS를 따르지 않고 화면 그대로 찍는 경우가 있어,
+   저장용 문서를 화면에서도 보이는 미리보기(rp-view)로 띄운 뒤 인쇄한다. 화면에는 이 문서만 보인다. */
+body.rp-view { display: block !important; overflow: auto !important; height: auto !important; background: #e4e9f1 !important; }
+body.rp-view > *:not(.print-doc):not(.rp-bar) { display: none !important; }
+body.rp-view .print-doc.rp { display: block; box-sizing: border-box; max-width: 210mm; margin: 64px auto 28px; padding: 14mm 12mm; background: #fff; box-shadow: 0 2px 14px rgba(20, 40, 80, .18); }
+.rp-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 99999; display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 12px; background: #1f3a68; color: #fff; font-size: 13px; }
+.rp-bar span { margin-right: auto; opacity: .85; }
+.rp-bar button { border: 0; border-radius: 10px; padding: 9px 14px; font: inherit; font-weight: 700; background: #fff; color: #1f3a68; cursor: pointer; }
+.rp-bar button.primary { background: #2a6bd6; color: #fff; }
+@media print { .rp-bar { display: none !important; } body.rp-view { background: #fff !important; } body.rp-view .print-doc.rp { margin: 0; padding: 0; max-width: none; box-shadow: none; } }
+
 /* ---- 참고 자료실 ---- */
 .lib-contact { display: block; font-size: 10.5px; margin: 6px 4px 0; }
 .lib-crumbs { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin: 12px 2px 8px; font-weight: 700; font-size: 13px; color: var(--muted); }
