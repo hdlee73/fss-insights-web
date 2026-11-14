@@ -316,7 +316,7 @@ async function overviewPane(body, co, sector, sectorLabel, ctx) {
   if (!ctx.alive()) return;
   // 상장사(종목코드 6자리, 본인 자료)는 개황 위에 주가 추이(기본 1년)를 바로 보여 준다.
   const co2 = dart.company || {};
-  const listed = (!dart.rel || dart.rel === "본인") && /^\d{6}$/.test(co2.stock || "");
+  const listed = (!dart.rel || dart.rel === "본인") && /^\d{6}$/.test(co2.stock || "") && ["Y", "K"].includes(co2.cls); // 유가증권(Y)·코스닥(K)만. 기타법인(E)·코넥스 등은 주가를 보이지 않는다
   const stockBox = h("div", { style: { marginBottom: "12px" } });
   body.replaceChildren(
     listed ? stockBox : null,
