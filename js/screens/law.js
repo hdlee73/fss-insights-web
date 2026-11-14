@@ -4,6 +4,7 @@
 import { setHeader } from "../app.js";
 import { APP_NAME, APP_VERSION, dialog, download, errorText, h, icon, iconButton, loading, message, share, store, toast } from "../core.js";
 import * as L from "../lib/law-core.js";
+import { previewPrint } from "../lib/report.js";
 
 const results = new Map(); // "검색어|기준일" → { tree } | { kw }
 const views = new Map(); // 같은 키의 화면 상태(펼침·선택·찾기)
@@ -624,19 +625,14 @@ function printDoc(tree, opt, extras) {
   p(footerLine(), "foot");
 
   const size = { A4: "210mm 297mm", B4: "257mm 364mm", Letter: "8.5in 11in" }[opt.paper || "A4"].split(" ");
-  const style = h("style", null, `@page { size: ${landscape ? size[1] + " " + size[0] : size.join(" ")}; margin: 17mm; }`);
-  document.head.append(style);
-  document.body.append(doc);
-  document.body.classList.add("printing");
-  const done = () => (doc.remove(), style.remove(), document.body.classList.remove("printing"));
-  addEventListener("afterprint", done, { once: true });
-  const prevTitle = document.title;
-  document.title = fileName(tree, "pdf").replace(/\.pdf$/, "");
-  setTimeout(() => {
-    window.print();
-    document.title = prevTitle;
-    setTimeout(() => document.body.contains(doc) && matchMedia("print").matches === false && done(), 1500);
-  }, 50);
+  doc.classList.add("rp-law");
+  if (landscape) doc.classList.add("land");
+  // 법령 문서도 fisis·dart 저장과 같은 미리보기 바(PDF로 저장·휴대폰 PDF 공유)로 연다.
+  previewPrint(doc, fileName(tree, "pdf").replace(/\.pdf$/, ""), {
+    title: `${tree.law.name} ${L.queryTarget(tree.query)}`,
+    pageCss: `@page { size: ${landscape ? size[1] + " " + size[0] : size.join(" ")}; margin: 17mm; }`,
+    landscape,
+  });
 }
 
 // ------------------------------------------------------------------ 판례·법령·행정규칙 본문

@@ -29,6 +29,7 @@ const GUIDE = [
   ["스마트 법령검색", "‘자본시장법 제85조 제2호’처럼 법령명과 조문(항·호·목까지)을 넣으면 그 조문이 위임한 시행령·시행규칙·감독규정·시행세칙을 위임한 줄 바로 아래에 이어 보여 주고, 그 조문을 인용한 판례만 골라 줍니다. 낱말만 넣으면 법령·행정규칙·판례와 조문 제목·내용을 함께 찾습니다. ‘현행 기준’ 단추로 과거 시점 조문을, ‘시행 연혁’으로 버전을 고르고, 비교표·결과 안에서 찾기·항목 숨기기·PDF/한글(HWPX) 저장·보관함을 지원합니다. 본문의 ‘법 제12조’ 같은 인용을 누르면 그 조문으로 이동합니다."],
   ["기타 참고자료", "공유 드라이브에 올린 참고자료를 폴더·태그·본문 검색으로 찾고 내려받습니다."],
   ["주요사이트 · 알림", "주요사이트는 편집 단추로 추가·수정·삭제합니다. 알림 설정에서 키워드(최근 24시간 뉴스와 금감원·금융위 보도자료 제목), 새 자료를 볼 기관, 참고 자료실, 오늘의 브리핑 시각을 정해 두면 새 글을 ‘새 소식’에 모으고 메뉴에 숫자로 표시합니다. 브라우저 알림을 허용하면 화면 알림도 띄웁니다. 웹은 열려 있는 동안(설치한 웹 앱 포함) 30분마다 확인합니다."],
+  ["표 내보내기 · 설정 백업", "재무손익·주요경영지표·회사 비교·DART 재무 표 위의 ‘표 복사’(엑셀에 바로 붙여넣기)·‘CSV’·‘엑셀’ 단추로 표를 가져갑니다. 회사 비교 화면 위쪽 ‘저장’은 비교표를 PDF·한글로 저장합니다. 이 화면의 ‘내 설정 백업·복원’은 관심기업·보관함·알림 키워드·즐겨찾기를 파일로 내보내고 다른 기기에서 가져옵니다. 알림 화면의 ‘PDF·한글 저장’은 모인 새 소식을 키워드·기관별로 묶어 저장합니다."],
   ["설치해서 쓰기", "Chrome·Edge 주소창의 설치 단추나 아래 ‘앱으로 설치’를 누르면 바탕화면·홈 화면에 아이콘이 생기고 앱처럼 열립니다. 갤럭시 휴대폰은 Chrome 메뉴(⋮) → ‘홈 화면에 추가’를 누릅니다."],
 ];
 
@@ -72,6 +73,18 @@ export async function render(root) {
         card("업데이트 정보", "refresh-cw", h("div", { class: "stack" },
           h("p", null, "새 버전이 배포되면 웹 앱이 자동으로 받아 두고 화면 아래에 ‘새 버전이 준비되었습니다’를 띄웁니다. ‘지금 적용’을 누르거나, 다음에 열 때 자동으로 바뀝니다."),
           h("div", { class: "row-gap" }, updateBtn, updateLine))),
+        card("내 설정 백업·복원", "download", (() => {
+          const fileIn = h("input", { type: "file", accept: "application/json,.json", style: { display: "none" }, onchange: async () => {
+            const f = fileIn.files[0];
+            fileIn.value = "";
+            if (f) (await import("../lib/backup.js")).importBackup(f);
+          } });
+          return h("div", { class: "stack" },
+            h("p", { class: "note" }, "관심기업·보관함(스크랩·메모)·알림 키워드와 기관·법령 즐겨찾기·메뉴 설정 등은 이 브라우저에만 저장됩니다. 파일로 내보내 두면 기기를 바꾸거나 PC와 휴대폰에서 이어 볼 때 가져올 수 있어요. 접속 통계 번호처럼 기기에 묶인 값은 담지 않습니다."),
+            h("div", { class: "row-gap" },
+              h("button", { class: "btn ghost sm", type: "button", onclick: async () => (await import("../lib/backup.js")).exportBackup() }, icon("download"), "설정 내보내기"),
+              h("button", { class: "btn ghost sm", type: "button", onclick: () => fileIn.click() }, icon("file-down"), "백업 가져오기"), fileIn));
+        })()),
         card("설치", "download", h("div", { class: "stack" },
           h("p", null, installed ? "앱으로 설치되어 실행 중입니다." : "설치하면 바탕화면·홈 화면 아이콘으로 바로 열 수 있습니다."),
           installed ? null : h("div", null, installBtn))),

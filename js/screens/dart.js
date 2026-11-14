@@ -2,6 +2,7 @@
 // 앱의 DartScreen.kt를 옮겼다. 공시 자료는 서버(/dart)가 DART Open API에서 받아 준다.
 import { setHeader } from "../app.js";
 import { api, cached, dialog, errorText, h, icon, iconButton, loading, message, openUrl, searchBox, store, tabs, toast } from "../core.js";
+import { withTableTools } from "../lib/tabletools.js";
 import { changeOf, history, intraday, percentOf, quote, signed, sparkline, tint, yearEndCloses, DOWN, UP } from "../lib/market.js";
 
 const MAX_WATCH = 12;
@@ -346,9 +347,9 @@ function holdersTab(body, hd) {
 }
 
 function table(head, rows) {
-  return h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+  return withTableTools(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
     h("thead", null, h("tr", null, h("th", null, "구분"), head.map(([l, s]) => h("th", { class: "num" }, l, s ? h("div", { class: "note", style: { fontWeight: 400 } }, s) : null)))),
-    h("tbody", null, rows.map(([label, vals]) => h("tr", null, h("td", null, label), vals.map((v) => h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v)))))));
+    h("tbody", null, rows.map(([label, vals]) => h("tr", null, h("td", null, label), vals.map((v) => h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v))))))), "DART_재무");
 }
 
 /** 손익현황 열. 분기·누적 뒤에 최근 3개 사업연도 연간을 모두 보이도록, 서버 연간 열에 없는 연도는 추이(trend)에서 채운다. */

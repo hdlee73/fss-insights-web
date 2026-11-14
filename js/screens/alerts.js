@@ -34,6 +34,7 @@ function newsView(root, ctx) {
           toast(n ? `새 소식 ${n}건` : "새 소식이 없습니다.");
           draw();
         }),
+        items.length ? h("button", { type: "button", class: "link-more", onclick: () => saveDigest(items) }, "PDF·한글 저장") : null,
         items.length ? h("button", { type: "button", class: "link-more", onclick: () => (markAllRead(), draw()) }, "모두 읽음") : null,
         items.length ? h("button", { type: "button", class: "link-more", onclick: async () => (await dialog({ title: "새 소식 지우기", text: "모아 둔 새 소식을 모두 지웁니다.", ok: "지우기", danger: true })) && (clearInbox(), draw()) }, "지우기") : null)].filter(Boolean));
     if (!items.length) {
@@ -117,4 +118,29 @@ function settingsView(root, ctx) {
     h("div", { class: "grid2 al-grid" }, agencyCard("PRESS", `새 ${GROUPS.PRESS.noun} 알림`), agencyCard("RESEARCH", "새 금융리포트 알림")),
     etc,
     h("p", { class: "note" }, "처음 켠 기관·키워드는 지금 있는 글을 ‘이미 본 것’으로 기록하고, 그다음부터 새로 올라온 글만 알립니다.")));
+}
+
+/** 내 키워드·기관에 걸려 모인 새 소식을 종류(키워드·기관)별로 묶어 한 문서(PDF·한글)로 저장한다. */
+async function saveDigest(items) {
+  const { saveReport } = await import("../lib/report.js");
+  const kinds = [...new Set(items.map((x) => x.kind || "기타"))];
+  await saveReport({
+    title: "내 관심 새 소식 저장",
+    parts: kinds.map((k) => ({ id: k, label: `${k} (${items.filter((x) => (x.kind || "기타") === k).length}건)` })),
+    build: async (ids) => {
+      const dates = items.map((x) => x.at).filter(Boolean);
+      const range = dates.length ? `${when(Math.min(...dates))} ~ ${when(Math.max(...dates))}` : "";
+      return {
+        title: "내 관심 새 소식",
+        subtitle: "FSS Insights 맞춤 브리핑",
+        fileName: `관심소식_${new Date().toISOString().slice(0, 10).replace(/-/g, "")}`,
+        meta: [`키워드·기관 알림으로 모은 소식 ${items.filter((x) => ids.has(x.kind || "기타")).length}건`, range ? `수집 기간: ${range}` : "", "알림 설정(키워드·기관)에 걸린 글만 담았습니다. 원문은 각 기관·언론사 누리집에서 확인하세요."].filter(Boolean),
+        sections: kinds.filter((k) => ids.has(k)).map((k) => ({
+          title: k,
+          blocks: [{ table: { head: ["수집", "출처", "제목"], weights: [0.9, 1.1, 4], num: () => false,
+            rows: items.filter((x) => (x.kind || "기타") === k).map((x) => [when(x.at), x.source || "", x.title]) } }],
+        })),
+      };
+    },
+  });
 }

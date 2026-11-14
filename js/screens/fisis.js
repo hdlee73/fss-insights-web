@@ -2,6 +2,7 @@
 // 앱의 FisisScreen.kt·FisisApi.kt를 옮겼다. 자료는 서버(/fisis)가 금융통계정보시스템 Open API에서 받아 준다.
 import { setHeader } from "../app.js";
 import { api, cached, dialog, errorText, h, icon, loading, message, store, tabs, toast } from "../core.js";
+import { withTableTools } from "../lib/tabletools.js";
 
 const SOURCE = "자료출처: 금융감독원 금융통계정보시스템";
 const NOTICE = "원본 오류로 인해 일부 수치가 잘못 표시되어 있을 수 있습니다.";
@@ -293,7 +294,7 @@ async function detail(root, params, ctx, sector) {
   if (!ctx.alive()) return;
   if (!profile.metrics.length) return body.replaceChildren(message(`이 회사는 ${sectorLabel} 자료를 찾지 못했습니다.`));
   body.replaceChildren();
-  ratioTab(body, sector, profile, params.rm, +(params.span || 4), (p) => ctx.go({ ...params, ...p }, { replace: true }));
+  ratioTab(body, sector, profile, params.rm, +(params.span || 4), (p) => ctx.go({ ...params, ...p }, { replace: true }), co.name);
   body.append(h("p", { class: "note", style: { marginTop: "12px" } }, `${SOURCE}. 금액은 억원 단위입니다. ${NOTICE}`));
 }
 
@@ -372,12 +373,12 @@ async function dartFinanceOf(name, basis) {
 const dartSourceText = (basis, d) => `금융통계정보시스템(FISIS)에 ${basis} 재무제표가 없어 전자공시시스템(DART) 정기보고서의 ${basis} 재무제표로 대신 표시합니다. DART 회사: ${d.name || d.company?.name || "-"}(고유번호 ${d.corp})${d.match === "guess" ? " · 회사 이름으로 추정해 맞춘 자료라 다를 수 있습니다" : ""}.`;
 
 // pick(행, 열)을 주면 항목 이름과 금액을 눌러 재무제표를 볼 수 있다.
-const cmpTable = (head, rows, bold, pick) => h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+const cmpTable = (head, rows, bold, pick, name) => withTableTools(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
   h("thead", null, h("tr", null, head.map((x, i) => h("th", { class: i ? "num" : "" }, x)))),
   h("tbody", null, rows.map((r, ri) => h("tr", { class: bold?.(ri) ? "bold" : "" }, r.map((v, i) => {
     const click = pick && ri < (pick.rows ?? rows.length) ? { class: "stmt-link", title: "눌러서 이 시점의 재무제표 보기", onclick: () => pick(ri, Math.max(0, i - 1)) } : null;
     return i ? h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") + (click ? " stmt-link" : ""), ...(click ? { title: click.title, onclick: click.onclick } : {}) }, v) : h("td", click || null, v);
-  }))))));
+  })))))), name || "표");
 
 const stmtNum = (v) => (v == null ? "-" : Math.abs(v) >= 10 ? Math.round(v).toLocaleString("en-US") : String(+v.toFixed(2)));
 const stmtTitle = (t) => String(t || "").replace(/\(\d{2}\.\d{2}월 (이후|이전)\)/g, "").trim();
@@ -435,8 +436,8 @@ async function financePane(body, params, co, sector, sectorLabel, ctx) {
   const homeLink = h("a", { class: "btn ghost", href: home.url, target: "_blank", rel: "noopener", style: { marginTop: "14px" } }, icon("external-link"), home.known ? `홈페이지 열기 (${home.url.replace("https://", "")})` : "공식 홈페이지 검색하기");
   const cmp = profile?.metrics?.length ? finCompare(profile, sector, basis) : null;
   if (cmp) {
-    body.replaceChildren(pills, sectionHeader(`재무상태 (${basis})`), cmpTable(cmp.bsHead, cmp.bsRows, null, Object.assign((ri, ci) => openStatement(sector, co, basis, cmp.bsMonths[ci], cmp.bsRows[ri][0]), { rows: cmp.bsKeys.length })),
-      sectionHeader(`손익 (${basis})`), cmpTable(cmp.plHead, cmp.plRows, cmp.plBold, (ri, ci) => openStatement(sector, co, basis, cmp.plMonths[ci], cmp.plRows[ri][0])),
+    body.replaceChildren(pills, sectionHeader(`재무상태 (${basis})`), cmpTable(cmp.bsHead, cmp.bsRows, null, Object.assign((ri, ci) => openStatement(sector, co, basis, cmp.bsMonths[ci], cmp.bsRows[ri][0]), { rows: cmp.bsKeys.length }), `${co.name}_재무상태_${basis}`),
+      sectionHeader(`손익 (${basis})`), cmpTable(cmp.plHead, cmp.plRows, cmp.plBold, (ri, ci) => openStatement(sector, co, basis, cmp.plMonths[ci], cmp.plRows[ri][0]), `${co.name}_손익_${basis}`),
       h("p", { class: "note" }, "항목 이름이나 금액을 누르면 그 시점의 재무제표를 볼 수 있습니다. 연간 열은 해당 사업연도 말까지의 누적 값입니다. 최근 분기 열은 그 분기만의 값과 올해 누적 값을 함께 보여 줍니다."));
     const funds = group(profile, "fund");
     if (funds.length) {
@@ -467,7 +468,7 @@ async function financePane(body, params, co, sector, sectorLabel, ctx) {
   body.replaceChildren(pills, h("div", { class: "card", style: { margin: "10px 0", borderColor: "var(--acc)" } }, h("b", null, "자료 출처: 전자공시시스템(DART)"), h("p", { class: "note", style: { margin: "4px 0 0" } }, dartSourceText(basis, got.d))), box, homeLink);
 }
 
-function ratioTab(body, sector, profile, month, span, set) {
+function ratioTab(body, sector, profile, month, span, set, coName) {
   const rows = RATIO_ROWS[sector];
   if (!rows) return body.append(message("이 권역은 주요경영지표를 제공하지 않습니다."));
   const ratios = group(profile, "ratio");
@@ -478,7 +479,7 @@ function ratioTab(body, sector, profile, month, span, set) {
   body.append(sectionHeader("주요경영지표", "단위: %"));
   const start = Math.max(0, months.indexOf(selected));
   const shown = months.slice(start, start + span);
-  body.append(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+  body.append(withTableTools(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
     h("thead", null, h("tr", null, h("th", null, "지표"), shown.map((m) => h("th", { class: "num" + (m === selected ? " sel" : "") }, monthLabel(m))))),
     h("tbody", null, rows.map(([k, label]) => {
       const metric = ratios.find((m) => m.key === k);
@@ -486,7 +487,7 @@ function ratioTab(body, sector, profile, month, span, set) {
         const v = at(metric, m)?.value;
         return h("td", { class: "num" + (m === selected ? " sel" : "") }, v != null && metric ? valueText(v, metric.unit).replace(/%$/, "") : "-");
       }));
-    })))));
+    })))), `${coName || "회사"}_주요경영지표`));
   body.append(h("p", { class: "note" }, "선택한 시점 열은 강조됩니다."));
 }
 
@@ -504,19 +505,49 @@ async function compare(root, params, ctx, sector) {
   }
   if (!ctx.alive()) return;
   root.replaceChildren();
-  const row = (label, key, pct) => h("tr", null, h("td", null, label), profiles.map((p) => {
+  const row = (label, key, pct) => [label, ...profiles.map((p) => {
     const m = metricOf(p, key, "별도");
     const v = at(m, null)?.value;
-    return h("td", { class: "num" + (v != null && v < 0 ? " neg" : "") }, m && v != null ? valueText(v, m.unit).replace(pct ? /%$/ : /억원$/, "") : "-");
-  }));
-  const section = (title, unit, rows) => [sectionHeader(title, unit), h("div", { class: "tbl-wrap" }, h("table", { class: "tbl cmp" },
-    h("thead", null, h("tr", null, h("th", null, ""), cos.map((c) => h("th", { class: "num" }, c.name)))),
-    h("tbody", null, rows)))];
-  root.append(h("div", { class: "note" }, "기준 시점: " + profiles.map((p, i) => `${cos[i].name} ${monthLabel(monthsOf(group(p, "fin", "별도"))[0] || "-")}`).join(" · ")));
-  root.append(...section("재무상태", "단위: 억원", ["assets", "liab", "equity"].map((k) => row(FINANCE_LABELS[k], k, false))));
-  root.append(...section("손익현황 (누적)", "단위: 억원", ["revenue", "opinc", "netincome"].map((k) => row(FINANCE_LABELS[k] + " (누적)", k + "_cum", false))));
-  if (RATIO_ROWS[sector]) root.append(...section("주요경영지표", "단위: %", RATIO_ROWS[sector].map(([k, l]) => row(l, k, true))));
+    return m && v != null ? valueText(v, m.unit).replace(pct ? /%$/ : /억원$/, "") : "-";
+  })];
+  const sections = [
+    { title: "재무상태", unit: "단위: 억원", rows: ["assets", "liab", "equity"].map((k) => row(FINANCE_LABELS[k], k, false)) },
+    { title: "손익현황 (누적)", unit: "단위: 억원", rows: ["revenue", "opinc", "netincome"].map((k) => row(FINANCE_LABELS[k] + " (누적)", k + "_cum", false)) },
+    ...(RATIO_ROWS[sector] ? [{ title: "주요경영지표", unit: "단위: %", rows: RATIO_ROWS[sector].map(([k, l]) => row(l, k, true)) }] : []),
+  ];
+  const basisLine = "기준 시점: " + profiles.map((p, i) => `${cos[i].name} ${monthLabel(monthsOf(group(p, "fin", "별도"))[0] || "-")}`).join(" · ");
+  const sectorLabel = SECTORS.find(([c]) => c === sector)?.[1] || "";
+  const names = cos.map((c) => c.name);
+  setHeader("회사 비교", SOURCE, [
+    h("button", { class: "pill", type: "button", title: "비교표를 PDF·한글로 저장", onclick: () => saveCompare(sectorLabel, names, basisLine, sections) }, icon("download"), h("span", { class: "lbl" }, "저장")),
+    h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록"))]);
+  root.append(h("div", { class: "note" }, basisLine));
+  for (const sec of sections) {
+    root.append(sectionHeader(sec.title, sec.unit), withTableTools(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl cmp" },
+      h("thead", null, h("tr", null, h("th", null, ""), names.map((n) => h("th", { class: "num" }, n)))),
+      h("tbody", null, sec.rows.map((r) => h("tr", null, h("td", null, r[0]), r.slice(1).map((v) => h("td", { class: "num" + (v.startsWith("-") && v !== "-" ? " neg" : "") }, v))))))), `${names.join("_")}_${sec.title}`));
+  }
   root.append(h("p", { class: "note", style: { marginTop: "10px" } }, "각 회사의 FISIS 최근 시점 기준입니다. 시점이 다르면 위의 기준 시점을 확인하세요."));
+}
+
+/** 선택한 2~3개사의 비교표를 PDF·한글로 저장한다. */
+async function saveCompare(sectorLabel, names, basisLine, sections) {
+  const { saveReport } = await import("../lib/report.js");
+  await saveReport({
+    title: "회사 비교 저장",
+    parts: sections.map((s) => ({ id: s.title, label: `${s.title} (${s.unit.replace("단위: ", "단위 ")})` })),
+    build: async (ids) => ({
+      title: `${names.join(" · ")} 비교`,
+      subtitle: `금융회사 비교 · ${sectorLabel}`,
+      fileName: `${names.join("_")}_비교`,
+      meta: [basisLine, "자료출처: 금융감독원 금융통계정보시스템(FISIS)", NOTICE],
+      sections: sections.filter((s) => ids.has(s.title)).map((s) => ({
+        title: s.title,
+        note: s.unit,
+        blocks: [{ table: { head: ["", ...names], rows: s.rows, weights: [2.2, ...names.map(() => 1.4)] } }],
+      })),
+    }),
+  });
 }
 
 // ---- PDF·한글 저장: 개황·주가·재무손익·주요경영지표·대시보드·제재(모든 탭의 저장 단추가 같은 저장 창을 연다) ----

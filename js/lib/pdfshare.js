@@ -31,7 +31,7 @@ const bytes = (s) => {
 };
 
 /** JPEG 쪽 그림들로 PDF 파일을 만든다. pages: [{ jpeg: Uint8Array, w, h(px) }] */
-export function pdfFromJpegs(pages) {
+export function pdfFromJpegs(pages, landscape = false) {
   const parts = [];
   const offsets = [];
   let len = 0;
@@ -53,7 +53,7 @@ export function pdfFromJpegs(pages) {
   obj(2, `<< /Type /Pages /Count ${n} /Kids [${pages.map((_, i) => `${3 + i * 3} 0 R`).join(" ")}] >>`);
   pages.forEach((p, i) => {
     const base = 3 + i * 3;
-    const w = A4.w;
+    const w = landscape ? A4.h : A4.w;
     const hh = (p.h / p.w) * w; // 쪽 높이는 그림 비율대로(마지막 쪽은 짧다)
     obj(base, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${w.toFixed(2)} ${hh.toFixed(2)}] /Resources << /XObject << /Im0 ${base + 2} 0 R >> >> /Contents ${base + 1} 0 R >>`);
     const content = `q ${w.toFixed(2)} 0 0 ${hh.toFixed(2)} 0 0 cm /Im0 Do Q`;
@@ -72,14 +72,14 @@ export function pdfFromJpegs(pages) {
 }
 
 /** 화면의 저장용 문서(el)를 A4 쪽으로 나눈 PDF Blob으로 만든다. */
-export async function elementToPdf(el) {
+export async function elementToPdf(el, { landscape = false } = {}) {
   const html2canvas = await loadCanvasLib();
   const cssW = el.scrollWidth;
   const cssH = el.scrollHeight;
   const scale = Math.max(1, Math.min(2, 15000 / cssH, 4000 / cssW)); // 휴대폰 캔버스 한도 안에서
   const breaks = breakPoints(el);
   const canvas = await html2canvas(el, { scale, backgroundColor: "#ffffff", useCORS: true, logging: false, windowWidth: cssW });
-  const pageH = cssW * (A4.h / A4.w); // 문서 폭 기준 한 쪽 높이(css px)
+  const pageH = cssW * (landscape ? A4.w / A4.h : A4.h / A4.w); // 문서 폭 기준 한 쪽 높이(css px)
   const pages = [];
   let start = 0;
   while (start < cssH - 1) {
@@ -104,5 +104,5 @@ export async function elementToPdf(el) {
     start = end;
     if (pages.length > 60) throw new Error("문서가 너무 길어 PDF로 만들 수 없습니다.");
   }
-  return pdfFromJpegs(pages);
+  return pdfFromJpegs(pages, landscape);
 }
