@@ -6,7 +6,7 @@ import { changeOf, history, intraday, percentOf, quote, signed, sparkline, tint,
 
 const MAX_WATCH = 12;
 const MAX_RECENT = 8;
-const TABS = ["개황", "최대주주", "재무손익", "정기보고서", "주요사항보고서", "기타공시"];
+const TABS = ["개황", "최대주주", "재무손익", "정기보고서", "주요사항보고서", "기타공시", "뉴스"];
 const MARKET = { Y: ["유가증권", "blue"], K: ["코스닥", "green"], N: ["코넥스", "orange"], E: ["기타법인", ""] };
 const clsOf = (c) => c.cls || (c.stock ? "Y" : "E");
 const symbolOf = (c) => (c.stock?.length === 6 ? `${c.stock}.${c.cls === "K" ? "KQ" : "KS"}` : null);
@@ -234,6 +234,9 @@ async function detail(root, params, ctx) {
       await infoP.catch(() => null);
       const [f, closes] = await Promise.all([finance(corp), c.stock?.length === 6 ? yearEndCloses(c.stock) : {}]);
       if (ctx.alive()) financeTab(body, f, closes, "연결");
+    } else if (TABS[tab] === "뉴스") {
+      await infoP.catch(() => null);
+      if (ctx.alive()) await (await import("./news.js")).companyPane(body, c.name);
     } else {
       const type = ["a", "m", "e"][tab - 3];
       await filingsTab(body, corp, type, params, ctx);

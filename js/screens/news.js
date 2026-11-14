@@ -299,3 +299,18 @@ function spark(daily, surge) {
   });
   return svg;
 }
+
+/** 회사 상세의 「뉴스」 탭: 최근 3일 그 회사 기사(링크 포함). */
+export async function companyPane(body, name) {
+  body.replaceChildren(loading("최근 3일 뉴스를 찾는 중…"));
+  try {
+    const page = await N.companyNews(name);
+    const list = h("div", { class: "list" });
+    for (const a of page.articles) list.append(articleRow(a));
+    body.replaceChildren(
+      h("p", { class: "note" }, `「${N.companySearchName(name)}」 최근 3일 기사 ${page.articles.length}건 · ${String(page.note).split(" (")[0]}`),
+      page.articles.length ? list : message("최근 3일 안에 이 회사 이름이 나온 기사를 찾지 못했습니다."));
+  } catch (e) {
+    body.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => companyPane(body, name) }));
+  }
+}
