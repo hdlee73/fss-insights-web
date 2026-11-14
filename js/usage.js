@@ -59,10 +59,11 @@ export function envInfo() {
 // 날짜별 '누적값'(v=방문, s=초)을 이 브라우저에 두고, 서버에는 그 누적값을 보낸다(서버가 최댓값으로 받아 중복 전송해도 안전).
 // 서버가 이 기능을 지원한다고 알려 준 뒤(응답의 live)에만 추가로 보내므로, 서버가 아직 옛 버전이어도 부담·오류가 없다.
 const TICK_MS = 60_000;
-const LIVE_PUSH_MS = 10 * 60_000; // 보는 동안 서버에 올리는 간격(변동이 있을 때만)
+const LIVE_PUSH_MS = 5 * 60_000; // 보는 동안 서버에 올리는 간격(변동이 있을 때만)
+const EARLY_PUSH_MS = 20_000; // 연 지 20초 뒤 한 번 더 올려, 금방 닫혀 마지막 전송이 누락돼도 시간이 0초로 남지 않게 한다
 const MAX_GAP_MS = 90_000; // 절전·타이머 지연으로 한 번에 크게 늘어나는 것을 막는다
 const sigOf = (x) => `${x.v || 0}:${x.s || 0}`;
-let tickTimer = 0, lastTick = 0, lastPush = 0;
+let tickTimer = 0, lastTick = 0, lastPush = 0, earlyTimer = 0;
 
 function bumpStat(fn) {
   const st = store.get("usage.stat", {});
@@ -87,8 +88,15 @@ function startVisible(countVisit) {
   if (countVisit) bumpStat((x) => (x.v = Math.min(2000, (x.v || 0) + 1)));
   lastTick = Date.now();
   if (!tickTimer) tickTimer = setInterval(tick, TICK_MS);
+  clearTimeout(earlyTimer);
+  earlyTimer = setTimeout(() => {
+    if (document.visibilityState !== "visible") return;
+    tick(false); // 지금까지 본 시간을 더해 올린다
+    sendIfNeeded();
+  }, EARLY_PUSH_MS);
 }
 function stopVisible() {
+  clearTimeout(earlyTimer);
   if (tickTimer) {
     clearInterval(tickTimer);
     tickTimer = 0;
@@ -136,13 +144,13 @@ let sending = false;
  * keepalive 는 화면을 닫는 순간에도 요청이 끝까지 가도록 한다.
  */
 export async function sendIfNeeded(keepalive = false) {
-  if (!enabled() || sending || !navigator.onLine) return;
+  if (!enabled() || (sending && !keepalive) || !navigator.onLine) return;
   const today = dayOf();
   const cutoff = dayOf(new Date(Date.now() - KEEP_DAYS * 86400000));
   const pending = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
   const past = Object.keys(pending).filter((d) => d < today).sort().slice(-10);
   const includeToday = store.get("usage.last", "") !== today || store.get("usage.lastV", "") !== APP_VERSION; // 같은 날 새 버전으로 바뀐 경우도 한 번 더 알린다
-  const live = store.get("usage.live", false); // 서버가 방문·시간 수집을 지원한다고 알려 준 적이 있는지
+  const live = true; // 서버는 이미 방문·시간 수집을 지원한다. (예전엔 응답의 live를 받은 뒤에만 보냈는데, 첫 접속자는 그 전에 닫으면 시간이 0초로 남았다)
   const stat = store.get("usage.stat", {});
   const acked = store.get("usage.acked", {});
   const changed = Object.keys(stat).filter((d) => sigOf(stat[d]) !== acked[d]).sort().slice(-10);
@@ -161,23 +169,35 @@ export async function sendIfNeeded(keepalive = false) {
     }
   }
   const days = [...map.values()].sort((a, b) => (a.d < b.d ? -1 : 1)).slice(-10);
+  const payload = JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, env: envInfo(), days });
+  const markSent = () => {
+    const now = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
+    past.forEach((d) => delete now[d]);
+    store.set("usage.pending", now);
+    store.set("usage.last", today);
+    store.set("usage.lastV", APP_VERSION);
+    // 누적값은 서버가 최댓값으로 받으므로, 보낸 값과 같은 서명만 기록해 두면 이후 변동분만 다시 보낸다
+    const a = Object.fromEntries(Object.entries(store.get("usage.acked", {})).filter(([d]) => d >= cutoff));
+    Object.assign(a, sentSig);
+    store.set("usage.acked", a);
+  };
+  // 화면을 닫는 순간에는 sendBeacon(사전 확인 요청이 없는 text/plain)으로 보낸다. fetch+JSON은 사전 확인(preflight) 때문에 닫히면서 끊기는 일이 있다.
+  if (keepalive && navigator.sendBeacon) {
+    try {
+      if (navigator.sendBeacon(SERVER + "/usage/ping", new Blob([payload], { type: "text/plain" }))) {
+        markSent();
+        return;
+      }
+    } catch {
+      // 아래 fetch 로 다시 시도
+    }
+  }
   sending = true;
   try {
-    const res = await fetch(SERVER + "/usage/ping", { method: "POST", keepalive, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: installId(), v: "web-" + APP_VERSION, env: envInfo(), days }) });
+    const res = await fetch(SERVER + "/usage/ping", { method: "POST", keepalive, headers: { "Content-Type": "application/json" }, body: payload });
     if (res.ok) {
-      const now = Object.fromEntries(Object.entries(store.get("usage.pending", {})).filter(([d]) => d >= cutoff));
-      past.forEach((d) => delete now[d]);
-      store.set("usage.pending", now);
-      store.set("usage.last", today);
-      store.set("usage.lastV", APP_VERSION);
-      const body = await res.json().catch(() => null);
-      if (body?.live) {
-        store.set("usage.live", true);
-        // 누적값은 서버가 최댓값으로 받으므로, 보낸 값과 같은 서명만 기록해 두면 이후 변동분만 다시 보낸다
-        const a = Object.fromEntries(Object.entries(store.get("usage.acked", {})).filter(([d]) => d >= cutoff));
-        Object.assign(a, sentSig);
-        store.set("usage.acked", a);
-      }
+      markSent();
+      store.set("usage.live", true);
     }
   } catch {
     // 오프라인·서버 오류는 다음에 다시
