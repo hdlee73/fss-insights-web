@@ -85,8 +85,11 @@ function bumpStat(fn) {
 }
 function tick(push = true) {
   const now = Date.now();
-  const gap = Math.min(now - lastTick, MAX_GAP_MS);
+  // 같은 브라우저의 여러 탭·창이 동시에 보이면 각자 시간을 더해 두 배로 잡히므로, 마지막으로 시간을 더한 시각을 탭끼리 공유해 겹치는 구간은 한 번만 센다.
+  const shared = Number(store.get("usage.tickAt", 0)) || 0;
+  const gap = Math.min(now - Math.max(lastTick, shared), MAX_GAP_MS);
   lastTick = now;
+  store.set("usage.tickAt", now);
   if (gap > 0) bumpStat((x) => (x.s = Math.min(86400, (x.s || 0) + Math.round(gap / 1000))));
   if (push && now - lastPush >= LIVE_PUSH_MS) {
     lastPush = now;
