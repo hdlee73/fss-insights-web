@@ -64,17 +64,18 @@ export function printReport(doc, base) {
   }
   (doc.footer || []).filter(Boolean).forEach((l) => el.append(h("p", { class: "foot" }, l)));
 
+  document.querySelectorAll(".print-doc").forEach((e) => e.remove()); // 앞서 남은 인쇄용 문서
   const style = h("style", null, "@page { size: 210mm 297mm; margin: 17mm; }");
   document.head.append(style);
   document.body.append(el);
   document.body.classList.add("printing");
-  const done = () => (el.remove(), style.remove(), document.body.classList.remove("printing"));
-  addEventListener("afterprint", done, { once: true });
   const prevTitle = document.title;
+  const done = () => (el.remove(), style.remove(), document.body.classList.remove("printing"), (document.title = prevTitle));
+  addEventListener("afterprint", done, { once: true });
   document.title = base;
   setTimeout(() => {
     window.print();
-    document.title = prevTitle;
-    setTimeout(() => document.body.contains(el) && matchMedia("print").matches === false && done(), 1500);
+    // 휴대폰 브라우저는 print()가 바로 돌아오고 미리보기를 나중에 만든다. 그때 인쇄용 문서가 없으면 화면의 현재 탭이 인쇄되므로
+    // 시간으로 치우지 않고 afterprint(인쇄 창을 닫을 때)에만 치운다. 화면에서는 .print-doc가 숨겨져 있어 남아도 보이지 않는다.
   }, 50);
 }
