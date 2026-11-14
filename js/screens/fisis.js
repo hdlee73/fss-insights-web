@@ -557,7 +557,8 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
           const sum = pick("핵심 지표·체크 포인트"), trend = pick("건전성 추이"), gov = pick("기업 개황·지배구조");
           if (sum || trend) {
             const blocks = [];
-            if (sum) blocks.push({ heading: `핵심 지표·체크 포인트 (${sum.note})` }, ...sum.blocks);
+            // 자산총계는 재무손익의 재무상태 표에 이미 있으므로 대시보드에서는 뺀다(저장 문서 한정).
+            if (sum) blocks.push({ heading: `핵심 지표·체크 포인트 (${sum.note})` }, ...sum.blocks.filter((b) => !(b.text || "").startsWith("자산총계(") || !ids.has("fin")));
             if (trend) blocks.push({ heading: `건전성 추이 (${trend.note})` }, ...trend.blocks);
             dashSecs.push({ title: "대시보드", note: "금융통계정보시스템·전자공시·제재공시 기준 요약", blocks });
           }
