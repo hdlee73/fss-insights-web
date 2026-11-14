@@ -287,12 +287,33 @@ function reportTable(b, t, pageW) {
   b.raw(`<hp:p id="${b.next()}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">${sb.join("")}<hp:t/></hp:run></hp:p>`);
 }
 
+/** 그림(PNG) 한 장을 글자처럼 놓인 문단으로 넣는다. images에 쌓아 두면 호출한 쪽이 BinData로 묶는다. */
+function imageParagraph(b, im, images, pageW) {
+  images.push(im);
+  const id = `image${images.length}`;
+  const w = Math.min(pageW - MARGIN * 2 - 400, 44000);
+  const hgt = Math.round((w * im.height) / im.width);
+  const nid = b.next();
+  b.raw(`<hp:p id="${b.next()}" paraPrIDRef="${P_CENTER}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">`
+    + `<hp:pic id="${nid}" zOrder="0" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="${b.next()}" reverse="0">`
+    + `<hp:offset x="0" y="0"/><hp:orgSz width="${w}" height="${hgt}"/><hp:curSz width="${w}" height="${hgt}"/><hp:flip horizontal="0" vertical="0"/>`
+    + `<hp:rotationInfo angle="0" centerX="${Math.round(w / 2)}" centerY="${Math.round(hgt / 2)}" rotateimage="1"/>`
+    + `<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>`
+    + `<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="${w}" y="0"/><hc:pt2 x="${w}" y="${hgt}"/><hc:pt3 x="0" y="${hgt}"/></hp:imgRect>`
+    + `<hp:imgClip left="0" right="${w}" top="0" bottom="${hgt}"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="${w}" dimheight="${hgt}"/>`
+    + `<hc:img binaryItemIDRef="${id}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/><hp:effects/>`
+    + `<hp:sz width="${w}" widthRelTo="ABSOLUTE" height="${hgt}" heightRelTo="ABSOLUTE" protect="0"/>`
+    + `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`
+    + `<hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic><hp:t/></hp:run></hp:p>`);
+}
+
 /** 일반 보고서 → HWPX Blob */
 export async function hwpxReport(doc) {
   const [pw, ph] = PAPERS.A4;
   const pageW = pw * 100, pageH = ph * 100;
   const b = new Body(pageW - MARGIN * 2);
   const today = new Date().toISOString().slice(0, 10);
+  const images = [];
   b.p(doc.title, C_TITLE);
   if (doc.subtitle) b.p(doc.subtitle, C_SUBTITLE);
   (doc.meta || []).forEach((m) => b.p(m, C_META));
@@ -303,6 +324,7 @@ export async function hwpxReport(doc) {
     for (const blk of s.blocks) {
       if (blk.kv) reportTable(b, { head: ["항목", "내용"], rows: blk.kv.filter(([, v]) => v), weights: [1, 3], num: () => false }, pageW);
       else if (blk.table) reportTable(b, blk.table, pageW);
+      else if (blk.image) imageParagraph(b, blk.image, images, pageW);
       else if (blk.heading) b.p(blk.heading, C_ITEM_BOLD);
       else if (blk.text != null) lines(blk.text).forEach((l) => b.p(l, blk.gray ? C_GRAY : C_BODY, blk.indent || 0));
     }
@@ -313,7 +335,8 @@ export async function hwpxReport(doc) {
   const first = (await res("first_paragraph.xml")).replace("{{LANDSCAPE}}", "WIDELY").replace("{{WIDTH}}", pageW).replace("{{HEIGHT}}", pageH).replaceAll("{{MARGIN}}", MARGIN);
   const section = (await res("section_head.xml")) + first + b.sb.join("") + "</hs:sec>";
   const title = doc.subtitle ? `${doc.title} - ${doc.subtitle}` : doc.title;
-  const hpf = (await res("content.hpf")).replaceAll("{{TITLE}}", esc(title)).replaceAll("{{DATE}}", today);
+  const hpf = (await res("content.hpf")).replaceAll("{{TITLE}}", esc(title)).replaceAll("{{DATE}}", today)
+    .replace("</opf:manifest>", images.map((_, i) => `<opf:item id="image${i + 1}" href="BinData/image${i + 1}.png" media-type="image/png" isEmbeded="1"/>`).join("") + "</opf:manifest>");
   return zip([
     ["mimetype", "application/hwp+zip"],
     ["version.xml", await res("version.xml")],
@@ -324,6 +347,7 @@ export async function hwpxReport(doc) {
     ["Contents/content.hpf", hpf],
     ["Contents/header.xml", await res("header.xml")],
     ["Contents/section0.xml", section],
+    ...images.map((im, i) => [`BinData/image${i + 1}.png`, im.png]),
     ["Preview/PrvText.txt", title],
   ], "application/hwp+zip");
 }

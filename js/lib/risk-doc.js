@@ -1,4 +1,4 @@
-// 리스크 대시보드(회사 대시보드·업권 현황)를 저장용 문서(doc)로 만든다. 형식은 report.js의 saveReport(PDF·한글 HWPX)가 받는 모양.
+// 리스크 대시보드(대시보드·업권 현황)를 저장용 문서(doc)로 만든다. 형식은 report.js의 saveReport(PDF·한글 HWPX)가 받는 모양.
 // 차트는 그림 대신 같은 값을 표로 담는다(앱 WebView에서도 한글 문서로 저장되고, PDF는 인쇄 창을 쓰므로).
 import { SECTOR_CFG, SEVERITY, distribution, latestMonth, monthsBack, ncrBasis, quadrantData, rankOf, rankSize, sanctionYears, sectorStat, seriesOf, severityOf, signals, valueAt, wonText } from "./risk.js";
 import { SECTOR_NAME } from "./risk.js";
@@ -11,7 +11,7 @@ const LEVEL = { warn: "주의", info: "참고", ok: "양호" };
 const NOTE = "자료출처: 금융감독원 금융통계정보시스템(FISIS), 전자공시시스템(DART), 금융감독원 제재공시. 회사 이름으로 자료를 맞춘 것이라 오류가 있을 수 있으며 참고용입니다. 업무에 인용할 때는 원문을 확인하세요.";
 
 export const DASH_PARTS = [
-  { id: "sum", label: "핵심 지표·리스크 신호" },
+  { id: "sum", label: "핵심 지표·체크 포인트" },
   { id: "trend", label: "건전성 추이 (업권 중앙값 비교 표)" },
   { id: "gov", label: "기업 개황·지배구조 (DART)" },
   { id: "sanc", label: "제재 이력" },
@@ -51,10 +51,10 @@ export function dashboardDoc(ids, { row, rows, sector, info, span = 8 }) {
       return [label, pct(v), v != null && prev != null ? `${(v - prev).toFixed(2)}%p` : "-", st ? pct(st.median) : "-", rk ? `${rk.rank}/${rk.n}위` : "-"];
     });
     const sig = signals({ row, rows, sector, month, cases, nowYear });
-    sections.push({ title: "핵심 지표·리스크 신호", note: `기준 ${ym(month)}${sector === "F" ? ` · 순자본비율 ${ncrBasis(row)}` : ""}`, blocks: [
+    sections.push({ title: "핵심 지표·체크 포인트", note: `기준 ${ym(month)}${sector === "F" ? ` · 순자본비율 ${ncrBasis(row)}` : ""}`, blocks: [
       { table: { head: ["지표", "값", "전분기 대비", "업권 중앙값", "업권 순위"], rows: trs, weights: [3, 1, 1, 1, 1] } },
       { text: `자산총계(별도): ${eok(row.assets)}` },
-      { heading: "리스크 신호 (업권 중앙값·추세·제재 이력 기준, 법정 기준선이 아닌 상대 비교)" },
+      { heading: "체크 포인트 (업권 중앙값·추세·제재 이력 기준, 법정 기준선이 아닌 상대 비교)" },
       ...sig.map((s) => ({ text: `[${LEVEL[s.level]}] ${s.text}`, indent: 1 })),
     ] });
   }

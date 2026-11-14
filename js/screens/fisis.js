@@ -1,4 +1,4 @@
-// 금융회사 주요 현황(FISIS): 권역 → 총자산 순 회사 목록(검색·비교 선택) → 회사 상세(재무현황·주요경영지표·최근 제재내역) / 비교.
+// 금융회사 주요 현황(FISIS): 권역 → 총자산 순 회사 목록(검색·비교 선택) → 회사 상세(대시보드·개황·재무손익·주요경영지표·최근 제재내역) / 비교.
 // 앱의 FisisScreen.kt·FisisApi.kt를 옮겼다. 자료는 서버(/fisis)가 금융통계정보시스템 Open API에서 받아 준다.
 import { setHeader } from "../app.js";
 import { api, cached, errorText, h, icon, loading, message, store, tabs, toast } from "../core.js";
@@ -256,13 +256,13 @@ async function detail(root, params, ctx, sector) {
     const fm = await import("../lib/fundaum.js");
     showFund = await fm.loadFundAum().then((d) => !!fm.findCompany(d, co.name, "F"), () => false);
   }
-  const tabNames = [...(SECTORS_RISK.includes(sector) ? ["회사 대시보드"] : []), "개황", "재무현황", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역", "뉴스"];
+  const tabNames = [...(SECTORS_RISK.includes(sector) ? ["대시보드"] : []), "개황", "재무손익", "주요경영지표", ...(showFund ? ["펀드 순자산"] : []), "최근 제재내역", "뉴스"];
   const tab = Math.min(+(params.tab || 0), tabNames.length - 1);
   const tabName = tabNames[tab];
   root.append(tabs(tabNames, tab, (i) => ctx.go({ ...params, tab: i }, { replace: true })));
   const body = h("div");
   root.append(body);
-  if (tabName === "회사 대시보드") return dashboardPane(body, params, co, sector, ctx, () => saveCompany(sector, sectorLabel, co, params));
+  if (tabName === "대시보드") return dashboardPane(body, params, co, sector, ctx, () => saveCompany(sector, sectorLabel, co, params));
   if (tabName === "개황") return overviewPane(body, co, sector, sectorLabel, ctx);
   if (tabName === "뉴스") {
     const m = await import("./news.js");
@@ -276,6 +276,7 @@ async function detail(root, params, ctx, sector) {
     const m = await import("../lib/fundaum.js");
     return m.fundAumPane(body, co.name, sector);
   }
+  if (tabName === "재무손익") return financePane(body, params, co, sector, sectorLabel, ctx);
   body.append(loading("경영정보를 불러오는 중…"));
   let profile;
   try {
@@ -285,20 +286,11 @@ async function detail(root, params, ctx, sector) {
   }
   if (!ctx.alive()) return;
   if (!profile.metrics.length) return body.replaceChildren(message(`이 회사는 ${sectorLabel} 자료를 찾지 못했습니다.`));
-  const basis = BASES.includes(params.basis) ? params.basis : "별도";
   body.replaceChildren();
-  if (tabName === "재무현황") {
-    body.append(h("div", { class: "row-gap" }, BASES.map((b) => h("button", { class: "pill" + (b === basis ? " on" : ""), type: "button", onclick: () => ctx.go({ ...params, basis: b, fm: null }, { replace: true }) }, `${b} 재무제표`))));
-    financeTab(body, sector, profile, basis, params.fm, (m) => ctx.go({ ...params, fm: m }, { replace: true }));
-    const home = homepage(co.name);
-    body.append(h("a", { class: "btn ghost", href: home.url, target: "_blank", rel: "noopener", style: { marginTop: "14px" } }, icon("external-link"), home.known ? `홈페이지 열기 (${home.url.replace("https://", "")})` : "공식 홈페이지 검색하기"));
-  } else {
-    ratioTab(body, sector, profile, params.rm, +(params.span || 4), (p) => ctx.go({ ...params, ...p }, { replace: true }));
-  }
+  ratioTab(body, sector, profile, params.rm, +(params.span || 4), (p) => ctx.go({ ...params, ...p }, { replace: true }));
   body.append(h("p", { class: "note", style: { marginTop: "12px" } }, `${SOURCE}. 금액은 억원 단위입니다. ${NOTICE}`));
 }
 
-/** 회사 대시보드: 건전성 추이·지배구조·제재 이력을 한 화면에(리스크 대시보드). 회사 상세의 첫 탭. */
 async function dashboardPane(body, params, co, sector, ctx, saveAll) {
   const [view, live, core] = await Promise.all([import("./risk-view.js"), import("../lib/risk-live.js"), import("../core.js")]);
   const go = (p) => (p.co === params.co ? ctx.go({ ...params, ...p }, { replace: true }) : p.co ? ctx.go({ sector: p.sector || sector, co: p.co }) : ctx.go({ tool: "risk", ...p, view: "overview" }));
@@ -321,44 +313,101 @@ async function overviewPane(body, co, sector, sectorLabel, ctx) {
     h("p", { class: "note", style: { marginTop: "12px" } }, `자료출처: 금융감독원 전자공시시스템(DART). ${sectorLabel} 회사 이름으로 맞춘 자료라 다를 수 있습니다.`));
 }
 
-function financeTab(body, sector, profile, basis, month, onMonth) {
+/** 재무손익 비교표 자료(FISIS): 최근 분기 + 직전 3개 사업연도 말. 이 기준(별도·연결)의 자료가 없으면 null. */
+function finCompare(profile, sector, basis) {
   const fin = group(profile, "fin", basis).filter((m) => m.basis === basis);
-  const funds = group(profile, "fund");
-  const months = monthsOf([...fin, ...funds]);
-  const selected = months.includes(month) ? month : months[0];
-  body.append(periodPicker(months, selected, profile.term, onMonth) || "");
-  if (!fin.length) {
-    body.append(h("p", { class: "note", style: { margin: "10px 0" } }, basis === "연결" ? "금융통계시스템엔 연결 재무정보 없음" : `${basis} 재무제표 자료가 없습니다.`));
-    if (basis === "연결") return;
-  }
+  if (!fin.length) return null;
+  const months = [...new Set(fin.flatMap((m) => (m.points || []).map((p) => p.month)))].sort().reverse();
+  const latest = months[0];
+  const fys = months.filter((m) => m.endsWith("12") && m !== latest).slice(0, 3);
   const metric = (k) => fin.find((m) => m.key === k);
-  body.append(sectionHeader(`재무상태 (${basis})`));
-  body.append(h("div", { class: "grid3 bal" }, ["assets", "liab", "equity"].map((k) => h("div", { class: "kpi" + (k === "assets" ? " hl" : "") }, h("small", null, FINANCE_LABELS[k]), h("b", null, amountOnly(metric(k), selected) ?? "-")))));
-  const liab = at(metric("liab"), selected)?.value;
-  const eq = at(metric("equity"), selected)?.value;
-  if (liab > 0 && eq > 0) {
-    const share = Math.min(0.98, Math.max(0.02, liab / (liab + eq)));
-    body.append(h("div", { class: "share-bar" }, h("span", { style: { flex: share } }), h("span", { style: { flex: 1 - share } })),
-      h("div", { class: "note" }, `■ 부채 ${(share * 100).toFixed(1)}%   ■ 자기자본 ${((1 - share) * 100).toFixed(1)}%`));
-  }
-  body.append(sectionHeader(`손익현황 (${basis})`));
-  const current = { H: "당반기", Y: "당기" }[profile.term] || "당분기";
+  const amt = (k, mo) => amountOnly(metric(k), mo) ?? "-";
   const card = sector === "C";
-  const cell = (m) => {
-    const v = at(m, selected)?.value;
-    return h("td", { class: "num" + (v != null && v < 0 ? " neg" : "") }, amountOnly(m, selected) ?? "-");
+  const current = { H: "당반기", Y: "당기" }[profile.term] || "당분기";
+  const end = { H: "반기말", Y: "연말" }[profile.term] || "분기말";
+  const bsMonths = [latest, ...fys];
+  const ratio = (mo) => {
+    const l = at(metric("liab"), mo)?.value, e = at(metric("equity"), mo)?.value;
+    return l != null && e > 0 ? ((l / e) * 100).toFixed(1) + "%" : "-";
   };
-  body.append(h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
-    h("thead", null, h("tr", null, h("th", null, "항목"), h("th", { class: "num" }, current), h("th", { class: "num" }, "누적"))),
-    h("tbody", null, (card ? CARD_PL_KEYS : DEFAULT_PL_KEYS).map((k) => h("tr", { class: k === "netincome" ? "bold" : "" },
-      h("td", null, (card ? CARD_PL_LABELS[k] : null) || FINANCE_LABELS[k]), cell(metric(k)), cell(metric(k + "_cum"))))))));
-  if (funds.length) {
-    body.append(sectionHeader("펀드 설정원본 · 순자산", null));
-    body.append(h("div", { class: "card list" }, funds.map((m) => {
-      const v = at(m, selected)?.value;
-      return h("div", { class: "item" }, h("div", { class: "body" }, m.label), h("b", null, v != null ? valueText(v, m.unit) : "-"));
-    })));
+  const keys = card ? CARD_PL_KEYS : DEFAULT_PL_KEYS;
+  return {
+    basis, latest,
+    bsHead: ["구분", `${monthLabel(latest)} (최근 ${end})`, ...fys.map(monthLabel)],
+    bsRows: [...["assets", "liab", "equity"].map((k) => [FINANCE_LABELS[k], ...bsMonths.map((m) => amt(k, m))]), ["부채비율(부채÷자기자본)", ...bsMonths.map(ratio)]],
+    plHead: ["구분", `${monthLabel(latest)} ${current}`, `${monthLabel(latest)} 누적`, ...fys.map((m) => `${m.slice(0, 4)}년 연간`)],
+    plRows: keys.map((k) => [(card ? CARD_PL_LABELS[k] : null) || FINANCE_LABELS[k], amt(k, latest), amt(k + "_cum", latest), ...fys.map((m) => amt(k + "_cum", m))]),
+    plBold: (i) => keys[i] === "netincome",
+  };
+}
+
+/** DART 재무 자료(/dart/finance)에서 고른 기준(별도·연결)의 자료만 남긴다. 없으면 null. */
+const dartBasis = (f, basis) => {
+  if (f.basis === basis && (f.balance?.length || f.income?.length)) return { ...f, separate: null };
+  const sep = f.separate;
+  return sep?.basis === basis && (sep.balance?.length || sep.income?.length) ? { ...f, ...sep, separate: null } : null;
+};
+/** FISIS에 없는 재무제표를 DART에서 찾는다. 모회사 자료는 쓰지 않는다. 돌려주는 값: { d(DART 회사), f(선택한 기준 자료) } 또는 null. */
+async function dartFinanceOf(name, basis) {
+  const [live, dart] = await Promise.all([import("../lib/risk-live.js"), import("./dart.js")]);
+  const d = await live.dartOf(name);
+  if (!d?.corp || (d.rel && d.rel !== "본인")) return null;
+  const f = dartBasis(await dart.finance(d.corp), basis);
+  return f ? { d, f } : null;
+}
+const dartSourceText = (basis, d) => `금융통계정보시스템(FISIS)에 ${basis} 재무제표가 없어 전자공시시스템(DART) 정기보고서의 ${basis} 재무제표로 대신 표시합니다. DART 회사: ${d.name || d.company?.name || "-"}(고유번호 ${d.corp})${d.match === "guess" ? " · 회사 이름으로 추정해 맞춘 자료라 다를 수 있습니다" : ""}.`;
+
+const cmpTable = (head, rows, bold) => h("div", { class: "tbl-wrap" }, h("table", { class: "tbl" },
+  h("thead", null, h("tr", null, head.map((x, i) => h("th", { class: i ? "num" : "" }, x)))),
+  h("tbody", null, rows.map((r, ri) => h("tr", { class: bold?.(ri) ? "bold" : "" }, r.map((v, i) => i ? h("td", { class: "num" + (String(v).startsWith("-") && v !== "-" ? " neg" : "") }, v) : h("td", null, v)))))));
+
+/** 재무손익 탭: 최근 분기 + 직전 3개 사업연도 비교. FISIS에 없는 재무제표(주로 연결)는 DART에서 찾고 출처를 밝힌다. */
+async function financePane(body, params, co, sector, sectorLabel, ctx) {
+  body.append(loading("재무 자료를 불러오는 중…"));
+  const basis = BASES.includes(params.basis) ? params.basis : "별도";
+  let profile = null;
+  let perr = null;
+  try {
+    profile = await profileOf(sector, co.code);
+  } catch (e) {
+    perr = e;
   }
+  if (!ctx.alive()) return;
+  const pills = h("div", { class: "row-gap" }, BASES.map((b) => h("button", { class: "pill" + (b === basis ? " on" : ""), type: "button", onclick: () => ctx.go({ ...params, basis: b }, { replace: true }) }, `${b} 재무제표`)));
+  const home = homepage(co.name);
+  const homeLink = h("a", { class: "btn ghost", href: home.url, target: "_blank", rel: "noopener", style: { marginTop: "14px" } }, icon("external-link"), home.known ? `홈페이지 열기 (${home.url.replace("https://", "")})` : "공식 홈페이지 검색하기");
+  const cmp = profile?.metrics?.length ? finCompare(profile, sector, basis) : null;
+  if (cmp) {
+    body.replaceChildren(pills, sectionHeader(`재무상태 (${basis})`), cmpTable(cmp.bsHead, cmp.bsRows),
+      sectionHeader(`손익 (${basis})`), cmpTable(cmp.plHead, cmp.plRows, cmp.plBold),
+      h("p", { class: "note" }, "연간 열은 해당 사업연도 말까지의 누적 값입니다. 최근 분기 열은 그 분기만의 값과 올해 누적 값을 함께 보여 줍니다."));
+    const funds = group(profile, "fund");
+    if (funds.length) {
+      body.append(sectionHeader("펀드 설정원본 · 순자산", null), h("div", { class: "card list" }, funds.map((m) => {
+        const v = at(m, cmp.latest)?.value;
+        return h("div", { class: "item" }, h("div", { class: "body" }, m.label), h("b", null, v != null ? valueText(v, m.unit) : "-"));
+      })));
+    }
+    body.append(homeLink, h("p", { class: "note", style: { marginTop: "12px" } }, `${SOURCE}. 금액은 억원 단위입니다. ${NOTICE}`));
+    return;
+  }
+  // FISIS에 이 기준의 재무제표가 없다 → DART에서 찾는다.
+  body.replaceChildren(pills, loading(`금융통계정보시스템에 ${basis} 재무제표가 없어 전자공시(DART)에서 찾는 중…`));
+  let got = null;
+  let derr = null;
+  try {
+    got = await dartFinanceOf(co.name, basis);
+  } catch (e) {
+    derr = e;
+  }
+  if (!ctx.alive()) return;
+  if (!got) {
+    const why = derr && perr ? errorText(derr) : `금융통계정보시스템과 전자공시(DART) 모두에서 ${basis} 재무제표를 찾지 못했습니다. ${basis === "연결" ? "연결 대상 종속회사가 없거나 DART 정기보고서 제출 대상이 아닌 회사일 수 있습니다. " : ""}`;
+    return body.replaceChildren(pills, message(why, { error: !!(derr && perr), action: derr && perr ? "다시 시도" : undefined, onAction: () => ctx.go(params, { replace: true }) }), homeLink);
+  }
+  const box = h("div");
+  (await import("./dart.js")).financeTab(box, got.f, {}, basis);
+  body.replaceChildren(pills, h("div", { class: "card", style: { margin: "10px 0", borderColor: "var(--acc)" } }, h("b", null, "자료 출처: 전자공시시스템(DART)"), h("p", { class: "note", style: { margin: "4px 0 0" } }, dartSourceText(basis, got.d))), box, homeLink);
 }
 
 function ratioTab(body, sector, profile, month, span, set) {
@@ -413,16 +462,17 @@ async function compare(root, params, ctx, sector) {
   root.append(h("p", { class: "note", style: { marginTop: "10px" } }, "각 회사의 FISIS 최근 시점 기준입니다. 시점이 다르면 위의 기준 시점을 확인하세요."));
 }
 
-// ---- PDF·한글 저장: 재무현황·주요경영지표·최근 제재내역 ----
+// ---- PDF·한글 저장: 개황·주가·재무손익·주요경영지표·대시보드·제재(모든 탭의 저장 단추가 같은 저장 창을 연다) ----
 async function saveCompany(sector, sectorLabel, co, params) {
   const { saveReport } = await import("../lib/report.js");
   await saveReport({
     title: `${co.name} 저장`,
     parts: [
       { id: "ovw", label: "개황 (DART 기업 개황·최대주주)" },
-      { id: "fin", label: "재무·손익현황 (별도·연결)" },
+      { id: "price", label: "주가 그래프 (최근 1년, 상장사만)" },
+      { id: "fin", label: "재무손익 (최근 분기·최근 3개 사업연도 비교, 별도·연결)" },
       { id: "ratio", label: RATIO_ROWS[sector] ? "주요경영지표 (최근 8개 시점)" : "주요경영지표 (이 권역은 제공 안 함)", checked: !!RATIO_ROWS[sector] },
-      ...(SECTORS_RISK.includes(sector) ? [{ id: "dash", label: "회사 대시보드 (핵심 지표·리스크 신호·건전성 추이)" }] : []),
+      ...(SECTORS_RISK.includes(sector) ? [{ id: "dash", label: "대시보드 (핵심 지표·체크 포인트·건전성 추이)" }] : []),
       { id: "sanction", label: "제재공시 (2011년 이후 금감원 제재공시 전체)" },
     ],
     build: (ids) => companyDoc(ids, sector, sectorLabel, co, params),
@@ -430,12 +480,12 @@ async function saveCompany(sector, sectorLabel, co, params) {
 }
 
 async function companyDoc(ids, sector, sectorLabel, co, params) {
-  const profile = await profileOf(sector, co.code);
+  const profile = await profileOf(sector, co.code).catch(() => ({ metrics: [], basisOptions: [] })); // 금융통계가 안 와도 DART 등 나머지는 저장
   const sections = [];
   const ovwSecs = [], dashSecs = [];
   const term = termLabel(profile.term) || "기준";
   if (ids.has("dash") || ids.has("ovw")) {
-    // 회사 대시보드·개황: 리스크 대시보드와 같은 자료·같은 표를 그대로 쓴다(실패해도 나머지 저장은 계속).
+    // 대시보드·개황: 리스크 대시보드와 같은 자료·같은 표를 그대로 쓴다(실패해도 나머지 저장은 계속).
     try {
       const [live, rd] = await Promise.all([import("../lib/risk-live.js"), import("../lib/risk-doc.js")]);
       if (SECTORS_RISK.includes(sector)) {
@@ -445,49 +495,47 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
         const want = new Set([ids.has("dash") && row ? "sum" : null, ids.has("dash") && row ? "trend" : null, ids.has("ovw") ? "gov" : null].filter(Boolean));
         if (want.size) {
           const d = rd.dashboardDoc(want, { row: row || { code: co.code, name: co.name }, rows, sector, info });
-          const order = ["핵심 지표·리스크 신호", "건전성 추이", "기업 개황·지배구조"];
+          const order = ["핵심 지표·체크 포인트", "건전성 추이", "기업 개황·지배구조"];
           d.sections.sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
           d.sections.forEach((x) => (x.title === "기업 개황·지배구조" ? ovwSecs : dashSecs).push(x.title === "기업 개황·지배구조" ? { ...x, title: "개황" } : x));
         }
       } else if (ids.has("ovw")) ovwSecs.push({ ...rd.govSection(await live.dartOf(co.name)), title: "개황" });
     } catch (e) {
-      (ids.has("ovw") ? ovwSecs : dashSecs).push({ title: ids.has("ovw") ? "개황" : "회사 대시보드", blocks: [{ text: "이 자료를 불러오지 못해 저장하지 못했습니다: " + errorText(e), gray: true }] });
+      (ids.has("ovw") ? ovwSecs : dashSecs).push({ title: ids.has("ovw") ? "개황" : "대시보드", blocks: [{ text: "이 자료를 불러오지 못해 저장하지 못했습니다: " + errorText(e), gray: true }] });
     }
   }
   sections.push(...ovwSecs);
+  if (ids.has("price")) {
+    try {
+      const ci = (await (await import("../lib/risk-live.js")).dartOf(co.name))?.company;
+      sections.push(await (await import("../lib/stockchart.js")).stockSection(ci?.stock, ci?.cls));
+    } catch (e) {
+      sections.push({ title: "주가 (최근 1년)", blocks: [{ text: "주가 자료를 불러오지 못해 넣지 못했습니다: " + errorText(e), gray: true }] });
+    }
+  }
   if (ids.has("fin")) {
     const funds = group(profile, "fund");
-    const allFin = group(profile, "fin").filter((m) => m.basis);
-    const month = (() => {
-      const ms = monthsOf([...allFin, ...funds]);
-      return ms.includes(params.fm) ? params.fm : ms[0];
-    })();
     const blocks = [];
-    const card = sector === "C";
-    const current = { H: "당반기", Y: "당기" }[profile.term] || "당분기";
+    let latest = null;
     for (const basis of BASES) {
-      const fin = allFin.filter((m) => m.basis === basis);
-      if (!fin.length) {
-        if (basis === "연결") blocks.push({ text: "연결 재무제표: 금융통계정보시스템에 연결 재무정보가 없습니다.", gray: true });
+      const cmp = finCompare(profile, sector, basis);
+      if (cmp) {
+        latest = latest || cmp.latest;
+        blocks.push({ heading: `재무상태 (${basis}) · 단위 억원` }, { table: { head: cmp.bsHead, rows: cmp.bsRows, weights: [2.2, ...cmp.bsHead.slice(1).map(() => 1)] } });
+        blocks.push({ heading: `손익 (${basis}) · 단위 억원` }, { table: { head: cmp.plHead, rows: cmp.plRows, bold: cmp.plBold, weights: [2.2, ...cmp.plHead.slice(1).map(() => 1)] } });
+        blocks.push({ text: "출처: 금융감독원 금융통계정보시스템(FISIS). 연간 열은 해당 사업연도 말까지의 누적 값입니다.", gray: true });
         continue;
       }
-      const metric = (k) => fin.find((m) => m.key === k);
-      const liab = at(metric("liab"), month)?.value, eq = at(metric("equity"), month)?.value;
-      const bal = ["assets", "liab", "equity"].map((k) => [FINANCE_LABELS[k], amountOnly(metric(k), month) ?? "-"]);
-      if (liab > 0 && eq > 0) bal.push(["부채비율(부채÷자기자본)", ((liab / eq) * 100).toFixed(1) + "%"]);
-      blocks.push({ heading: `재무상태 (${basis}) · 단위 억원` }, { table: { head: ["항목", "금액"], rows: bal, weights: [2, 1] } });
-      const keys = card ? CARD_PL_KEYS : DEFAULT_PL_KEYS;
-      blocks.push({ heading: `손익현황 (${basis}) · 단위 억원` }, {
-        table: {
-          head: ["항목", current, "누적"],
-          rows: keys.map((k) => [(card ? CARD_PL_LABELS[k] : null) || FINANCE_LABELS[k], amountOnly(metric(k), month) ?? "-", amountOnly(metric(k + "_cum"), month) ?? "-"]),
-          bold: (i) => keys[i] === "netincome",
-        },
-      });
+      // FISIS에 없는 재무제표는 전자공시(DART)에서 찾아 출처를 밝힌다.
+      let got = null;
+      try {
+        got = await dartFinanceOf(co.name, basis);
+      } catch {}
+      if (got) blocks.push({ heading: `${basis} 재무제표 (전자공시 DART)` }, { text: "출처: " + dartSourceText(basis, got.d), gray: true }, ...(await import("./dart.js")).financeBlocks(got.f, false));
+      else blocks.push({ text: `${basis} 재무제표: 금융통계정보시스템과 전자공시(DART) 모두에서 찾지 못했습니다.`, gray: true });
     }
-    if (funds.length) blocks.push({ heading: "펀드 설정원본 · 순자산" }, { table: { head: ["항목", "금액"], rows: funds.map((m) => [m.label, at(m, month)?.value != null ? valueText(at(m, month).value, m.unit) : "-"]), weights: [2, 1] } });
-    if (!blocks.length) blocks.push({ text: "재무 자료가 없습니다.", gray: true });
-    sections.push({ title: "재무·손익현황", note: `기준 시점: ${month ? monthLabel(month) : "-"} (${term})`, blocks });
+    if (funds.length && latest) blocks.push({ heading: "펀드 설정원본 · 순자산" }, { table: { head: ["항목", "금액"], rows: funds.map((m) => [m.label, at(m, latest)?.value != null ? valueText(at(m, latest).value, m.unit) : "-"]), weights: [2, 1] } });
+    sections.push({ title: "재무손익", note: "최근 분기와 직전 3개 사업연도 비교", blocks });
   }
   if (ids.has("ratio")) {
     const rows = RATIO_ROWS[sector];
