@@ -22,7 +22,7 @@ const preFresh = () => cached("risk:pre:ok", TTL, async () => {
 });
 const prePeers = async (sector) => { await preFresh(); const d = await pre(`peers-${sector}.json`); if (!d.rows?.length) throw new Error("빈 자료"); return d.rows; };
 const KEEP = ["bis", "npl", "delinq", "ncr", "ncr_c", "lev", "liq", "solv", "adj", "lcr"];
-const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
+const clean = (n) => String(n || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim().replace(/지주회사$/, "지주");
 // 이름 검색으로는 같은 이름의 옛 법인(폐지·합병)과 섞이거나 공시회사명 목록에서 빠지는 회사의 DART 고유번호. DART 누리집에서 최근 사업보고서(또는 공시) 제출을 확인한 현행 법인만 둔다(2026-11-13 확인).
 // 국민은행(060000)·신한은행·하나은행·우리은행·농협은행·KB증권(공시회사명 케이비증권)은 모두 자체 DART 자료가 있어 모회사로 대신하지 않는다.
 export const OWN_DART = { 국민은행: "00386937", 신한은행: "00149293", 하나은행: "00158909", 우리은행: "00254045", 농협은행: "00908757", "KB증권": "00164876", "kb국민은행": "00386937", 케이비국민은행: "00386937", "nh농협은행": "00908757", 엔에이치농협은행: "00908757", "kb증권": "00164876", 케이비증권: "00164876" };

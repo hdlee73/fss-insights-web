@@ -308,7 +308,7 @@ export async function companyPane(body, name) {
     const list = h("div", { class: "list" });
     for (const a of page.articles) list.append(articleRow(a));
     body.replaceChildren(
-      h("p", { class: "note" }, `「${N.companySearchName(name)}」 최근 3일 기사 ${page.articles.length}건 · ${String(page.note).split(" (")[0]}`),
+      h("p", { class: "note" }, `「${N.companySearchName(name)}」${page.names?.length > 1 ? `(${page.names.slice(1, 4).join(", ")} 포함)` : ""} 최근 3일 기사 ${page.articles.length}건 · ${String(page.note).split(" (")[0]}`),
       page.articles.length ? list : message("최근 3일 안에 이 회사 이름이 나온 기사를 찾지 못했습니다."));
   } catch (e) {
     body.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => companyPane(body, name) }));

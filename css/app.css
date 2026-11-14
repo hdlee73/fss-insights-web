@@ -672,6 +672,7 @@ body.rp-view .print-doc .rp-tbl tr { break-inside: avoid; }
    저장용 문서를 화면에서도 보이는 미리보기(rp-view)로 띄운 뒤 인쇄한다. 화면에는 이 문서만 보인다. */
 body.rp-view { display: block !important; overflow: auto !important; height: auto !important; background: #e4e9f1 !important; }
 body.rp-view > *:not(.print-doc):not(.rp-bar) { display: none !important; }
+body.rp-view.rp-view > iframe.html2canvas-container { display: block !important; } /* PDF 공유용 그림 만들기(html2canvas)가 쓰는 보이지 않는 틀 */
 body.rp-view .print-doc.rp { display: block; box-sizing: border-box; max-width: 210mm; margin: 64px auto 28px; padding: 14mm 12mm; background: #fff; box-shadow: 0 2px 14px rgba(20, 40, 80, .18); }
 .rp-bar { position: fixed; top: 0; left: 0; right: 0; z-index: 99999; display: flex; gap: 8px; align-items: center; justify-content: flex-end; padding: 8px 12px; background: #1f3a68; color: #fff; font-size: 13px; }
 .rp-bar span { margin-right: auto; opacity: .85; }
@@ -1217,3 +1218,6 @@ textarea.facts { width: 100%; padding: 10px; border: 1px solid var(--line); bord
 .rk-stats b { color: var(--fg); }
 @media (max-width: 720px) { .rk-rank { grid-template-columns: 24px 1fr 110px; } .rk-rank .rb { grid-column: 2 / -1; grid-row: 2; } }
 .rk-save { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+.tbl .stmt-link { cursor: pointer; }
+.tbl td.stmt-link:hover { background: #f6f9ff; text-decoration: underline dotted; }
+.modal.wide .modal-body { max-height: 70vh; overflow: auto; }
