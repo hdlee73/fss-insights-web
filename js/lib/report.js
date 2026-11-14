@@ -41,6 +41,15 @@ export async function saveReport({ title, parts, build }) {
   } else printReport(doc, base);
 }
 
+/** 파일을 만드는 동안 눌린 시간이 오래 지나 브라우저가 공유를 막을 수 있어(특히 아이폰), 그럴 때는 한 번 더 눌러 공유하게 한다. */
+async function shareReady(blob, name, title) {
+  if (navigator.userActivation && !navigator.userActivation.isActive) {
+    const ok = await dialog({ title: "공유할 파일이 준비됐어요", text: name, ok: "공유", cancel: "취소" });
+    if (!ok) return;
+  }
+  await shareFile(blob, name, title);
+}
+
 /** 인쇄 창(→ PDF로 저장) */
 export function printReport(doc, base) {
   const el = h("div", { class: "print-doc rp" });
@@ -76,12 +85,19 @@ export function printReport(doc, base) {
   // 화면에 저장용 문서만 보이는 미리보기를 띄운 뒤 인쇄한다(휴대폰 브라우저는 print 전용 CSS를 따르지 않고 화면을 그대로 찍는 일이 있다).
   const bar = h("div", { class: "rp-bar" }, h("span", null, "저장 미리보기"),
     h("button", { type: "button", class: "primary", onclick: () => window.print() }, "PDF로 저장(인쇄)"),
-    // PDF는 브라우저 인쇄 기능으로만 만들어져 파일을 넘길 수 없으므로, 같은 내용을 한글(HWPX) 파일로 만들어 공유한다.
+    // PDF 파일 자체를 만들어 카카오톡 등 공유 창으로 보낸다(브라우저 인쇄 기능은 파일을 넘길 수 없어, 화면의 문서를 쪽별 그림으로 담은 PDF를 만든다).
+    navigator.share ? h("button", { type: "button", onclick: async () => {
+      try {
+        toast("공유할 PDF 파일을 만드는 중…");
+        const { elementToPdf } = await import("./pdfshare.js");
+        await shareReady(await elementToPdf(el), base + ".pdf", doc.title);
+      } catch (e) { toast("공유할 PDF를 만들지 못했어요: " + errorText(e)); }
+    } }, "PDF 공유") : null,
     navigator.share ? h("button", { type: "button", onclick: async () => {
       try {
         toast("공유할 한글(HWPX) 파일을 만드는 중…");
         const { hwpxReport } = await import("./hwpx.js");
-        await shareFile(await hwpxReport(doc), base + ".hwpx", doc.title);
+        await shareReady(await hwpxReport(doc), base + ".hwpx", doc.title);
       } catch (e) { toast("공유할 파일을 만들지 못했어요: " + errorText(e)); }
     } }, "공유(한글 파일)") : null,
     h("button", { type: "button", onclick: () => done() }, "닫기"));

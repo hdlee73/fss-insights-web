@@ -252,7 +252,8 @@ async function detail(root, params, ctx) {
 const PERIODS = [["1일", 1], ["1주", 5], ["1개월", 21], ["3개월", 63], ["1년", 260]];
 const START = [() => todayStr(), () => daysAgo(7), () => monthsAgo(1), () => monthsAgo(3), () => yearsAgo(1)];
 
-async function stockCard(box, c, params, ctx) {
+/** 주가 카드. opts.key·opts.def: 기간 선택을 기억할 저장 이름과 기본 기간(0일·1주·1개월·3개월·1년 순서의 번호). 다른 화면(금융회사 개황)에서도 쓴다. */
+export async function stockCard(box, c, params, ctx, opts = {}) {
   const sym = symbolOf(c);
   if (!sym || box.dataset.sym === sym) return;
   box.dataset.sym = sym;
@@ -266,7 +267,8 @@ async function stockCard(box, c, params, ctx) {
     return card.replaceChildren(h("div", { class: "note" }, "주가"), message("시세를 불러오지 못했습니다.", { error: true, action: "다시 시도", onAction: () => ((box.dataset.sym = ""), stockCard(box, c, params, ctx)) }));
   }
   if (!ctx.alive()) return;
-  let period = store.get("dart.stockPeriod", 3);
+  const periodKey = opts.key || "dart.stockPeriod";
+  let period = store.get(periodKey, opts.def ?? 3);
   const ch = changeOf(q);
   const p = percentOf(q);
   const chart = h("div", { class: "stock-chart" });
@@ -279,7 +281,7 @@ async function stockCard(box, c, params, ctx) {
     chart, pills, foot);
 
   async function draw() {
-    pills.replaceChildren(...PERIODS.map(([l], i) => h("button", { class: "pill sm" + (i === period ? " on" : ""), type: "button", onclick: () => ((period = i), store.set("dart.stockPeriod", i), draw()) }, l)));
+    pills.replaceChildren(...PERIODS.map(([l], i) => h("button", { class: "pill sm" + (i === period ? " on" : ""), type: "button", onclick: () => ((period = i), store.set(periodKey, i), draw()) }, l)));
     const [label, count] = PERIODS[period];
     let start = "";
     let change = "";

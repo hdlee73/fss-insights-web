@@ -53,7 +53,8 @@ const HOMEPAGES = [
   ["SBI저축은행", "https://www.sbisb.co.kr"], ["OK저축은행", "https://www.oksavingsbank.com"], ["웰컴저축은행", "https://www.welcomebank.co.kr"],
 ];
 
-export const cleanCompanyName = (name) => String(name || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim();
+// 금융지주회사는 통용 이름대로 "…지주"로 줄인다(신한금융지주회사 → 신한금융지주).
+export const cleanCompanyName = (name) => String(name || "").replace(/\(\s*주\s*\)|㈜|주식회사/g, " ").replace(/\s+/g, " ").trim().replace(/지주회사$/, "지주");
 const monthLabel = (m) => (/^\d{6}$/.test(m) ? `${m.slice(0, 4)}.${m.slice(4)}` : m);
 const termLabel = (t) => ({ Q: "분기", H: "반기", Y: "연간" })[t] || "";
 
@@ -313,9 +314,15 @@ async function overviewPane(body, co, sector, sectorLabel, ctx) {
     return body.replaceChildren(message(errorText(e), { error: true, action: "다시 시도", onAction: () => ctx.go({ sector, co: co.code, tab: 0 }, { replace: true }) }));
   }
   if (!ctx.alive()) return;
+  // 상장사(종목코드 6자리, 본인 자료)는 개황 위에 주가 추이(기본 1년)를 바로 보여 준다.
+  const co2 = dart.company || {};
+  const listed = (!dart.rel || dart.rel === "본인") && /^\d{6}$/.test(co2.stock || "");
+  const stockBox = h("div", { style: { marginBottom: "12px" } });
   body.replaceChildren(
+    listed ? stockBox : null,
     h("div", { class: "card" }, view.govBody(dart)),
     h("p", { class: "note", style: { marginTop: "12px" } }, `자료출처: 금융감독원 전자공시시스템(DART). ${sectorLabel} 회사 이름으로 맞춘 자료라 다를 수 있습니다.`));
+  if (listed) (await import("./dart.js")).stockCard(stockBox, { stock: co2.stock, cls: co2.cls }, {}, ctx, { key: "fisis.stockPeriod", def: 4 });
 }
 
 /** 재무손익 비교표 자료(FISIS): 최근 분기 + 직전 3개 사업연도 말. 이 기준(별도·연결)의 자료가 없으면 null. */

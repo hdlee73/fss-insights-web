@@ -1,6 +1,7 @@
 // 뉴스검색 핵심(앱 NewsRepository·NewsProviders·SearchQuery·PublisherCatalog·NewsText·KeywordTrend와 같은 규칙).
 // 네이버 뉴스(서버 /news, 키는 서버 비밀값)를 먼저 쓰고, 안 되면 Google 뉴스 RSS(서버 /fetch)로 대신 찾는다.
 import { api, fetchSite, store } from "../core.js";
+import * as dm from "./dartmatch.js";
 
 export const DEFAULT_KEYWORDS = ["금융감독원", "증권사", "자산운용사", "금융투자", "금융사고", "금감원 제재", "불완전판매", "내부통제", "사모펀드", "공매도"];
 export const SCOPES = [["MAJOR_30", "30대 언론"], ["ALL", "전체 언론"]];
@@ -280,22 +281,88 @@ export async function home(s = settings()) {
   return { ...refine(fetched, s, terms), fetched: fetched.length, hasMore: false, nextStart: 1, note: noteText(note), failed };
 }
 
-/** 회사별 뉴스: 최근 3일, 회사명이 제목·요약에 든 기사만(언론 범위는 전체). */
+/** 회사별 뉴스: 최근 3일, 회사명이 제목·요약에 든 기사만(언론 범위는 전체). 영문·약칭 이름으로도 찾아 합친다. */
 const coCache = new Map();
 export const companySearchName = (name) => String(name || "").replace(/\(주\)|㈜|주식회사/g, "").replace(/\s+/g, " ").trim();
-export async function companyNews(name) {
+
+// 기사에서 자주 쓰는 약칭·영문 표기(회사 이름은 base()로 공백 없이 소문자로 비교). 규칙으로 풀리지 않는 곳만 둔다.
+const NEWS_ALIAS = {
+  농협금융지주: ["NH농협금융지주", "NH금융지주", "농협금융", "NH금융", "농협지주"],
+  우리금융지주: ["우리금융", "우리지주"],
+  신한금융지주: ["신한금융", "신한지주"],
+  하나금융지주: ["하나금융", "하나지주"],
+  메리츠금융지주: ["메리츠금융", "메리츠지주"],
+  한국투자금융지주: ["한국투자금융", "한투지주", "한국금융지주"],
+  디지비금융지주: ["DGB금융지주", "DGB금융", "DGB"],
+  제이비금융지주: ["JB금융지주", "JB금융", "JB"],
+  중소기업은행: ["IBK기업은행", "기업은행", "IBK"],
+  산업은행: ["KDB산업은행", "한국산업은행", "KDB"],
+  한국산업은행: ["KDB산업은행", "산업은행", "KDB"],
+  한국씨티은행: ["씨티은행", "한국씨티", "씨티"],
+  에스씨제일은행: ["SC제일은행", "제일은행"],
+  제일은행: ["SC제일은행"],
+  카카오뱅크: ["카뱅"],
+  케이뱅크: ["K뱅크", "케이뱅크"],
+  농협은행: ["NH농협은행", "NH은행"],
+  엔에이치투자증권: ["NH투자증권", "NH증권"],
+  한국투자증권: ["한투증권", "한국투자"],
+  삼성화재해상보험: ["삼성화재"],
+  현대해상화재보험: ["현대해상"],
+  디비손해보험: ["DB손해보험", "DB손보"],
+  케이비손해보험: ["KB손해보험", "KB손보"],
+  케이비증권: ["KB증권"],
+  케이비국민카드: ["KB국민카드", "국민카드"],
+  케이비라이프생명: ["KB라이프", "KB라이프생명"],
+  교보생명보험: ["교보생명"],
+  한화생명보험: ["한화생명"],
+  삼성생명보험: ["삼성생명"],
+  신한라이프생명보험: ["신한라이프"],
+  엔에이치농협생명보험: ["NH농협생명", "농협생명"],
+  엔에이치농협손해보험: ["NH농협손해보험", "농협손보", "농협손해보험"],
+};
+
+/** 뉴스 검색에 쓸 이름들(앞쪽일수록 우선): 원래 이름, 영문↔한글 읽기, 줄임말(…금융지주→…금융), 별칭 사전. */
+export function newsNames(name) {
   const key = companySearchName(name);
-  if (!key) return { articles: [], note: "", failed: 0 };
+  if (!key) return [];
+  const out = [key];
+  const add = (v) => { v = String(v || "").trim(); if (v.length >= 2 && !out.some((o) => o.replace(/\s/g, "").toLowerCase() === v.replace(/\s/g, "").toLowerCase())) out.push(v); };
+  const compact = key.replace(/\s/g, "");
+  for (const a of NEWS_ALIAS[dm.base(compact)] || []) add(a);
+  const latin = dm.latinize(dm.base(compact));
+  const upperLatin = (t) => t.replace(/^[a-z]{2,4}/, (m) => m.toUpperCase());
+  const forms = [compact];
+  if (latin !== dm.base(compact)) { forms.push(upperLatin(latin)); add(upperLatin(latin)); } // 케이비금융지주 → KB금융지주
+  else if (/^[A-Za-z]{2,4}/.test(compact)) add(dm.hangulize(dm.base(compact))); // KB금융지주 → 케이비금융지주
+  for (const f of [...forms].reverse()) {
+    const m = f.match(/^(.*?)(금융)?지주(회사)?$/);
+    if (m && m[1]) {
+      add(m[1] + "금융"); // KB금융
+      if (/^[A-Za-z]{3,4}$/.test(m[1])) add(m[1]); // BNK, DGB처럼 그 자체가 통용되는 영문 약칭
+      add(m[1] + " 지주"); // KB 지주
+      add(m[1] + "지주");
+    }
+    const t = f.replace(/(생명|화재해상|해상화재)보험$/, "$1").replace(/화재해상$/, "화재").replace(/해상화재$/, "해상");
+    if (t !== f) add(t);
+  }
+  return out.slice(0, 8);
+}
+
+export async function companyNews(name) {
+  const names = newsNames(name);
+  if (!names.length) return { articles: [], note: "", failed: 0 };
+  const key = names[0];
   const hit = coCache.get(key);
   if (hit && Date.now() - hit.at < 3 * 60 * 1000) return hit.page;
   const note = {};
-  const page = await naverFirst(`"${key}"`, "DAY3", 1, 100, note);
+  const { res, failed } = await gather(names.slice(0, 5).map((n) => ({ run: () => naverFirst(`"${n}"`, "DAY3", 1, 100, note) })));
+  const pages = res.filter((r) => r.status === "fulfilled").map((r) => r.value);
   const compact = (t) => t.replace(/\s+/g, "").toLowerCase();
-  const k = compact(key);
+  const ks = names.map(compact);
   const cutoff = Date.now() - 3 * 864e5;
-  const raw = page.articles.filter((a) => a.at >= cutoff && compact(`${a.title} ${a.summary}`).includes(k));
-  const r = refine(raw, { scope: "ALL" }, [key]);
-  const out = { articles: r.articles, note: noteText(note), failed: 0 };
+  const raw = pages.flatMap((p) => p.articles).filter((a) => a.at >= cutoff && ks.some((k) => compact(`${a.title} ${a.summary}`).includes(k)));
+  const r = refine(raw, { scope: "ALL" }, names);
+  const out = { articles: r.articles, note: noteText(note), failed, names };
   coCache.set(key, { at: Date.now(), page: out });
   return out;
 }
