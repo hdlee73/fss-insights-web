@@ -55,8 +55,8 @@ class Body {
   next() {
     return this.id++;
   }
-  p(text = "", char = C_BODY, depth = 0) {
-    this.sb.push(pXml(this.next(), text, char, pIndent(depth)));
+  p(text = "", char = C_BODY, depth = 0, para = null) {
+    this.sb.push(pXml(this.next(), text, char, para ?? pIndent(depth)));
     this.used += sizeOf(char) * 1.3 * wrap(text, this.width - depth * 1400, sizeOf(char)).length;
   }
   raw(x) {
@@ -252,7 +252,7 @@ export async function hwpx(tree, opt) {
 
 // ---- 일반 보고서(회사 정보 등) ----
 // doc = { title, subtitle, meta:[문자열], sections:[{ title, note, blocks:[{kv:[[항목,값]]} | {table:{head, rows, weights, num}} | {text, gray}] }], footer:[문자열] }
-const P_RIGHT = 28;
+const P_RIGHT = 28, P_KEEP = 29; // P_KEEP: 다음 문단과 같은 쪽에 두는 문단 모양
 function reportTable(b, t, pageW) {
   const n = t.head.length;
   const weights = t.weights || t.head.map((_, i) => (i === 0 ? 1.6 : 1));
@@ -265,7 +265,7 @@ function reportTable(b, t, pageW) {
   const rowH = (row, head) => Math.max(head ? 1200 : 0, Math.floor(Math.max(...row.map((v, c) => linesOf(v, c).length)) * lineH + pad * 2));
   const heights = [rowH(t.head, true), ...t.rows.map((r) => rowH(r))];
   const sb = [];
-  sb.push(`<hp:tbl id="${b.next()}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="CELL" repeatHeader="1" rowCnt="${t.rows.length + 1}" colCnt="${n}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">`);
+  sb.push(`<hp:tbl id="${b.next()}" zOrder="0" numberingType="TABLE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" pageBreak="${t.rows.length > 38 ? "CELL" : "NONE"}" repeatHeader="1" rowCnt="${t.rows.length + 1}" colCnt="${n}" cellSpacing="0" borderFillIDRef="3" noAdjust="0">`);
   sb.push(`<hp:sz width="${widths.reduce((s, w) => s + w, 0)}" widthRelTo="ABSOLUTE" height="${heights.reduce((s, x) => s + x, 0)}" heightRelTo="ABSOLUTE" protect="0"/>`);
   sb.push(`<hp:pos treatAsChar="0" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`);
   sb.push(`<hp:outMargin left="0" right="0" top="0" bottom="0"/><hp:inMargin left="${pad}" right="${pad}" top="${pad}" bottom="${pad}"/>`);
@@ -287,24 +287,34 @@ function reportTable(b, t, pageW) {
   b.raw(`<hp:p id="${b.next()}" paraPrIDRef="0" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">${sb.join("")}<hp:t/></hp:run></hp:p>`);
 }
 
-/** 그림(PNG) 한 장을 글자처럼 놓인 문단으로 넣는다. images에 쌓아 두면 호출한 쪽이 BinData로 묶는다. */
-function imageParagraph(b, im, images, pageW) {
-  images.push(im);
-  const id = `image${images.length}`;
-  const w = Math.min(pageW - MARGIN * 2 - 400, 44000);
-  const hgt = Math.round((w * im.height) / im.width);
-  const nid = b.next();
-  b.raw(`<hp:p id="${b.next()}" paraPrIDRef="${P_CENTER}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">`
-    + `<hp:pic id="${nid}" zOrder="0" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="${b.next()}" reverse="0">`
-    + `<hp:offset x="0" y="0"/><hp:orgSz width="${w}" height="${hgt}"/><hp:curSz width="${w}" height="${hgt}"/><hp:flip horizontal="0" vertical="0"/>`
+/**
+ * 그림(PNG)을 글자처럼 놓인 문단으로 넣는다. ims가 둘이면 한 줄에 나란히 놓는다. images에 쌓아 두면 호출한 쪽이 BinData로 묶는다.
+ * orgSz·imgDim은 원본 그림 크기(96dpi 픽셀 × 75), curSz·sz는 표시 크기다. 둘이 같으면 한글이 그림을 실제보다 크게 그리므로 구분해야 한다.
+ */
+function imageParagraph(b, ims, images, pageW) {
+  const full = pageW - MARGIN * 2;
+  const each = ims.length > 1 ? Math.floor((full - 600) / ims.length) : Math.min(full - 400, ims[0].wide ? 44000 : 40000);
+  const pics = ims.map((im) => {
+    images.push(im);
+    const id = `image${images.length}`;
+    const w = each, hgt = Math.round((w * im.height) / im.width);
+    const ow = im.width * 75, oh = im.height * 75;
+    const sx = (w / ow).toFixed(6), sy = (hgt / oh).toFixed(6);
+    return { hgt, xml: `<hp:pic id="${b.next()}" zOrder="0" numberingType="PICTURE" textWrap="TOP_AND_BOTTOM" textFlow="BOTH_SIDES" lock="0" dropcapstyle="None" href="" groupLevel="0" instid="${b.next()}" reverse="0">`
+    + `<hp:offset x="0" y="0"/><hp:orgSz width="${ow}" height="${oh}"/><hp:curSz width="${w}" height="${hgt}"/><hp:flip horizontal="0" vertical="0"/>`
     + `<hp:rotationInfo angle="0" centerX="${Math.round(w / 2)}" centerY="${Math.round(hgt / 2)}" rotateimage="1"/>`
-    + `<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>`
-    + `<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="${w}" y="0"/><hc:pt2 x="${w}" y="${hgt}"/><hc:pt3 x="0" y="${hgt}"/></hp:imgRect>`
-    + `<hp:imgClip left="0" right="${w}" top="0" bottom="${hgt}"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="${w}" dimheight="${hgt}"/>`
+    + `<hp:renderingInfo><hc:transMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/><hc:scaMatrix e1="${sx}" e2="0" e3="0" e4="0" e5="${sy}" e6="0"/><hc:rotMatrix e1="1" e2="0" e3="0" e4="0" e5="1" e6="0"/></hp:renderingInfo>`
+    + `<hp:imgRect><hc:pt0 x="0" y="0"/><hc:pt1 x="${ow}" y="0"/><hc:pt2 x="${ow}" y="${oh}"/><hc:pt3 x="0" y="${oh}"/></hp:imgRect>`
+    + `<hp:imgClip left="0" right="${ow}" top="0" bottom="${oh}"/><hp:inMargin left="0" right="0" top="0" bottom="0"/><hp:imgDim dimwidth="${ow}" dimheight="${oh}"/>`
     + `<hc:img binaryItemIDRef="${id}" bright="0" contrast="0" effect="REAL_PIC" alpha="0"/><hp:effects/>`
     + `<hp:sz width="${w}" widthRelTo="ABSOLUTE" height="${hgt}" heightRelTo="ABSOLUTE" protect="0"/>`
     + `<hp:pos treatAsChar="1" affectLSpacing="0" flowWithText="1" allowOverlap="0" holdAnchorAndSO="0" vertRelTo="PARA" horzRelTo="COLUMN" vertAlign="TOP" horzAlign="LEFT" vertOffset="0" horzOffset="0"/>`
-    + `<hp:outMargin left="0" right="0" top="0" bottom="0"/></hp:pic><hp:t/></hp:run></hp:p>`);
+    + `<hp:outMargin left="0" right="${ims.length > 1 ? 150 : 0}" top="0" bottom="0"/></hp:pic>` };
+  });
+  const lineH = Math.max(...pics.map((p) => p.hgt)) + 200;
+  // 줄 높이를 그림 높이로 알려 주어(linesegarray) 앞뒤 내용과 겹치거나 잘리지 않게 한다.
+  b.raw(`<hp:p id="${b.next()}" paraPrIDRef="${P_CENTER}" styleIDRef="0" pageBreak="0" columnBreak="0" merged="0"><hp:run charPrIDRef="0">${pics.map((p) => p.xml).join("")}<hp:t/></hp:run>`
+    + `<hp:linesegarray><hp:lineseg textpos="0" vertpos="0" vertsize="${lineH}" textheight="${lineH}" baseline="${Math.round(lineH * 0.85)}" spacing="0" horzpos="0" horzsize="${full}" flags="393216"/></hp:linesegarray></hp:p>`);
 }
 
 /** 일반 보고서 → HWPX Blob */
@@ -319,13 +329,18 @@ export async function hwpxReport(doc) {
   (doc.meta || []).forEach((m) => b.p(m, C_META));
   for (const s of doc.sections) {
     b.p("");
-    b.p(s.title, C_SECTION);
-    if (s.note) b.p(s.note, C_META);
-    for (const blk of s.blocks) {
+    b.p(s.title, C_SECTION, 0, P_KEEP);
+    if (s.note) b.p(s.note, C_META, 0, P_KEEP);
+    for (let bi = 0; bi < s.blocks.length; bi++) {
+      const blk = s.blocks[bi];
       if (blk.kv) reportTable(b, { head: ["항목", "내용"], rows: blk.kv.filter(([, v]) => v), weights: [1, 3], num: () => false }, pageW);
       else if (blk.table) reportTable(b, blk.table, pageW);
-      else if (blk.image) imageParagraph(b, blk.image, images, pageW);
-      else if (blk.heading) b.p(blk.heading, C_ITEM_BOLD);
+      else if (blk.image) {
+        // half(작은 그래프)는 두 개씩 한 줄에 나란히 놓는다.
+        const nx = s.blocks[bi + 1];
+        if (blk.half && nx?.image?.half) { imageParagraph(b, [blk.image, nx.image], images, pageW); bi++; }
+        else imageParagraph(b, [blk.image], images, pageW);
+      } else if (blk.heading) b.p(blk.heading, C_ITEM_BOLD, 0, P_KEEP);
       else if (blk.text != null) lines(blk.text).forEach((l) => b.p(l, blk.gray ? C_GRAY : C_BODY, blk.indent || 0));
     }
   }

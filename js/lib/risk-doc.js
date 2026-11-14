@@ -66,7 +66,7 @@ export function dashboardDoc(ids, { row, rows, sector, info, span = 8, charts = 
         { name: "업권 중앙값", color: "#8a94a6", dash: true, pts: months.map((m) => [m, sectorStat(rows, k, m)?.median ?? null]) },
         { name: row.name, color: "#1f64d8", pts: seriesOf(row, k, months) },
       ] }) : null;
-      if (img) return [{ image: img }];
+      if (img) return [{ image: img, half: true }];
       return [
         { heading: cfg.names[k] || k },
         { table: { head: ["시점", row.name, "업권 중앙값"], rows: months.map((m) => [ym(m), pct(valueAt(row, k, m)), pct(sectorStat(rows, k, m)?.median)]), weights: [1, 1, 1] } },
