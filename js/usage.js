@@ -1,5 +1,5 @@
 // 익명 사용 통계(앱 UsageStats.kt와 같은 방식). 하루 한 번 서버에 (랜덤 기기ID, 웹 버전, 날짜, 메뉴별 이용 횟수)만 보낸다.
-// 이름·계정·검색어는 보내지 않으며 앱 정보에서 끌 수 있다. 지난 날짜는 메뉴 횟수와 함께, 오늘은 '사용함'만 보낸다.
+// 이름·계정·검색어는 보내지 않으며 앱 정보에서 끌 수 있다. 메뉴 횟수는 그날 누적값을 보낸다(오늘 것도 바뀔 때마다 보내며, 서버는 최댓값으로 받아 중복 집계되지 않는다).
 // 사용자별 하루 방문 횟수·사용 시간(화면이 보인 시간)도 함께 보낸다(아래 '방문 횟수·사용 시간').
 // 서버의 관리자 화면(/admin)에서 버전 이름 'web-…'으로 앱과 구분된다.
 import { APP_VERSION, SERVER, store } from "./core.js";
@@ -143,6 +143,7 @@ export function setEnabled(on) {
     store.set("usage.pending", {});
     store.set("usage.stat", {});
     store.set("usage.acked", {});
+    store.set("usage.mack", {});
     if (tickTimer) clearInterval(tickTimer), (tickTimer = 0);
   } else if (document.visibilityState === "visible" && !tickTimer) {
     startVisible(false);
@@ -167,10 +168,15 @@ export async function sendIfNeeded(keepalive = false) {
   const acked = store.get("usage.acked", {});
   const changed = Object.keys(stat).filter((d) => sigOf(stat[d]) !== acked[d]).sort().slice(-10);
   const extra = live ? changed : [];
-  if (!past.length && !includeToday && !extra.length) return;
+  // 오늘 메뉴 누적값이 바뀌었으면(마지막으로 보낸 값과 다르면) 오늘 것도 함께 보낸다
+  const mack = store.get("usage.mack", {});
+  const todayMenus = pending[today];
+  const menuSig = (m) => Object.values(m || {}).reduce((t, n) => t + n, 0);
+  const todayMenuChanged = !!todayMenus && menuSig(todayMenus) !== (mack[today] || 0);
+  if (!past.length && !includeToday && !extra.length && !todayMenuChanged) return;
   const map = new Map();
   past.forEach((d) => map.set(d, { d, m: pending[d] }));
-  if (includeToday) map.set(today, { d: today, m: {} });
+  if (includeToday || todayMenuChanged) map.set(today, { d: today, m: todayMenus || {} });
   extra.forEach((d) => !map.has(d) && map.set(d, { d, m: {} }));
   const sentSig = {};
   for (const [d, o] of map) {
@@ -188,6 +194,10 @@ export async function sendIfNeeded(keepalive = false) {
     store.set("usage.pending", now);
     store.set("usage.last", today);
     store.set("usage.lastV", APP_VERSION);
+    // 보낸 오늘 메뉴 누적 횟수(다음에 바뀐 경우에만 다시 보낸다)
+    const mk = Object.fromEntries(Object.entries(store.get("usage.mack", {})).filter(([d]) => d >= cutoff));
+    if (todayMenus) mk[today] = menuSig(todayMenus);
+    store.set("usage.mack", mk);
     // 누적값은 서버가 최댓값으로 받으므로, 보낸 값과 같은 서명만 기록해 두면 이후 변동분만 다시 보낸다
     const a = Object.fromEntries(Object.entries(store.get("usage.acked", {})).filter(([d]) => d >= cutoff));
     Object.assign(a, sentSig);
