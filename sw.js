@@ -1,6 +1,6 @@
 // 서비스 워커: 화면 파일을 미리 받아 두어(오프라인에서도 열림) 빠르게 띄우고, 새 버전이 오면 교체한다.
 // 배포할 때 VERSION이 바뀌면 브라우저가 새 서비스 워커를 받고, 화면에 "새 버전" 띠가 뜬다(js/app.js).
-const VERSION = "2.21.3";
+const VERSION = "2.21.4";
 const CACHE = "fss-web-" + VERSION;
 const SHELL = [
   "./",
@@ -58,6 +58,7 @@ const SHELL = [
   "js/lib/dartmatch.js",
   "js/lib/risk-doc.js",
   "js/lib/stockchart.js",
+  "js/lib/dashchart.js",
   "js/lib/riskchart.js",
   "js/screens/dart.js",
   "js/screens/disclosure.js",

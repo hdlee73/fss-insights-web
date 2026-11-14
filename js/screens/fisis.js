@@ -494,10 +494,17 @@ async function companyDoc(ids, sector, sectorLabel, co, params) {
         const row = rows.find((r) => r.code === co.code);
         const want = new Set([ids.has("dash") && row ? "sum" : null, ids.has("dash") && row ? "trend" : null, ids.has("ovw") ? "gov" : null].filter(Boolean));
         if (want.size) {
-          const d = rd.dashboardDoc(want, { row: row || { code: co.code, name: co.name }, rows, sector, info });
-          const order = ["핵심 지표·체크 포인트", "건전성 추이", "기업 개황·지배구조"];
-          d.sections.sort((a, b) => order.indexOf(a.title) - order.indexOf(b.title));
-          d.sections.forEach((x) => (x.title === "기업 개황·지배구조" ? ovwSecs : dashSecs).push(x.title === "기업 개황·지배구조" ? { ...x, title: "개황" } : x));
+          const d = rd.dashboardDoc(want, { row: row || { code: co.code, name: co.name }, rows, sector, info, charts: true });
+          // 대시보드는 화면과 같은 구성(핵심 지표·체크 포인트 → 건전성 추이 그래프)을 한 구역으로 묶는다.
+          const pick = (t) => d.sections.find((x) => x.title === t);
+          const sum = pick("핵심 지표·체크 포인트"), trend = pick("건전성 추이"), gov = pick("기업 개황·지배구조");
+          if (sum || trend) {
+            const blocks = [];
+            if (sum) blocks.push({ heading: `핵심 지표·체크 포인트 (${sum.note})` }, ...sum.blocks);
+            if (trend) blocks.push({ heading: `건전성 추이 (${trend.note})` }, ...trend.blocks);
+            dashSecs.push({ title: "대시보드", note: "금융통계정보시스템·전자공시·제재공시 기준 요약", blocks });
+          }
+          if (gov) ovwSecs.push({ ...gov, title: "개황" });
         }
       } else if (ids.has("ovw")) ovwSecs.push({ ...rd.govSection(await live.dartOf(co.name)), title: "개황" });
     } catch (e) {

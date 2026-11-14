@@ -43,9 +43,9 @@ export async function saveReport({ title, parts, build }) {
 
 /** 인쇄 창(→ PDF로 저장) */
 export function printReport(doc, base) {
-  const el = h("div", { class: "print-doc" });
+  const el = h("div", { class: "print-doc rp" });
+  el.append(h("div", { class: "rp-kicker" }, doc.subtitle || "FSS Insights"));
   el.append(h("h1", null, doc.title));
-  if (doc.subtitle) el.append(h("h2", null, doc.subtitle));
   (doc.meta || []).forEach((m) => el.append(h("p", { class: "meta" }, m)));
   for (const s of doc.sections) {
     el.append(h("h3", null, s.title));
@@ -58,7 +58,8 @@ export function printReport(doc, base) {
         el.append(h("table", { class: "rp-tbl" },
           h("thead", null, h("tr", null, t.head.map((x, c) => h("th", { class: num(c) ? "num" : "" }, x)))),
           h("tbody", null, t.rows.map((r, i) => h("tr", { class: t.bold?.(i) ? "b" : "" }, r.map((x, c) => h("td", { class: num(c) ? "num" : "" }, x ?? "")))))));
-      } else if (b.heading) el.append(h("div", { class: "ph" }, b.heading));
+      } else if (b.image) el.append(h("img", { class: "rp-img", src: b.image.dataUrl, alt: "그래프" }));
+      else if (b.heading) el.append(h("div", { class: "ph" }, b.heading));
       else if (b.text != null) el.append(h("div", { class: "pb" + (b.gray ? " gray" : ""), style: b.indent ? { marginLeft: b.indent * 14 + "pt" } : null }, b.text));
     }
   }

@@ -582,6 +582,26 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc .rp-kv, .print-doc .rp-tbl { width: 100%; border-collapse: collapse; margin: 4pt 0 8pt; font-size: 9pt; }
   .print-doc .rp-kv th, .print-doc .rp-kv td, .print-doc .rp-tbl th, .print-doc .rp-tbl td { border: 1px solid #999; padding: 3pt 5pt; vertical-align: top; text-align: left; }
   .print-doc .rp-img { display: block; width: 100%; max-width: 100%; height: auto; margin: 4pt 0 6pt; break-inside: avoid; }
+  /* 회사 정보 등 저장 문서(PDF)의 편집 디자인 */
+  .print-doc.rp { font-family: "Malgun Gothic", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; font-size: 9.5pt; line-height: 1.6; color: #1a2233; }
+  .print-doc.rp .rp-kicker { color: #2a6bd6; font-weight: 700; font-size: 9.5pt; letter-spacing: .04em; margin-bottom: 2pt; }
+  .print-doc.rp h1 { font-size: 22pt; color: #1f3a68; margin: 0 0 4pt; padding-bottom: 8pt; border-bottom: 2.5pt solid #1f3a68; }
+  .print-doc.rp .meta { color: #5a6577; font-size: 9pt; }
+  .print-doc.rp h3 { font-size: 13pt; color: #1f3a68; margin: 20pt 0 6pt; padding: 4pt 8pt; background: #eef3fb; border-left: 4pt solid #1f3a68; border-bottom: 0; break-after: avoid; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-doc.rp h3 + .meta { margin-top: -2pt; margin-bottom: 4pt; break-after: avoid; }
+  .print-doc.rp .rp-tbl, .print-doc.rp .rp-kv { break-before: avoid; }
+  .print-doc.rp .ph { color: #1f3a68; font-size: 10.5pt; margin: 10pt 0 3pt; break-after: avoid; }
+  .print-doc.rp .pb { margin: 1pt 0; }
+  .print-doc.rp .gray { color: #6b7587; }
+  .print-doc.rp .rp-kv, .print-doc.rp .rp-tbl { margin: 3pt 0 8pt; font-size: 9pt; border: 0; }
+  .print-doc.rp .rp-kv th, .print-doc.rp .rp-kv td, .print-doc.rp .rp-tbl th, .print-doc.rp .rp-tbl td { border: 0; border-bottom: .6pt solid #cfd6e2; padding: 4pt 6pt; }
+  .print-doc.rp .rp-kv th { background: #f3f6fb; color: #33405a; }
+  .print-doc.rp .rp-tbl th { background: #1f3a68; border-bottom: 0; font-weight: 600; }
+  .print-doc.rp .rp-tbl tbody tr:nth-child(even) td { background: #f6f8fc; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .print-doc.rp .rp-tbl tr.b td { background: #e8eef9 !important; }
+  .print-doc.rp .rp-img { margin: 6pt 0 8pt; border: .6pt solid #dfe4ee; border-radius: 3pt; }
+  .print-doc.rp .foot { color: #7a8497; font-size: 8pt; margin-top: 4pt; }
+  .print-doc.rp .foot:first-of-type { margin-top: 18pt; padding-top: 6pt; border-top: .6pt solid #cfd6e2; }
   .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight: 600; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-doc .rp-tbl th { background: #1f3a68; color: #fff; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-doc .rp-tbl .num { text-align: right; white-space: nowrap; }
