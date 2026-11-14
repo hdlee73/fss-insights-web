@@ -65,18 +65,25 @@ export function printReport(doc, base) {
   }
   (doc.footer || []).filter(Boolean).forEach((l) => el.append(h("p", { class: "foot" }, l)));
 
-  document.querySelectorAll(".print-doc").forEach((e) => e.remove()); // 앞서 남은 인쇄용 문서
+  document.querySelectorAll(".print-doc, .rp-bar").forEach((e) => e.remove()); // 앞서 남은 인쇄용 문서
   const style = h("style", null, "@page { size: 210mm 297mm; margin: 17mm; }");
   document.head.append(style);
-  document.body.append(el);
-  document.body.classList.add("printing");
   const prevTitle = document.title;
-  const done = () => (el.remove(), style.remove(), document.body.classList.remove("printing"), (document.title = prevTitle));
-  addEventListener("afterprint", done, { once: true });
+  // 휴대폰은 화면 폭(약 360px)대로 배치되면 표가 찌그러지므로, 미리보기·인쇄 동안만 폭 820px 기준으로 배치한다.
+  const vp = document.querySelector('meta[name="viewport"]');
+  const prevVp = vp?.getAttribute("content");
+  if (vp) vp.setAttribute("content", "width=820");
+  // 화면에 저장용 문서만 보이는 미리보기를 띄운 뒤 인쇄한다(휴대폰 브라우저는 print 전용 CSS를 따르지 않고 화면을 그대로 찍는 일이 있다).
+  const bar = h("div", { class: "rp-bar" }, h("span", null, "저장 미리보기"),
+    h("button", { type: "button", class: "primary", onclick: () => window.print() }, "PDF로 저장(인쇄)"),
+    h("button", { type: "button", onclick: () => done() }, "닫기"));
+  const done = () => (el.remove(), bar.remove(), style.remove(), document.body.classList.remove("printing", "rp-view"), (document.title = prevTitle), vp && prevVp != null && vp.setAttribute("content", prevVp), removeEventListener("afterprint", onAfter));
+  // 컴퓨터는 인쇄 창을 닫으면 미리보기도 닫고, 휴대폰(터치)은 다시 저장할 수 있게 미리보기를 남겨 둔다.
+  const onAfter = () => { if (matchMedia("(pointer: fine)").matches) done(); };
+  addEventListener("afterprint", onAfter);
+  document.body.append(el, bar);
+  document.body.classList.add("printing", "rp-view");
+  scrollTo(0, 0);
   document.title = base;
-  setTimeout(() => {
-    window.print();
-    // 휴대폰 브라우저는 print()가 바로 돌아오고 미리보기를 나중에 만든다. 그때 인쇄용 문서가 없으면 화면의 현재 탭이 인쇄되므로
-    // 시간으로 치우지 않고 afterprint(인쇄 창을 닫을 때)에만 치운다. 화면에서는 .print-doc가 숨겨져 있어 남아도 보이지 않는다.
-  }, 50);
+  setTimeout(() => window.print(), 400);
 }
