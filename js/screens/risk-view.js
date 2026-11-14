@@ -63,7 +63,7 @@ function axisNote(sector) {
 }
 const monthText = (m) => (m ? `${m.slice(0, 4)}.${m.slice(4)}` : "-");
 
-// ---------- 회사 대시보드 ----------
+// ---------- 대시보드(회사) ----------
 export async function dashboard(root, params, env, sector) {
   const cfg = SECTOR_CFG[sector];
   const back = h("button", { class: "pill", type: "button", onclick: () => history.back() }, icon("chevron-left"), h("span", { class: "lbl" }, "목록"));
@@ -113,7 +113,7 @@ export async function dashboard(root, params, env, sector) {
 
   // 신호
   const sig = signals({ row, rows, sector, month, cases, nowYear });
-  const sigBox = section("리스크 신호", "업권 중앙값·추세·제재 이력 기준(법정 기준선이 아니라 상대 비교입니다)",
+  const sigBox = section("체크 포인트", "업권 중앙값·추세·제재 이력 기준(법정 기준선이 아니라 상대 비교입니다)",
     h("div", { class: "rk-sig" }, sig.map((s) => h("div", { class: "rk-sg " + s.level }, h("span", { class: "tag " + LEVEL[s.level][1] }, LEVEL[s.level][0]), h("span", null, s.text)))));
 
   // 추이 차트
@@ -139,8 +139,8 @@ export async function dashboard(root, params, env, sector) {
   // 제재
   const sanc = section("제재 이력 타임라인", "금융감독원 제재공시(2011년 이후)", sanctionBody(cases, nowYear, env));
 
-  const saveBtn = h("button", { class: "pill", type: "button", onclick: async () => { if (env.saveAll) return env.saveAll(); const { saveReport } = await import("../lib/report.js"); saveReport({ title: `${row.name} 리스크 대시보드 저장`, parts: DASH_PARTS, build: async (ids) => dashboardDoc(ids, { row, rows, sector, info, span }) }); } }, icon("download"), h("span", { class: "lbl" }, env.saveAll ? "저장 (개황·재무·대시보드·제재)" : "대시보드 저장"));
-  body.replaceChildren(h("div", { class: "rk-save" }, saveBtn), head, tiles, sigBox, trend, quad, gov, sanc,
+  const saveBtn = env.saveAll ? null : h("button", { class: "pill", type: "button", onclick: async () => { const { saveReport } = await import("../lib/report.js"); saveReport({ title: `${row.name} 리스크 대시보드 저장`, parts: DASH_PARTS, build: async (ids) => dashboardDoc(ids, { row, rows, sector, info, span }) }); } }, icon("download"), h("span", { class: "lbl" }, "대시보드 저장"));
+  body.replaceChildren(...(saveBtn ? [h("div", { class: "rk-save" }, saveBtn)] : []), head, tiles, sigBox, trend, quad, gov, sanc,
     h("p", { class: "note", style: { marginTop: "12px" } }, "자료출처: 금융감독원 금융통계정보시스템(FISIS), 전자공시시스템(DART), 금융감독원 제재공시. 회사 이름으로 세 자료를 맞춘 것이라 오류가 있을 수 있으며 참고용입니다. 업무에 인용할 때는 원문을 확인하세요."));
   const open = (g) => env.go({ sector, co: g.dataset.id });
   body.querySelectorAll(".rk-pt").forEach((g) => { g.addEventListener("click", () => open(g)); g.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(g); } }); });

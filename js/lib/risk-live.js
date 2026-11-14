@@ -110,7 +110,7 @@ export function liveProvider() {
     async company(sector, code) {
       const row = (await companies(sector)).find((c) => c.code === code);
       const name = row?.name || "";
-      const [dart, san] = await Promise.all([dartOf(name, sector + ":" + code), loadSanctions().catch(() => null)]);
+      const [dart, san] = await Promise.all([dartOf(name), loadSanctions().catch(() => null)]);
       const cases = san ? casesOf(san, name).map((c) => ({ id: c.id, date: c.date, co: c.company, inst: c.inst, exec: c.exec, staff: c.staff, fine: c.fine, penalty: c.penalty, view: c.viewUrl, items: c.items.map((i) => ({ t: i.title, laws: i.laws })) })).sort((a, b) => (a.date < b.date ? 1 : -1)) : [];
       return { dart, sanctions: cases, nowYear: new Date().getFullYear() };
     },
