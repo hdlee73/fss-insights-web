@@ -179,12 +179,26 @@ function drawHero(hero, w) {
 const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1";
 
 // 직장 망처럼 외부 날씨 사이트(open-meteo)를 막는 곳이 있어, 직접 읽기가 안 되면 서버(/fetch)를 거쳐 읽는다.
+// 직접 읽기가 막힌 기기는 6시간 동안 곧바로 서버 경유로 읽어(6초 기다림 방지), 서버 경유까지 실패할 때만 오류로 남긴다.
+const DIRECT_RETRY_MS = 6 * 3600 * 1000;
 async function readWeather() {
+  const blockedAt = store.get("weather.directFail", 0);
+  if (!blockedAt || Date.now() - blockedAt > DIRECT_RETRY_MS) {
+    try {
+      const r = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
+      if (r.ok) {
+        if (blockedAt) store.set("weather.directFail", 0);
+        return await r.json();
+      }
+    } catch { /* 아래에서 서버 경유로 다시 시도 */ }
+    store.set("weather.directFail", Date.now());
+  }
   try {
-    const r = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
-    if (r.ok) return await r.json();
-  } catch { reportError("fetch:open-meteo"); /* 아래에서 서버 경유로 다시 시도 */ }
-  return JSON.parse((await fetchSite(WEATHER_URL)).text);
+    return JSON.parse((await fetchSite(WEATHER_URL)).text);
+  } catch (e) {
+    reportError("fetch:open-meteo");
+    throw e;
+  }
 }
 
 async function loadWeather() {
