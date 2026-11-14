@@ -614,6 +614,7 @@ mark { background: #ffe58a; color: inherit; border-radius: 2px; padding: 0 1px; 
   .print-doc .rp-tbl th { background: #1f3a68; color: #fff; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .print-doc .rp-tbl .num { text-align: right; white-space: nowrap; }
   .print-doc .rp-tbl th.num { text-align: center; }
+  .print-doc .rp-tbl td:first-child { white-space: nowrap; }
   .print-doc .rp-tbl tr.b td { font-weight: 700; }
   .print-doc .rp-tbl thead { display: table-header-group; }
   .print-doc .rp-tbl tr { break-inside: avoid; }
@@ -665,6 +666,7 @@ body.rp-view .print-doc .rp-kv th { width: 24%; background: #eef2f8; font-weight
 body.rp-view .print-doc .rp-tbl th { background: #1f3a68; color: #fff; text-align: center; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 body.rp-view .print-doc .rp-tbl .num { text-align: right; white-space: nowrap; }
 body.rp-view .print-doc .rp-tbl th.num { text-align: center; }
+body.rp-view .print-doc .rp-tbl td:first-child { white-space: nowrap; }
 body.rp-view .print-doc .rp-tbl tr.b td { font-weight: 700; }
 body.rp-view .print-doc .rp-tbl thead { display: table-header-group; }
 body.rp-view .print-doc .rp-tbl tr { break-inside: avoid; }

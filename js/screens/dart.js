@@ -560,17 +560,22 @@ export function financeBlocks(f, withEps, closes = {}) {
     ["자본총계", ...f.balance.map((b) => eok(b.equity))],
     ["부채비율", ...f.balance.map((b) => pct(b.equity && b.liab != null ? (b.liab / b.equity) * 100 : null))],
   ] } });
-  blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...incomeCols(f).map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
-    ["매출액", ...incomeCols(f).map((x) => eok(x.revenue))],
-    ["영업이익", ...incomeCols(f).map((x) => eok(x.op))],
-    ["당기순이익", ...incomeCols(f).map((x) => eok(x.net))],
-  ], bold: (i) => i === 2 } });
-  if (f.trend?.length >= 2) blocks.push({ heading: `최근 ${f.trend.length}개년 추이 (${f.basis}재무제표 · 단위 억원)` }, { table: { head: ["구분", ...f.trend.map((t) => `${t.year}년`)], rows: [
-    ["매출액", ...f.trend.map((t) => eok(t.revenue))],
-    ["영업이익", ...f.trend.map((t) => eok(t.op))],
-    ["당기순이익", ...f.trend.map((t) => eok(t.net))],
-    ...(f.trend.some((t) => t.debt != null) ? [["부채비율", ...f.trend.map((t) => pct(t.debt))]] : []),
-  ] } });
+  // 저장 문서는 같은 숫자를 두 번 싣지 않는다: 손익은 분기·누적 + 가능한 모든 사업연도 연간을 한 표로 합치고(추이 표를 따로 두지 않음),
+  // 재무상태 표에 이미 있는 연도의 부채비율은 추이에서 다시 싣지 않는다.
+  const cols = incomeCols(f);
+  const yearOf = (x) => Number(/^(\d{4})년 연간/.exec(x.label)?.[1]) || null;
+  const annual = new Map();
+  cols.forEach((x) => { const y = yearOf(x); if (y) annual.set(y, x); });
+  (f.trend || []).forEach((t) => { if (!annual.has(t.year)) annual.set(t.year, { label: `${t.year}년 연간`, revenue: t.revenue, op: t.op, net: t.net }); });
+  const plCols = [...cols.filter((x) => !yearOf(x)), ...[...annual.entries()].sort((a, b) => b[0] - a[0]).map(([y, x]) => ({ label: `${y}년 연간`, revenue: x.revenue, op: x.op, net: x.net }))];
+  blocks.push({ heading: "손익현황 (DART 정기보고서 · 단위 억원)" }, { table: { head: ["구분", ...plCols.map((x) => (x.sub ? `${x.label}\n${x.sub}` : x.label))], rows: [
+    ["매출액", ...plCols.map((x) => eok(x.revenue))],
+    ["영업이익", ...plCols.map((x) => eok(x.op))],
+    ["당기순이익", ...plCols.map((x) => eok(x.net))],
+  ], bold: (i) => i === 2, weights: [1.3, ...plCols.map(() => 1)] } });
+  const shown = new Set(f.balance.map((b) => /^(\d{4})\.12/.exec(b.label)?.[1]).filter(Boolean).map(Number));
+  const olderDebt = (f.trend || []).filter((t) => t.debt != null && !shown.has(t.year)).sort((a, b) => b.year - a.year);
+  if (olderDebt.length) blocks.push({ text: "이전 사업연도 부채비율: " + olderDebt.map((t) => `${t.year}년 ${pct(t.debt)}`).join(" · "), gray: true });
   const years = (f.trend || []).map((t) => t.year).filter((y) => f.eps?.[y] != null).slice(-4);
   if (withEps && years.length) {
     const rows = [["EPS(원)", ...years.map((y) => grouped(f.eps[y]))]];
