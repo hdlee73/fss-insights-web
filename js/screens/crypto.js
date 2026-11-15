@@ -96,11 +96,15 @@ function lineChart(series, labels, { height = 200, format = num, dots, width } =
   const vals = series.flatMap((s) => s.data).filter((v) => v != null && Number.isFinite(v));
   const n = Math.max(0, ...series.map((s) => s.data.length));
   if (vals.length < 2) return h("div", { class: "note" }, "그래프를 그리기에 데이터가 아직 부족합니다.");
-  const W = width || narrowW(), H = width && width < 500 ? 190 : height, L = W < 500 ? 54 : 64, R = W < 500 ? 46 : 56, T = 14, B = 24;
+  const W = width || narrowW(), H = width && width < 500 ? 190 : height, T = 14, B = 24;
   let lo = Math.min(...vals), hi = Math.max(...vals);
   const flat = hi === lo;
   if (flat) { lo -= Math.abs(lo) * 0.01 || 1; hi += Math.abs(hi) * 0.01 || 1; }
   const pad = (hi - lo) * 0.12; lo -= pad; hi += pad;
+  // 눈금·마지막 값 글자 수에 맞춰 좌우 여백을 정한다(글자 하나 약 6.6px, 굵은 마지막 값은 7.2px).
+  const tickMax = Math.max(...[0, 1, 2, 3].map((g) => String(format(hi - ((hi - lo) * g) / 3)).length));
+  const lastLen = String(format(vals.at(-1))).length;
+  const L = Math.max(W < 500 ? 54 : 64, Math.ceil(tickMax * 6.6) + 12), R = Math.max(W < 500 ? 46 : 56, Math.ceil(lastLen * 7.2) + 14);
   const x = (i) => L + (n <= 1 ? 0 : (i * (W - L - R)) / (n - 1));
   const y = (v) => T + ((hi - v) / (hi - lo)) * (H - T - B);
   const showDots = dots ?? n <= 40;
@@ -541,7 +545,7 @@ function coinChartCard(ctx, cs, coin, year, params) {
     const noteTxt = year
       ? `주봉 종가 기준 최근 1년(업비트)은 ${shortDate(cs.date)} 24시 집계본이고, 마지막 점·고저가·변동률만 실시간 현재가로 이어집니다. 변동률은 1년 전 첫 주 시가 대비 현재가입니다.`
       : v.candles
-        ? "업비트 1분봉을 직접 불러온 최근 ${span()}(1분마다 갱신)이며 마지막 점은 실시간 현재가입니다. 당일은 달력상 하루가 아니라 최근 ${span()}이고, 변동률·고저가도 이 구간 기준(첫 봉 시가 대비 현재가)입니다."
+        ? `업비트 1분봉을 직접 불러온 최근 ${span()}(1분마다 갱신)이며 마지막 점은 실시간 현재가입니다. 당일은 달력상 하루가 아니라 최근 ${span()}이고, 변동률·고저가도 이 구간 기준(첫 봉 시가 대비 현재가)입니다.`
         : `1분봉을 불러오지 못해 ${shortDate(cs.date)} 24시 집계본(수집 ${cs.collected_at || "-"} 직전 24시간)을 보여 줍니다. 마지막 점·고저가·변동률만 실시간 현재가로 이어집니다.`;
     stats.replaceChildren(
       h("div", null, h("small", { class: "note" }, year ? "1년 변동" : `${v.candles ? span() : "24시간"} 변동`), h("div", null, chg(v.rate))),
