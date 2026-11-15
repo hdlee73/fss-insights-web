@@ -1,6 +1,6 @@
 // 서비스 워커: 화면 파일을 미리 받아 두어(오프라인에서도 열림) 빠르게 띄우고, 새 버전이 오면 교체한다.
 // 배포할 때 VERSION이 바뀌면 브라우저가 새 서비스 워커를 받고, 화면에 "새 버전" 띠가 뜬다(js/app.js).
-const VERSION = "2.25.2";
+const VERSION = "2.25.3";
 const CACHE = "fss-web-" + VERSION;
 const SHELL = [
   "./",
@@ -126,7 +126,8 @@ const SHELL = [
 const FONT_HOSTS = ["cdn.jsdelivr.net"];
 
 self.addEventListener("install", (e) => {
-  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))));
+  // 새 버전은 기다리지 않고 바로 활성화한다(열려 있는 화면은 app.js의 controllerchange 처리로 즉시 새로 열린다).
+  e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL.map((u) => new Request(u, { cache: "reload" })))).then(() => self.skipWaiting()));
 });
 
 self.addEventListener("activate", (e) => {
