@@ -1,4 +1,4 @@
-// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 이번 주 금융리포트.
+// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 최근 검사·공시조사·회계감리 결과, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
 import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
@@ -10,6 +10,7 @@ import { drawStats, indexTile } from "./market.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
+import { DAYS as ACTION_DAYS, loadRecentActions } from "../lib/recentaction.js";
 
 const PRESS = ["FSS", "FSC"];
 const PRESS_COUNT = 5;
@@ -92,6 +93,19 @@ export async function render(root, params, ctx) {
     if (fresh) pressSec.querySelector("small").replaceChildren(h("b", { class: "br-new" }, `새 자료 ${fresh}건`), ` · 최근 ${PRESS_COUNT}건`);
     pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
   });
+
+  // 최근 검사·공시조사·회계감리 결과: 제재공시·공시조사결과제재·회계감리결과제재 중 최근 7일 이내를 합쳐서
+  const actBox = h("div", { class: "card list" }, skeleton(3));
+  root.append(section("최근 검사·공시조사·회계감리 결과", `제재공시 · 공시조사결과제재 · 회계감리결과제재 · 최근 ${ACTION_DAYS}일`, null, actBox));
+  loadRecentActions().then(({ items, failed }) => {
+    if (!ctx.alive()) return;
+    const note = failed.length ? h("div", { class: "note" }, `${failed.join("·")} 자료는 불러오지 못했습니다.`) : null;
+    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, `최근 ${ACTION_DAYS}일 이내 새로 공시된 검사·공시조사·회계감리 결과가 없습니다.`), note);
+    actBox.replaceChildren(...items.map((x) => h("a", { class: "item", href: x.href }, h("div", { class: "body" },
+      h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, h("span", { class: "tag " + (x.kind === "검사" ? "blue" : x.kind === "공시조사" ? "orange" : "red") }, x.kind), " ", x.date.replace(/-/g, ".")),
+      h("div", { class: "t" }, x.company),
+      x.summary ? h("div", { class: "m" }, x.summary) : null))), note);
+  }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
 
   // 이번 주 금융리포트: 기본 연구기관마다 최근 7일 자료를 몇 건씩
   const researchBox = h("div", { class: "card list" }, skeleton(3));
