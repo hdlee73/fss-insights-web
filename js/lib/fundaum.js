@@ -75,7 +75,7 @@ export function eokText(v) {
   return `${v.toLocaleString("ko-KR")}억`;
 }
 
-const dateLabel = (s) => (s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6)}` : s || "");
+export const dateLabel = (s) => (s && s.length === 8 ? `${s.slice(0, 4)}.${s.slice(4, 6)}.${s.slice(6)}` : s || "");
 
 /** 금융회사 주요 현황 → '펀드 순자산' 탭. */
 export async function fundAumPane(box, company, sector = "G") {

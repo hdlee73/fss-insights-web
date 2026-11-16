@@ -3,6 +3,7 @@
 import { setHeader } from "../app.js";
 import { errorText, h, icon, loading, message } from "../core.js";
 import { caseButtons, dartQuery, loadData, matchAll, terms } from "../lib/accdata.js";
+import { linkLaws } from "../lib/lawlink.js";
 import { Format } from "../lib/yangjeong.js";
 
 const MARKETS = ["전체", "코스닥", "유가증권", "코넥스", "비상장"];
@@ -99,7 +100,7 @@ function detail(root, a) {
           a.fiscalYearEnds ? [h("dt", null, "결산기"), h("dd", null, a.fiscalYearEnds)] : null),
         h("div", { class: "row-gap", style: { marginTop: "10px" } }, tags(a))),
       h("section", { class: "card" }, h("div", { class: "ch" }, icon("gavel"), h("h3", null, "조치 내용")),
-        (a.actions || []).length ? h("ul", { style: { margin: 0, paddingLeft: "18px" } }, a.actions.map((x) => h("li", null, x))) : h("p", { class: "note" }, "조치 내용을 자동 추출하지 못했습니다. 원문을 확인하세요."),
+        (a.actions || []).length ? h("ul", { style: { margin: 0, paddingLeft: "18px" } }, a.actions.map((x) => h("li", null, linkLaws(x)))) : h("p", { class: "note" }, "조치 내용을 자동 추출하지 못했습니다. 원문을 확인하세요."),
         fl.fineNote ? h("p", { class: "note", style: { marginTop: "8px" } }, "※ " + fl.fineNote) : null),
       h("section", { class: "card" }, h("div", { class: "ch" }, icon("external-link"), h("h3", null, "원문")),
         h("div", { class: "stack" },
@@ -111,7 +112,7 @@ function detail(root, a) {
         h("div", { class: "list" }, (a.findings || []).map((x) => h("div", { class: "item" }, h("div", { style: { flex: 1 } },
           h("div", { class: "t" }, `${x.no}. ${x.title}`),
           x.amountNote ? h("div", { class: "m" }, x.amountNote) : null,
-          x.summary ? h("p", { style: { margin: "6px 0 0" } }, x.summary) : null,
+          x.summary ? h("p", { style: { margin: "6px 0 0" } }, linkLaws(x.summary)) : null,
           h("div", { class: "m" }, (x.accounts || []).map((t) => h("span", { class: "tag blue" }, t)), (x.violations || []).map((t) => h("span", { class: "tag" }, t)))))))),
       h("p", { class: "note" }, DISCLAIMER))));
 }

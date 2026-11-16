@@ -26,6 +26,7 @@ jobs:
           mkdir -p _site
           cp -r index.html manifest.webmanifest sw.js css js icons assets data _site/
           touch _site/.nojekyll
+          echo www.fssinsights.com > _site/CNAME
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
