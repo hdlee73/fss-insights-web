@@ -11,6 +11,7 @@ export const MENU = [
     ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향 및 거시경제 지표", "trending-up"],
     ["law", "스마트 법령검색", "scale"],
+    ["lawnews", "최근 금융관련 법령개정 소식", "file-text"],
     ["consumer", "금융소비자 지킴이", "shield-check"],
   ]],
   ["금융회사 현황 및 검사", "landmark", [
@@ -49,7 +50,7 @@ const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", 
 const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
-  ["자료·더보기", ["press", "regulatory", "research", "library", "crypto", "vault", "sites", "info"]],
+  ["자료·더보기", ["lawnews", "press", "regulatory", "research", "library", "crypto", "vault", "sites", "info"]],
 ];
 
 const loaders = {
@@ -67,6 +68,7 @@ const loaders = {
   consumer: () => import("./screens/consumer.js"),
   crypto: () => import("./screens/crypto.js"),
   law: () => import("./screens/law.js"),
+  lawnews: () => import("./screens/lawnews.js"),
   vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
