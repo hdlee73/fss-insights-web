@@ -41,24 +41,28 @@ export async function render(root, params, ctx) {
   // ① KPI 4칸: KOSPI · KOSDAQ · 원/달러 · 국고채 3년 (미니 차트)
   const tiles = [];
   const kpis = h("div", { class: "hm-kpis" });
-  for (const sym of ["^KS11", "^KQ11", "KRW=X"]) {
-    const it = INDEX_CHOICES.find((x) => x.symbol === sym);
-    if (!it) continue;
+  // 시장 동향의 '지표 선택'에서 오늘의 브리핑에 고른 지표를 모두 보여 준다(고른 것이 없으면 기본 3개).
+  const picked = indexSelection().briefing;
+  let chosen = INDEX_CHOICES.filter((x) => picked.includes(x.symbol));
+  if (!chosen.length) chosen = ["^KS11", "^KQ11", "KRW=X"].map((sym) => INDEX_CHOICES.find((x) => x.symbol === sym)).filter(Boolean);
+  for (const it of chosen) {
     const t = indexTile(it);
     tiles.push(t);
     kpis.append(t.el);
   }
   const ktb = h("div", { class: "tile hm-ktb" }, h("div", { class: "nm" }, "국고채 3년"), h("div", { class: "px" }, "—"), h("div", { class: "dl" }, ""));
-  kpis.append(ktb);
-  loadStats(["ktb-3y"]).then((r) => {
-    const it = r.items.find((x) => x.id === "ktb-3y");
-    if (!it || !ctx.alive()) return;
-    const ch = it.previous != null ? it.value - it.previous : null;
-    ktb.querySelector(".px").textContent = statText(it, it.value);
-    const dl = ktb.querySelector(".dl");
-    dl.textContent = statDelta(it) || "";
-    dl.style.color = tint(ch);
-  }).catch(() => {});
+  if (!picked.length || statSelection().briefing.includes("ktb-3y")) {
+    kpis.append(ktb);
+    loadStats(["ktb-3y"]).then((r) => {
+      const it = r.items.find((x) => x.id === "ktb-3y");
+      if (!it || !ctx.alive()) return;
+      const ch = it.previous != null ? it.value - it.previous : null;
+      ktb.querySelector(".px").textContent = statText(it, it.value);
+      const dl = ktb.querySelector(".dl");
+      dl.textContent = statDelta(it) || "";
+      dl.style.color = tint(ch);
+    }).catch(() => {});
+  }
   root.append(kpis);
   tiles.forEach((t) => t.update());
   const timer = setInterval(() => {
