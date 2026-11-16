@@ -9,7 +9,7 @@ import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
 import { drawStats, indexTile } from "./market.js";
 import { loadStats, statDelta, statText, tint } from "../lib/market.js";
 import { inbox as alertsInbox } from "../alerts-check.js";
-import { loadLawNews } from "../lib/lawnews.js";
+import { docHref, loadLawNews } from "../lib/lawnews.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
@@ -87,7 +87,7 @@ export async function render(root, params, ctx) {
 
   cached("home.lawnews", 6 * 3600 * 1000, () => loadLawNews({ per: 1, limit: 3 })).then((list) => {
     if (!ctx.alive()) return;
-    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: "#/law?q=" + encodeURIComponent(x.name) }, h("div", { class: "t" }, x.name), h("small", null, `${x.type || "개정"} · 공포 ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
+    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: docHref(x) }, h("div", { class: "t" }, x.name), h("small", null, `${x.type || "개정"} · 공포 ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
   }).catch(() => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")));
 
   // ③ 소비자 지킴이 · 가상자산 시장 · 내 알림
