@@ -1,0 +1,9 @@
+name = "fss-board"
+main = "board-worker.js"
+compatibility_date = "2026-11-01"
+
+# FSS_insights/server/news-proxy 와 동일한 D1 바인딩(DB) 및 ADMIN_TOKEN 시크릿 사용
+[[d1_databases]]
+binding = "DB"
+database_name = "fss-insights-db"
+database_id = "REPLACE_WITH_YOUR_D1_DATABASE_ID"

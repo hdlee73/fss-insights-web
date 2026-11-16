@@ -35,6 +35,7 @@ export const MENU = [
     ["library", "기타 참고자료", "folder-open"],
   ]],
   ["더보기", "ellipsis-vertical", [
+    ["board", "익명게시판", "message-square"],
     ["vault", "보관함(스크랩·메모)", "bookmark-check"],
     ["sites", "주요사이트", "globe"],
     ["alerts", "알림", "bell"],
@@ -74,6 +75,7 @@ const loaders = {
   law: () => import("./screens/law.js"),
   lawnews: () => import("./screens/lawnews.js"),
   lawdoc: () => import("./screens/lawdoc.js"),
+  board: () => import("./screens/board.js"),
   vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
@@ -358,6 +360,7 @@ function setupFresh() {
     setTimeout(() => btn.classList.remove("busy"), 900);
     refreshAll();
   });
+  document.getElementById("board-btn")?.addEventListener("click", () => go("board"));
   document.getElementById("qs-btn")?.addEventListener("click", openQuickSearch);
   window.addEventListener("fss-fresh", paintFresh);
   addEventListener("online", () => (paintFresh(), toast("다시 연결되었습니다. 새로고침으로 최신 자료를 받을 수 있어요.")));
@@ -369,6 +372,7 @@ async function render() {
   const { id, params } = currentRoute();
   markCurrent();
   closeMega();
+  document.getElementById("board-btn")?.classList.toggle("on", id === "board");
   refreshFolds(id !== lastCountedId); // 다른 화면으로 옮겨 가면 그 화면이 든 묶음은 펼친다
   const route = ROUTES[id];
   setHeader(route.label);

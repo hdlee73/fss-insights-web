@@ -78,6 +78,7 @@ const SHELL = [
   "js/screens/releases.js",
   "js/screens/regulatory.js",
   "js/screens/library.js",
+  "js/screens/board.js",
   "js/screens/vault.js",
   "js/screens/sites.js",
   "js/screens/alerts.js",
