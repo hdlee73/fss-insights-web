@@ -1365,3 +1365,4 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 @media (max-width: 700px) { .lw-on-row { grid-template-columns: 1fr; } }
 .hm-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
 .hm-ch h3 { min-width: 0; }
+.hm-lawi .t .tag { margin-right: 4px; vertical-align: 1px; }

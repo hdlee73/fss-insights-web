@@ -67,7 +67,7 @@ export async function render(root, params, ctx) {
     card("최신 보도자료", "file-text", "press", pressBox, "hm-press"),
     h("div", { class: "hm-right" },
       card("최근 검사·공시조사·회계감리 제재", "gavel", null, actBox, "", [["검사", "sanction"], ["공시조사", "disclosure"], ["회계감리", "audit"]]),
-      card("법령 개정 소식", "scale", "lawnews", lawBox))));
+      card("법령·하위 법규 개정 소식", "scale", "lawnews", lawBox))));
 
   const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
   Promise.all(pressSources.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20))).then((items) => [key, items]).catch(() => [key, null]))).then((res) => {
@@ -87,10 +87,16 @@ export async function render(root, params, ctx) {
       x.summary ? h("div", { class: "m" }, x.summary) : null))));
   }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
 
-  cached("home.lawnews", 6 * 3600 * 1000, () => loadLawNews({ per: 1, limit: 3 })).then((list) => {
+  // 법률·시행령·시행규칙·감독규정·시행세칙의 최신 개정 5건(스마트 법령검색 '최근 개정 소식'과 같은 자료·같은 캐시)
+  const lawTag = { 법률: "blue", 시행령: "green", 시행규칙: "green", 감독규정: "orange", 시행세칙: "orange" };
+  const lawFail = () => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요."));
+  cached("lawnews.all2", 6 * 3600 * 1000, () => loadLawNews({ per: 3, limit: 80, sub: true })).then((all) => {
     if (!ctx.alive()) return;
-    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: docHref(x) }, h("div", { class: "t" }, x.name), h("small", null, `${x.type || "개정"} · 공포 ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
-  }).catch(() => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")));
+    const list = all.slice(0, 5);
+    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: docHref(x) },
+      h("div", { class: "t" }, h("span", { class: "tag " + (lawTag[x.kind] || "") }, x.kind || "법률"), " ", x.name),
+      h("small", null, `${x.type || "개정"} · ${x.adm ? "발령" : "공포"} ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
+  }).catch(lawFail);
 
   // ③ 소비자 지킴이 · 가상자산 시장 · 내 알림
   const coinBox = h("div", { class: "hm-coins" }, h("div", { class: "note" }, "시세를 불러오는 중…"));
