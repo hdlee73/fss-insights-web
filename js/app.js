@@ -120,6 +120,8 @@ function sections() {
   return [[FAV_HEAD, "star", list.map((id) => [id, ROUTES[id].label, ROUTES[id].icon])], ...MENU];
 }
 const FAV_HEAD = "즐겨찾기";
+/** 오늘의 브리핑 즐겨찾기 줄에 쓰는 목록 [{id,label,icon}]. */
+export const favoriteList = () => favs().map((id) => ({ id, label: ROUTES[id].label, icon: ROUTES[id].icon }));
 
 function toggleFav(id) {
   const now = favs();
