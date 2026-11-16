@@ -308,7 +308,7 @@ function pickTable(rows, a, b, labels = ["시장동향", "브리핑"]) {
 
 async function pickIndexes() {
   const sel = indexSelection();
-  const groupOfIndex = (s) => (KOREA_INDEXES.some((k) => k.symbol === s) ? "국내" : /=X|DX-Y/.test(s) ? "환율" : /\^(TNX|FVX|TYX)/.test(s) ? "금리" : /=F|-USD/.test(s) ? "원자재·코인" : "해외 지수");
+  const groupOfIndex = (s) => (KOREA_INDEXES.some((k) => k.symbol === s) ? "국내" : /=X|DX-Y/.test(s) ? "환율" : /\^(TNX|FVX|TYX)/.test(s) ? "금리" : /^NQ=F$/.test(s) ? "해외 지수" : /=F|-USD/.test(s) ? "원자재·코인" : "해외 지수");
   const order = ["국내", "해외 지수", "환율", "금리", "원자재·코인"];
   const rows = [...INDEX_CHOICES].sort((x, y) => order.indexOf(groupOfIndex(x.symbol)) - order.indexOf(groupOfIndex(y.symbol))).map((x) => ({ key: x.symbol, label: x.name, group: groupOfIndex(x.symbol) }));
   const t = pickTable(rows, new Set(sel.market), new Set(sel.briefing));
