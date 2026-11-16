@@ -1336,3 +1336,6 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 @media (max-width: 1000px) { .hm-grid { grid-template-columns: 1fr; } .hm-bot { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .hm-kpis { grid-template-columns: repeat(2, 1fr); gap: 10px; } .hm-kpis .tile .px { font-size: 18px; } }
 .hm-press .item .acts { display: none; }
+
+.ln-row .ln-t { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.ln-row > .i { color: var(--muted); align-self: center; }

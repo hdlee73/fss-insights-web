@@ -9,7 +9,7 @@ import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
 import { drawStats, indexTile } from "./market.js";
 import { loadStats, statDelta, statText, tint } from "../lib/market.js";
 import { inbox as alertsInbox } from "../alerts-check.js";
-import { repo } from "../lib/law-core.js";
+import { loadLawNews } from "../lib/lawnews.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
@@ -78,7 +78,7 @@ export async function render(root, params, ctx) {
     card("최신 보도자료", "file-text", "press", pressBox, "hm-press"),
     h("div", { class: "hm-right" },
       card("최근 제재공시", "gavel", "sanction", actBox),
-      card("법령 개정 소식", "scale", "law", lawBox))));
+      card("법령 개정 소식", "scale", "lawnews", lawBox))));
 
   const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
   Promise.all(pressSources.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20))).then((items) => [key, items]).catch(() => [key, null]))).then((res) => {
@@ -98,7 +98,7 @@ export async function render(root, params, ctx) {
       x.summary ? h("div", { class: "m" }, x.summary) : null))));
   }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
 
-  cached("home.lawnews", 6 * 3600 * 1000, loadLawNews).then((list) => {
+  cached("home.lawnews", 6 * 3600 * 1000, () => loadLawNews({ per: 1, limit: 3 })).then((list) => {
     if (!ctx.alive()) return;
     lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: "#/law?q=" + encodeURIComponent(x.name) }, h("div", { class: "t" }, x.name), h("small", null, `${x.type || "개정"} · 공포 ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
   }).catch(() => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")));
@@ -218,16 +218,6 @@ function seoulNow() {
 }
 
 const dotYmd = (v) => (v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6)}` : v || "-");
-const KEY_LAWS = ["자본시장과 금융투자업에 관한 법률", "은행법", "보험업법", "금융소비자 보호에 관한 법률", "전자금융거래법", "여신전문금융업법", "가상자산 이용자 보호 등에 관한 법률", "상호저축은행법", "특정 금융거래정보의 보고 및 이용 등에 관한 법률"];
-/** 주요 금융 법령의 최근 제·개정(공포일 기준 최신 3건). */
-async function loadLawNews() {
-  const rows = await Promise.all(KEY_LAWS.map((name) => repo.lawVersions({ name }).then((vs) => {
-    const v = vs.sort((a, b) => (b.promulgationDate || "").localeCompare(a.promulgationDate || ""))[0];
-    return v ? { name: v.name, promulgationDate: v.promulgationDate, effectiveDate: v.effectiveDate, type: v.revisionType } : null;
-  }).catch(() => null)));
-  return rows.filter(Boolean).sort((a, b) => (b.promulgationDate || "").localeCompare(a.promulgationDate || "")).slice(0, 3);
-}
-
 function drawHello(el, w) {
   const now = seoulNow();
   el.replaceChildren(w ? h("span", { class: "hm-w" }, `${w.emoji} ${w.temp}° ${w.summary} · ${w.min}°/${w.max}°`) : null, h("span", { class: "hm-g" }, greeting(now, w)));
