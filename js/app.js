@@ -11,7 +11,6 @@ export const MENU = [
     ["news", "뉴스검색", "newspaper"],
     ["market", "금융시장 동향 및 거시경제 지표", "trending-up"],
     ["law", "스마트 법령검색", "scale"],
-    ["lawnews", "최근 금융관련 법령개정 소식", "file-text"],
     ["consumer", "금융소비자 지킴이", "shield-check"],
   ]],
   ["금융회사 현황 및 검사", "landmark", [
@@ -43,6 +42,11 @@ export const MENU = [
   ]],
 ];
 const ROUTES = Object.fromEntries(MENU.flatMap(([, , items]) => items.map(([id, label, ic]) => [id, { label, icon: ic }])));
+// 메뉴에는 없고 스마트 법령검색 안에서만 열리는 하위 화면(parent의 메뉴를 켜 둔다).
+Object.assign(ROUTES, {
+  lawnews: { label: "최근 금융관련 법령개정 소식", icon: "file-text", parent: "law" },
+  lawdoc: { label: "법령 개정 내용", icon: "file-text", parent: "law" },
+});
 
 // v3.0 내비: 어느 화면에서든 한 번에 열리는 3개 + 법령. 나머지는 '전체 메뉴'(PC 메가메뉴, 휴대폰 서랍).
 const PINNED = [["news", "뉴스검색", "newspaper"], ["market", "금융시장 동향", "trending-up"], ["consumer", "소비자 지킴이", "shield-check"]];
@@ -50,7 +54,7 @@ const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", 
 const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
-  ["자료·더보기", ["lawnews", "press", "regulatory", "research", "library", "crypto", "vault", "sites", "info"]],
+  ["자료·더보기", ["press", "regulatory", "research", "library", "crypto", "vault", "sites", "info"]],
 ];
 
 const loaders = {
@@ -69,6 +73,7 @@ const loaders = {
   crypto: () => import("./screens/crypto.js"),
   law: () => import("./screens/law.js"),
   lawnews: () => import("./screens/lawnews.js"),
+  lawdoc: () => import("./screens/lawdoc.js"),
   vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
   research: () => import("./screens/releases.js"),
@@ -218,7 +223,8 @@ function buildTabs() {
 
 /** 현재 화면에 해당하는 메뉴·탭·필 단추를 강조한다. */
 function markCurrent() {
-  const { id } = currentRoute();
+  const cur = currentRoute().id;
+  const id = ROUTES[cur]?.parent || cur;
   for (const a of document.querySelectorAll("[data-id]")) a.classList.toggle("on", a.dataset.id === id);
   const inMega = MEGA.some(([, ids]) => ids.includes(id));
   document.getElementById("tn-all")?.classList.toggle("on", inMega);

@@ -5,6 +5,7 @@ import { setHeader } from "../app.js";
 import { APP_NAME, APP_VERSION, dialog, download, errorText, h, icon, iconButton, loading, message, share, store, toast } from "../core.js";
 import * as L from "../lib/law-core.js";
 import { previewPrint } from "../lib/report.js";
+import { lawTabs } from "../lib/lawtabs.js";
 
 const results = new Map(); // "검색어|기준일" → { tree } | { kw }
 const views = new Map(); // 같은 키의 화면 상태(펼침·선택·찾기)
@@ -49,7 +50,7 @@ async function searchView(root, params, ctx) {
   setHeader("스마트 법령검색", "법조문 하나로 위임 규정(시행령·시행규칙·감독규정·세칙)과 판례를 한눈에");
   const q = (params.q || "").trim();
   const asOf = /^\d{8}$/.test(params.asOf || "") ? params.asOf : null;
-  root.append(searchBar(params, ctx));
+  root.append(lawTabs("law"), searchBar(params, ctx));
   if (!q) return root.append(idle(ctx));
 
   const key = `${q}|${asOf || ""}`;
