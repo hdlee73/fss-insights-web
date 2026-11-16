@@ -30,8 +30,10 @@ export async function render(root, params, ctx) {
   drawHello(hello, null);
   cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHello(hello, w)).catch(() => {});
 
-  const card = (title, ic, target, body, cls = "") => h("section", { class: "card hm-card " + cls },
-    h("div", { class: "hm-ch" }, icon(ic), h("h3", null, title), target ? h("a", { class: "link-more", href: "#/" + target }, "전체", icon("chevron-right")) : null), body);
+  const card = (title, ic, target, body, cls = "", links = null) => h("section", { class: "card hm-card " + cls },
+    h("div", { class: "hm-ch" }, icon(ic), h("h3", null, title),
+      links ? h("div", { class: "hm-links" }, links.map(([label, to]) => h("a", { class: "link-more", href: "#/" + to }, label, icon("chevron-right"))))
+        : target ? h("a", { class: "link-more", href: "#/" + target }, "전체", icon("chevron-right")) : null), body);
   const digestData = { articles: null, press: null, extra: [], ai: undefined };
   const drawDigest = () => {}; // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
   const section = (title, sub, target, body) => h("section", { class: "br-sec" },
@@ -64,7 +66,7 @@ export async function render(root, params, ctx) {
   root.append(h("div", { class: "hm-grid" },
     card("최신 보도자료", "file-text", "press", pressBox, "hm-press"),
     h("div", { class: "hm-right" },
-      card("최근 제재공시", "gavel", "sanction", actBox),
+      card("최근 검사·공시조사·회계감리 제재", "gavel", null, actBox, "", [["검사", "sanction"], ["공시조사", "disclosure"], ["회계감리", "audit"]]),
       card("법령 개정 소식", "scale", "lawnews", lawBox))));
 
   const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
