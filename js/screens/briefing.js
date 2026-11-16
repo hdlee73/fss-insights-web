@@ -50,19 +50,6 @@ export async function render(root, params, ctx) {
     tiles.push(t);
     kpis.append(t.el);
   }
-  const ktb = h("div", { class: "tile hm-ktb" }, h("div", { class: "nm" }, "국고채 3년"), h("div", { class: "px" }, "—"), h("div", { class: "dl" }, ""));
-  if (!picked.length || statSelection().briefing.includes("ktb-3y")) {
-    kpis.append(ktb);
-    loadStats(["ktb-3y"]).then((r) => {
-      const it = r.items.find((x) => x.id === "ktb-3y");
-      if (!it || !ctx.alive()) return;
-      const ch = it.previous != null ? it.value - it.previous : null;
-      ktb.querySelector(".px").textContent = statText(it, it.value);
-      const dl = ktb.querySelector(".dl");
-      dl.textContent = statDelta(it) || "";
-      dl.style.color = tint(ch);
-    }).catch(() => {});
-  }
   root.append(kpis);
   tiles.forEach((t) => t.update());
   const timer = setInterval(() => {
@@ -86,7 +73,7 @@ export async function render(root, params, ctx) {
     const seen = new Map(res.map(([key]) => [key, new Set(store.get("seen." + key, []))]));
     const all = res.flatMap(([key, items]) => (items || []).map((x) => ({ ...x, _new: seen.get(key).size > 0 && !seen.get(key).has(x.link) })));
     all.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    const top = all.slice(0, PRESS_COUNT);
+    const top = all.slice(0, PRESS_COUNT + 1);
     pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
   });
 
