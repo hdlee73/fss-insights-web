@@ -4,7 +4,7 @@ import { setHeader } from "../app.js";
 import { dialog, errorText, forget, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
-  loadKofia, loadStats, macroSelection, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
+  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
   UP, DOWN, STALE_MS,
 } from "../lib/market.js";
 
@@ -328,9 +328,11 @@ async function pickStats() {
 }
 
 async function pickMacro() {
-  const t = pickTable(MACRO_CATALOG.map((s) => ({ key: s.id, label: s.name, group: s.group })), new Set(macroSelection()), null, ["표시"]);
-  if (!(await dialog({ title: "거시경제 지표 선택", body: [h("div", { class: "note" }, "금융시장 동향에 보일 거시경제 지표를 고릅니다. 기본은 실질GDP 성장률·소비자물가 상승률·실업률·경상수지입니다."), t.box], ok: "저장", wide: true }))) return false;
-  saveMacroSelection(t.read().a);
+  const t = pickTable(MACRO_CATALOG.map((s) => ({ key: s.id, label: s.name, group: s.group })), new Set(macroSelection()), new Set(macroBriefingSelection()));
+  if (!(await dialog({ title: "거시경제 지표 선택", body: [h("div", { class: "note" }, "금융시장 동향과 오늘의 브리핑에 보일 거시경제 지표를 고릅니다. 금융시장 동향 기본은 실질GDP 성장률·소비자물가 상승률·실업률·경상수지, 브리핑 기본은 소비자물가 상승률·실업률입니다."), t.box], ok: "저장", wide: true }))) return false;
+  const r = t.read();
+  saveMacroSelection(r.a);
+  saveMacroBriefing(r.b);
   return true;
 }
 
