@@ -1369,9 +1369,9 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 
 /* v3.3 오늘의 브리핑 재배치: 즐겨찾기 줄 · 증시 지표(더보기) · 통계 둘째 줄 · 2열 카드 */
 .hm-favs { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 12px; }
-.hm-favs > b { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #b7791f; margin-right: 2px; }
+.hm-favs > b { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; color: #b7791f; margin-right: 2px; }
 .hm-favs > b .i { width: 15px; height: 15px; }
-.hm-fav { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; }
+.hm-fav { display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; flex: none; }
 .hm-fav .i { width: 14px; height: 14px; color: var(--acc); }
 .hm-fav:hover { border-color: var(--acc); color: var(--acc-fg); }
 .hm-sh { display: flex; align-items: center; justify-content: space-between; margin: 10px 2px 8px; }
