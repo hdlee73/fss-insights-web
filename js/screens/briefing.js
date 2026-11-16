@@ -7,6 +7,9 @@ import * as N from "../lib/news.js";
 import { INDEX_CHOICES, KOREA_INDEXES, indexSelection, statSelection } from "../lib/market.js";
 import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
 import { drawStats, indexTile } from "./market.js";
+import { loadStats, statDelta, statText, tint } from "../lib/market.js";
+import { inbox as alertsInbox } from "../alerts-check.js";
+import { repo } from "../lib/law-core.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
@@ -18,39 +21,100 @@ const ARTICLE_COUNT = 5;
 const RESEARCH_PER_AGENCY = 3;
 
 export async function render(root, params, ctx) {
-  setHeader("오늘의 브리핑", "한눈에 보는 오늘 시장과 금융당국 소식"); // 새로고침은 헤더 우측 공통 버튼
-  const hero = h("section", { class: "br-hero" });
-  root.append(hero);
-  drawHero(hero, null);
+  const now0 = seoulNow();
+  const pad = (n) => String(n).padStart(2, "0");
+  const d0 = new Date();
+  setHeader("오늘의 브리핑", `${now0.y}년 ${now0.m}월 ${now0.d}일 ${KO_DAY[now0.wd]} · ${pad(d0.getHours())}:${pad(d0.getMinutes())} 갱신`); // 새로고침은 헤더 우측 공통 버튼
+  const hello = h("div", { class: "hm-hello" });
+  root.append(hello);
+  drawHello(hello, null);
+  cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHello(hello, w)).catch(() => {});
 
-  // 최신 주요 이슈 카드: 많이 나온 말, 원장·위원장 일정, (기기 AI가 있으면) 주요 기사 요약. 아래 기사·보도자료가 도착하는 대로 채워진다.
-  const digestBox = h("section", { class: "br-digest card", "aria-live": "polite" });
-  // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
+  const card = (title, ic, target, body, cls = "") => h("section", { class: "card hm-card " + cls },
+    h("div", { class: "hm-ch" }, icon(ic), h("h3", null, title), target ? h("a", { class: "link-more", href: "#/" + target }, "전체", icon("chevron-right")) : null), body);
   const digestData = { articles: null, press: null, extra: [], ai: undefined };
-  const drawDigest = () => {};
-  drawDigest();
-  cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHero(hero, w)).catch(() => {});
-
+  const drawDigest = () => {}; // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
   const section = (title, sub, target, body) => h("section", { class: "br-sec" },
     h("div", { class: "br-sh" }, h("div", null, h("h3", null, title), h("small", null, sub)), target ? h("a", { class: "link-more", href: "#/" + target }, "더 보기", icon("chevron-right")) : null),
     body);
 
-  // 시장 지표(시장 동향의 '지표 선택'에서 브리핑에 고른 것)
-  const sel = indexSelection().briefing;
-  const chosen = INDEX_CHOICES.filter((x) => sel.includes(x.symbol));
-  const wide = chosen.filter((x) => KOREA_INDEXES.some((k) => k.symbol === x.symbol));
-  const small = chosen.filter((x) => !wide.includes(x));
+  // ① KPI 4칸: KOSPI · KOSDAQ · 원/달러 · 국고채 3년 (미니 차트)
   const tiles = [];
-  const mk = h("div");
-  if (wide.length) mk.append(h("div", { class: "tiles wide2" }, wide.map((it) => (tiles.push(indexTile(it, { wide: true, showInvestors: true })), tiles[tiles.length - 1].el))));
-  if (small.length) mk.append(h("div", { class: "tiles" }, small.map((it) => (tiles.push(indexTile(it)), tiles[tiles.length - 1].el))));
-  if (!chosen.length) mk.append(h("p", { class: "note card" }, "브리핑에 표시할 지표가 없습니다. 금융시장 동향 및 거시경제 지표의 ‘지표 선택’에서 고르세요."));
-  root.append(section("시장 지표", "한눈에 보는 오늘 시장", "market", mk));
+  const kpis = h("div", { class: "hm-kpis" });
+  for (const sym of ["^KS11", "^KQ11", "KRW=X"]) {
+    const it = INDEX_CHOICES.find((x) => x.symbol === sym);
+    if (!it) continue;
+    const t = indexTile(it);
+    tiles.push(t);
+    kpis.append(t.el);
+  }
+  const ktb = h("div", { class: "tile hm-ktb" }, h("div", { class: "nm" }, "국고채 3년"), h("div", { class: "px" }, "—"), h("div", { class: "dl" }, ""));
+  kpis.append(ktb);
+  loadStats(["ktb-3y"]).then((r) => {
+    const it = r.items.find((x) => x.id === "ktb-3y");
+    if (!it || !ctx.alive()) return;
+    const ch = it.previous != null ? it.value - it.previous : null;
+    ktb.querySelector(".px").textContent = statText(it, it.value);
+    const dl = ktb.querySelector(".dl");
+    dl.textContent = statDelta(it) || "";
+    dl.style.color = tint(ch);
+  }).catch(() => {});
+  root.append(kpis);
   tiles.forEach((t) => t.update());
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer);
     if (document.visibilityState === "visible") tiles.forEach((t) => t.update());
   }, 20000);
+
+  // ② 최신 보도자료(왼쪽) · 최근 제재공시 + 법령 개정 소식(오른쪽)
+  const pressBox = h("div", { class: "list" }, skeleton(PRESS_COUNT));
+  const actBox = h("div", { class: "list" }, skeleton(3));
+  const lawBox = h("div", { class: "hm-law" }, skeleton(2));
+  root.append(h("div", { class: "hm-grid" },
+    card("최신 보도자료", "file-text", "press", pressBox, "hm-press"),
+    h("div", { class: "hm-right" },
+      card("최근 제재공시", "gavel", "sanction", actBox),
+      card("법령 개정 소식", "scale", "law", lawBox))));
+
+  const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
+  Promise.all(pressSources.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20))).then((items) => [key, items]).catch(() => [key, null]))).then((res) => {
+    if (!ctx.alive()) return;
+    const seen = new Map(res.map(([key]) => [key, new Set(store.get("seen." + key, []))]));
+    const all = res.flatMap(([key, items]) => (items || []).map((x) => ({ ...x, _new: seen.get(key).size > 0 && !seen.get(key).has(x.link) })));
+    all.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const top = all.slice(0, PRESS_COUNT);
+    pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
+  });
+
+  loadRecentActions().then(({ items, failed }) => {
+    if (!ctx.alive()) return;
+    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, `최근 ${ACTION_DAYS}일 이내 새로 공시된 검사·공시조사·회계감리 결과가 없습니다.` + (failed.length ? ` (${failed.join("·")} 자료는 불러오지 못함)` : "")));
+    actBox.replaceChildren(...items.slice(0, 5).map((x) => h("a", { class: "item hm-act", href: x.href }, h("div", { class: "body" },
+      h("div", { class: "hm-act-r" }, h("span", { class: "tag " + (x.kind === "검사" ? "blue" : x.kind === "공시조사" ? "orange" : "red") }, x.kind), h("b", null, x.company), h("span", { class: "hm-d" }, x.date.slice(5).replace("-", "."))),
+      x.summary ? h("div", { class: "m" }, x.summary) : null))));
+  }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
+
+  cached("home.lawnews", 6 * 3600 * 1000, loadLawNews).then((list) => {
+    if (!ctx.alive()) return;
+    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: "#/law?q=" + encodeURIComponent(x.name) }, h("div", { class: "t" }, x.name), h("small", null, `${x.type || "개정"} · 공포 ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
+  }).catch(() => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")));
+
+  // ③ 소비자 지킴이 · 가상자산 시장 · 내 알림
+  const coinBox = h("div", { class: "hm-coins" }, h("div", { class: "note" }, "시세를 불러오는 중…"));
+  fetch("https://api.upbit.com/v1/ticker?markets=KRW-BTC,KRW-ETH", { signal: AbortSignal.timeout(6000) }).then((r) => r.json()).then((rows) => {
+    if (!ctx.alive()) return;
+    coinBox.replaceChildren(...rows.map((c) => {
+      const pct = c.signed_change_rate * 100;
+      return h("div", null, c.market.replace("KRW-", ""), " ₩" + Math.round(c.trade_price).toLocaleString("ko-KR") + " ", h("b", { class: pct >= 0 ? "up" : "down" }, (pct >= 0 ? "+" : "") + pct.toFixed(1) + "%"));
+    }));
+  }).catch(() => ctx.alive() && coinBox.replaceChildren(h("div", { class: "note" }, "시세를 불러오지 못했습니다.")));
+  const inbox = alertsInbox().filter((x) => !x.read);
+  root.append(h("div", { class: "hm-bot" },
+    card("소비자 지킴이", "shield-check", "consumer", h("div", { class: "hm-sos" }, h("a", { href: "#/consumer" }, "🚨 보이스피싱 긴급대응"), h("small", null, "피해구제 절차 · 연락처(112·1332)"))),
+    card("가상자산 시장", "coins", "crypto", coinBox),
+    card("내 알림", "bell", "alerts", inbox.length
+      ? h("div", { class: "hm-al" }, inbox.slice(0, 2).map((x) => h("div", null, x.title)), inbox.length > 2 ? h("small", null, `외 ${inbox.length - 2}건`) : null)
+      : h("div", { class: "note" }, "새 알림이 없습니다. 알림 설정에서 키워드를 등록해 보세요."))));
 
   // 주요 금융 통계
   const statIds = statSelection().briefing;
@@ -75,37 +139,6 @@ export async function render(root, params, ctx) {
     drawDigest();
     newsBox.replaceChildren(h("div", { class: "note" }, "기사를 불러오지 못했습니다. 새로고침을 눌러 주세요."));
   });
-
-  // 최근 금융당국 보도자료(금감원·금융위 + 직접 추가한 기관)
-  const pressBox = h("div", { class: "card list" }, skeleton(PRESS_COUNT));
-  const pressSec = section("최근 금융당국 보도자료", `금융감독원 · 금융위원회 · 최근 ${PRESS_COUNT}건`, "press", pressBox);
-  root.append(pressSec);
-  const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
-  Promise.all(pressSources.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20))).then((items) => [key, items]).catch(() => [key, null]))).then((res) => {
-    if (!ctx.alive()) return;
-    const seen = new Map(res.map(([key]) => [key, new Set(store.get("seen." + key, []))]));
-    const all = res.flatMap(([key, items]) => (items || []).map((x) => ({ ...x, _new: seen.get(key).size > 0 && !seen.get(key).has(x.link) })));
-    all.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    digestData.press = all;
-    drawDigest();
-    const top = all.slice(0, PRESS_COUNT);
-    const fresh = all.filter((x) => x._new).length;
-    if (fresh) pressSec.querySelector("small").replaceChildren(h("b", { class: "br-new" }, `새 자료 ${fresh}건`), ` · 최근 ${PRESS_COUNT}건`);
-    pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
-  });
-
-  // 최근 검사·공시조사·회계감리 결과: 제재공시·공시조사결과제재·회계감리결과제재 중 최근 7일 이내를 합쳐서
-  const actBox = h("div", { class: "card list" }, skeleton(3));
-  root.append(section("최근 검사·공시조사·회계감리 결과", `제재공시 · 공시조사결과제재 · 회계감리결과제재 · 최근 ${ACTION_DAYS}일`, null, actBox));
-  loadRecentActions().then(({ items, failed }) => {
-    if (!ctx.alive()) return;
-    const note = failed.length ? h("div", { class: "note" }, `${failed.join("·")} 자료는 불러오지 못했습니다.`) : null;
-    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, `최근 ${ACTION_DAYS}일 이내 새로 공시된 검사·공시조사·회계감리 결과가 없습니다.`), note);
-    actBox.replaceChildren(...items.map((x) => h("a", { class: "item", href: x.href }, h("div", { class: "body" },
-      h("div", { class: "m", style: { marginTop: 0, marginBottom: "3px" } }, h("span", { class: "tag " + (x.kind === "검사" ? "blue" : x.kind === "공시조사" ? "orange" : "red") }, x.kind), " ", x.date.replace(/-/g, ".")),
-      h("div", { class: "t" }, x.company),
-      x.summary ? h("div", { class: "m" }, x.summary) : null))), note);
-  }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
 
   // 이번 주 금융리포트: 기본 연구기관마다 최근 7일 자료를 몇 건씩
   const researchBox = h("div", { class: "card list" }, skeleton(3));
@@ -178,6 +211,22 @@ function seoulNow() {
   const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", { timeZone: "Asia/Seoul", year: "numeric", month: "numeric", day: "numeric", hour: "numeric", hour12: false, weekday: "short" }).formatToParts(new Date()).map((p) => [p.type, p.value]));
   const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(parts.weekday);
   return { y: +parts.year, m: +parts.month, d: +parts.day, hour: +parts.hour % 24, wd };
+}
+
+const dotYmd = (v) => (v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6)}` : v || "-");
+const KEY_LAWS = ["자본시장과 금융투자업에 관한 법률", "은행법", "보험업법", "금융소비자 보호에 관한 법률", "전자금융거래법", "여신전문금융업법", "가상자산 이용자 보호 등에 관한 법률", "상호저축은행법", "특정 금융거래정보의 보고 및 이용 등에 관한 법률"];
+/** 주요 금융 법령의 최근 제·개정(공포일 기준 최신 3건). */
+async function loadLawNews() {
+  const rows = await Promise.all(KEY_LAWS.map((name) => repo.lawVersions({ name }).then((vs) => {
+    const v = vs.sort((a, b) => (b.promulgationDate || "").localeCompare(a.promulgationDate || ""))[0];
+    return v ? { name: v.name, promulgationDate: v.promulgationDate, effectiveDate: v.effectiveDate, type: v.revisionType } : null;
+  }).catch(() => null)));
+  return rows.filter(Boolean).sort((a, b) => (b.promulgationDate || "").localeCompare(a.promulgationDate || "")).slice(0, 3);
+}
+
+function drawHello(el, w) {
+  const now = seoulNow();
+  el.replaceChildren(w ? h("span", { class: "hm-w" }, `${w.emoji} ${w.temp}° ${w.summary} · ${w.min}°/${w.max}°`) : null, h("span", { class: "hm-g" }, greeting(now, w)));
 }
 
 function drawHero(hero, w) {
