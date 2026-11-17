@@ -1406,3 +1406,9 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 @media (max-width: 1000px) { .hm-two { grid-template-columns: 1fr; } }
 @media (max-width: 860px) { .hm-stats { grid-template-columns: repeat(2, 1fr); gap: 10px; } .hm-sc b { font-size: 17px; } .hm-favs { flex-wrap: nowrap; overflow-x: auto; padding-bottom: 4px; } }
 @media (max-width: 1000px) { .hm-grid { grid-template-columns: 1fr; } }
+
+/* 오늘의 브리핑 증시 지표: 첫 줄은 코스피·코스닥만 크게 */
+.hm-kpis-top { grid-template-columns: repeat(2, 1fr); margin-bottom: 12px; }
+.hm-kpis-top .tile .ch { flex: 0 0 45%; }
+.hm-kpis-top .tile .px { font-size: 26px; }
+@media (max-width: 860px) { .hm-kpis-top { gap: 10px; margin-bottom: 10px; } .hm-kpis-top .tile .tt { flex-direction: column; align-items: stretch; } .hm-kpis-top .tile .ch { flex: none; } .hm-kpis-top .tile .px { font-size: 20px; } }

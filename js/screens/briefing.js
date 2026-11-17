@@ -12,7 +12,7 @@ import { docHref, loadLawNews } from "../lib/lawnews.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
-import { DAYS as ACTION_DAYS, loadRecentActions } from "../lib/recentaction.js";
+import { loadRecentActions } from "../lib/recentaction.js";
 
 const PRESS = ["FSS", "FSC"];
 const PRESS_COUNT = 5;
@@ -48,17 +48,27 @@ export async function render(root, params, ctx) {
   // ② 증시 지표(첫째 줄) + 주요 금융 통계·거시경제 지표(둘째 줄). 오른쪽 '더보기'는 금융시장 동향 및 거시경제 지표로 간다.
   root.append(h("div", { class: "hm-sh" }, h("h3", null, "증시 지표"), h("a", { class: "link-more", href: "#/market" }, "더보기", icon("chevron-right"))));
   const tiles = [];
-  const kpis = h("div", { class: "hm-kpis" });
   // 시장 동향의 '지표 선택'에서 오늘의 브리핑에 고른 지표를 모두 보여 준다(고른 것이 없으면 기본 3개).
   const picked = indexSelection().briefing;
   let chosen = INDEX_CHOICES.filter((x) => picked.includes(x.symbol));
   if (!chosen.length) chosen = ["^KS11", "^KQ11", "KRW=X"].map((sym) => INDEX_CHOICES.find((x) => x.symbol === sym)).filter(Boolean);
-  for (const it of chosen) {
-    const t = indexTile(it, { showInvestors: it.symbol === "^KS11" || it.symbol === "^KQ11" }); // 코스피·코스닥은 금융시장 동향처럼 투자자별 순매수도 보여 준다
+  // 첫 줄에는 코스피·코스닥 두 칸을 크게(투자자별 순매수 포함), 나머지 지표는 아래 줄에 둔다.
+  const topIdx = chosen.filter((x) => x.symbol === "^KS11" || x.symbol === "^KQ11");
+  const restIdx = chosen.filter((x) => !topIdx.includes(x));
+  const topBox = h("div", { class: "hm-kpis hm-kpis-top" });
+  const kpis = h("div", { class: "hm-kpis" });
+  for (const it of topIdx) {
+    const t = indexTile(it, { wide: true, showInvestors: true });
+    tiles.push(t);
+    topBox.append(t.el);
+  }
+  for (const it of restIdx) {
+    const t = indexTile(it);
     tiles.push(t);
     kpis.append(t.el);
   }
-  root.append(kpis);
+  if (topIdx.length) root.append(topBox);
+  if (restIdx.length) root.append(kpis);
   tiles.forEach((t) => t.update());
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer);
@@ -106,9 +116,9 @@ export async function render(root, params, ctx) {
     pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
   });
 
-  loadRecentActions().then(({ items, failed }) => {
+  loadRecentActions(36500).then(({ items, failed }) => {
     if (!ctx.alive()) return;
-    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, `최근 ${ACTION_DAYS}일 이내 새로 공시된 검사·공시조사·회계감리 결과가 없습니다.` + (failed.length ? ` (${failed.join("·")} 자료는 불러오지 못함)` : "")));
+    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, "검사·공시조사·회계감리 결과가 없습니다." + (failed.length ? ` (${failed.join("·")} 자료는 불러오지 못함)` : "")));
     actBox.replaceChildren(...items.slice(0, 5).map((x) => h("a", { class: "item hm-act", href: x.href }, h("div", { class: "body" },
       h("div", { class: "hm-act-r" }, h("span", { class: "tag " + (x.kind === "검사" ? "blue" : x.kind === "공시조사" ? "orange" : "red") }, x.kind), h("b", null, x.company), h("span", { class: "hm-d" }, x.date.slice(5).replace("-", "."))),
       x.summary ? h("div", { class: "m" }, x.summary) : null))));
