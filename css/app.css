@@ -1328,7 +1328,8 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .hm-kpis .tile .nm { color: var(--muted); font-weight: 600; }
 .hm-kpis .tile .px { font-size: 22px; text-align: left; font-weight: 700; }
 .hm-kpis .tile .dl { text-align: left; }
-.hm-kpis .tile .inv { margin-top: 8px; }
+.hm-kpis .tile { display: flex; flex-direction: column; }
+.hm-kpis .tile .inv { margin-top: auto; padding-top: 8px; }
 .hm-grid { display: grid; grid-template-columns: 1.15fr 1fr; gap: 12px; margin-top: 12px; align-items: stretch; }
 .hm-right { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
 .hm-card { min-width: 0; }

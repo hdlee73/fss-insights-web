@@ -205,7 +205,7 @@ function openMega() {
   const btn = document.getElementById("tn-all");
   if (!btn) return;
   const r = btn.getBoundingClientRect();
-  const w = Math.min(880, innerWidth - 24);
+  const w = Math.min(980, innerWidth - 24);
   mega.style.width = w + "px";
   mega.style.left = Math.max(12, Math.min(r.left - 40, innerWidth - w - 12)) + "px";
   mega.style.top = tnav.getBoundingClientRect().bottom + "px";
