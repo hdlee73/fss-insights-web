@@ -1,5 +1,5 @@
 // 보관함: 스크랩한 기사·보도자료·리포트를 모아 보고, 항목마다 메모를 남긴다. 서버 없이 이 브라우저에만 저장된다.
-import { setHeader } from "../app.js";
+import { go, setHeader } from "../app.js";
 import { dialog, dotDate, download, h, icon, iconButton, message, openUrl, share, tabs, toast, ymd } from "../core.js";
 import { allItems, editNote, exportAll, importAll, isRead, markRead, removeItem, setNote } from "../lib/vault.js";
 import { matchText } from "../lib/text.js";
@@ -27,6 +27,10 @@ export async function render(root, params, ctx) {
     const shown = items.filter((x) => filters[tab](x) && matchText(`${x.title} ${x.summary} ${x.note} ${x.source}`, query));
     if (!shown.length) {
       list.replaceChildren(message(items.length ? "조건에 맞는 항목이 없습니다." : "보관함이 비어 있습니다.\n기사나 보도자료의 북마크 버튼으로 담고, 연필 버튼으로 메모를 남겨 보세요."));
+      if (!items.length) list.append(h("div", { class: "row-gap", style: { display: "flex", gap: "8px", justifyContent: "center", flexWrap: "wrap", padding: "0 0 20px" } },
+        h("button", { class: "btn sm", type: "button", onclick: () => go("news") }, "뉴스검색에서 담기"),
+        h("button", { class: "btn sm", type: "button", onclick: () => go("press") }, "보도자료에서 담기"),
+        h("button", { class: "btn sm", type: "button", onclick: () => go("alerts", { view: "settings" }) }, "알림 설정")));
       return;
     }
     list.replaceChildren(...shown.map((it) => row(it, redraw)));
@@ -36,7 +40,7 @@ export async function render(root, params, ctx) {
     tabs(labels.map((l, i) => `${l} ${count(filters[i])}`), tab, (i) => ((tab = i), redraw())),
     h("form", { class: "search", onsubmit: (e) => e.preventDefault() }, icon("search"), input),
     list,
-    h("p", { class: "note", style: { margin: "12px 2px" } }, "브라우저 데이터를 지우면 보관함도 사라집니다. 중요한 내용은 ‘내보내기’로 파일에 백업해 두세요.")
+    h("p", { class: "note", style: { margin: "12px 2px" } }, "브라우저 데이터를 지우면 보관함도 사라집니다. 중요한 내용은 ‘내보내기’로 파일에 백업해 두세요. ", h("a", { class: "link-more", href: "#/alerts?view=settings" }, "알림 설정"))
   );
   draw();
 }

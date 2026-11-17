@@ -1464,3 +1464,12 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .cr-asof { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
 @media (max-width: 980px) { .cr-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .cr-grid3 { grid-template-columns: 1fr; } }
+
+/* 보관함·알림 바로가기: PC는 상단 내비, 휴대폰은 상단 줄 */
+.tn-vault { position: relative; }
+.tn-vault.on { color: var(--acc); }
+.top .top-quick { display: none; position: relative; }
+.top .top-bell .badge { position: absolute; top: -2px; right: -2px; font-style: normal; font-size: 10px; line-height: 14px; min-width: 14px; text-align: center; background: var(--warm); color: #14213d; font-weight: 700; border-radius: 10px; padding: 0 3px; }
+.top .top-quick.on { color: var(--acc); }
+@media (max-width: 860px) { .top .top-quick { display: inline-grid; } }
+@media (max-width: 1360px) { .tn-search span { display: none; } .tn-search { min-width: 0; width: 36px; padding: 0; justify-content: center; } }
