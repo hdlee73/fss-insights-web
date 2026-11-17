@@ -50,7 +50,7 @@ Object.assign(ROUTES, {
 });
 
 // v3.0 내비: 어느 화면에서든 한 번에 열리는 3개 + 법령. 나머지는 '전체 메뉴'(PC 메가메뉴, 휴대폰 서랍).
-const PINNED = [["news", "뉴스검색", "newspaper"], ["market", "금융시장 동향", "trending-up"], ["consumer", "소비자 지킴이", "shield-check"]];
+const PINNED = [["news", "뉴스검색", "newspaper"], ["market", "금융시장 동향", "trending-up"], ["consumer", "소비자 지킴이", "shield-check"], ["law", "스마트 법령검색", "scale"], ["crypto", "가상자산 시장 동향", "coins"]];
 const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", "trending-up"], ["consumer", "소비자", "shield-check"], ["law", "법령", "scale"], ["crypto", "가상자산", "coins"]];
 const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
@@ -178,8 +178,6 @@ function buildTopNav() {
     link("briefing", "tn-brand", h("img", { class: "logo", src: "icons/icon-192.png", alt: "" }), h("b", null, "FSS Insights")),
     link("briefing", "tn-link", "홈"),
     ...PINNED.map(([id, label, ic]) => link(id, "tn-pill", icon(ic), label)),
-    link("law", "tn-link", "스마트 법령검색"),
-    link("crypto", "tn-link", "가상자산 시장 동향"),
     h("button", { class: "tn-link tn-all", id: "tn-all", type: "button", "aria-expanded": "false", "aria-controls": "mega", onclick: toggleMega }, "전체 메뉴", icon("chevron-down")),
     h("span", { class: "tn-sp" }),
     h("button", { class: "tn-search", id: "qs-btn", type: "button", title: "저장된 기사·보도자료 검색 (Ctrl K)", onclick: openQuickSearch }, icon("search"), h("span", null, "검색 · Ctrl K")),
