@@ -1436,3 +1436,12 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .fp-star:hover { background: var(--chip); }
 .fp-sub { margin: 8px 4px 2px; padding-top: 8px; border-top: 1px solid var(--line2); font-size: 11.5px; color: var(--muted); font-weight: 600; }
 .fp-empty { padding: 6px 8px; }
+
+/* 거래소 재무 비교 카드: 3열 격자, 기준일 표시 */
+.cr-grid3 { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; align-items: stretch; }
+.cr-grid3 > .card { min-width: 0; }
+.cr-grid3 .cr-hb { grid-template-columns: 56px 1fr 70px; }
+.cr-grid3 .cr-hb b { white-space: nowrap; }
+.cr-asof { display: block; color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+@media (max-width: 980px) { .cr-grid3 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .cr-grid3 { grid-template-columns: 1fr; } }
