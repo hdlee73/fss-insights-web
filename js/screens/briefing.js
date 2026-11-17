@@ -40,10 +40,17 @@ export async function render(root, params, ctx) {
     body);
 
   // ① 즐겨찾기: 전체 메뉴를 열지 않고 바로 가도록 맨 위에 둔다.
-  const fav = favoriteList();
-  root.append(h("div", { class: "hm-favs" }, h("b", null, icon("star"), "즐겨찾기"),
-    fav.length ? fav.map((f) => h("a", { class: "hm-fav", href: "#/" + f.id }, icon(f.icon), f.label))
-      : h("span", { class: "note" }, "전체 메뉴에서 ★를 누르면 자주 쓰는 화면이 여기에 모입니다.")));
+  const favBox = h("div", { class: "hm-favs" });
+  const paintFavs = () => {
+    const fav = favoriteList();
+    favBox.replaceChildren(h("b", null, icon("star"), "즐겨찾기"),
+      ...(fav.length ? fav.map((f) => h("a", { class: "hm-fav", href: "#/" + f.id }, icon(f.icon), f.label))
+        : [h("span", { class: "note" }, "상단 ★ 단추나 전체 메뉴의 ★로 자주 쓰는 화면을 모아 두세요.")]));
+  };
+  paintFavs();
+  root.append(favBox);
+  const onFavs = () => (ctx.alive() ? paintFavs() : removeEventListener("favschange", onFavs));
+  addEventListener("favschange", onFavs);
 
   // ② 증시 지표(첫째 줄) + 주요 금융 통계·거시경제 지표(둘째 줄). 오른쪽 '더보기'는 금융시장 동향 및 거시경제 지표로 간다.
   root.append(h("div", { class: "hm-sh" }, h("h3", null, "증시 지표"), h("a", { class: "link-more", href: "#/market" }, "더보기", icon("chevron-right"))));
