@@ -1,4 +1,4 @@
-// 앱 뼈대(v3.0): PC는 상단 내비(뉴스검색·금융시장 동향·소비자 지킴이 고정 + 전체 메뉴), 휴대폰은 하단 탭 5개(뉴스·시장·소비자·법령·전체=서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
+// 앱 뼈대(v3.0): PC는 상단 내비(뉴스검색·금융시장 동향·소비자 지킴이 고정 + 전체 메뉴), 휴대폰은 하단 탭 6개(뉴스·시장·소비자·법령·가상자산·전체=서랍), 주소(#/화면) 기반 이동, 업데이트 알림.
 // 화면 이동은 모두 브라우저 기록에 남으므로 뒤로가기(버튼·제스처)는 앱을 닫지 않고 직전 화면으로 돌아간다.
 import { APP_VERSION, DISCLAIMER_DETAIL, DISCLAIMER_SHORT, dialog, forget, freshness, h, icon, skeleton, store, toast } from "./core.js";
 import { installQuickSearchKey, openQuickSearch } from "./quicksearch.js";
@@ -51,11 +51,12 @@ Object.assign(ROUTES, {
 
 // v3.0 내비: 어느 화면에서든 한 번에 열리는 3개 + 법령. 나머지는 '전체 메뉴'(PC 메가메뉴, 휴대폰 서랍).
 const PINNED = [["news", "뉴스검색", "newspaper"], ["market", "금융시장 동향", "trending-up"], ["consumer", "소비자 지킴이", "shield-check"]];
-const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", "trending-up"], ["consumer", "소비자", "shield-check"], ["law", "법령", "scale"]];
+const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", "trending-up"], ["consumer", "소비자", "shield-check"], ["law", "법령", "scale"], ["crypto", "가상자산", "coins"]];
 const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
-  ["자료·더보기", ["press", "regulatory", "research", "library", "crypto", "vault", "sites", "info"]],
+  ["금융관련 자료", ["press", "regulatory", "research", "library"]],
+  ["더보기", ["board", "vault", "sites", "info"]],
 ];
 
 const loaders = {
@@ -178,6 +179,7 @@ function buildTopNav() {
     link("briefing", "tn-link", "홈"),
     ...PINNED.map(([id, label, ic]) => link(id, "tn-pill", icon(ic), label)),
     link("law", "tn-link", "스마트 법령검색"),
+    link("crypto", "tn-link", "가상자산 시장 동향"),
     h("button", { class: "tn-link tn-all", id: "tn-all", type: "button", "aria-expanded": "false", "aria-controls": "mega", onclick: toggleMega }, "전체 메뉴", icon("chevron-down")),
     h("span", { class: "tn-sp" }),
     h("button", { class: "tn-search", id: "qs-btn", type: "button", title: "저장된 기사·보도자료 검색 (Ctrl K)", onclick: openQuickSearch }, icon("search"), h("span", null, "검색 · Ctrl K")),
@@ -203,7 +205,7 @@ function openMega() {
   const btn = document.getElementById("tn-all");
   if (!btn) return;
   const r = btn.getBoundingClientRect();
-  const w = Math.min(880, innerWidth - 24);
+  const w = Math.min(980, innerWidth - 24);
   mega.style.width = w + "px";
   mega.style.left = Math.max(12, Math.min(r.left - 40, innerWidth - w - 12)) + "px";
   mega.style.top = tnav.getBoundingClientRect().bottom + "px";
@@ -503,7 +505,7 @@ if (!store.get("disclaimer.ok")) {
 if (store.get("disclaimer.ok") && !store.get("whatsnew.3.0")) {
   dialog({ title: "FSS Insights 3.0 — 새 메뉴 구성", body: h("div", { class: "stack" },
     h("p", null, "뉴스검색·금융시장 동향·소비자 지킴이를 언제든 한 번에 열 수 있도록 메뉴를 바꿨습니다."),
-    h("p", { class: "note" }, "PC: 위쪽 메뉴 바의 파란 단추 3개 + ‘전체 메뉴 ▾’에서 나머지 메뉴(즐겨찾기 별 포함). 휴대폰: 아래쪽 탭 5개(뉴스·시장·소비자·법령·전체). 모든 기능과 즐겨찾기는 그대로입니다.")), ok: "확인", cancel: null })
+    h("p", { class: "note" }, "PC: 위쪽 메뉴 바의 파란 단추 3개와 스마트 법령검색·가상자산 시장 동향 + ‘전체 메뉴 ▾’에서 나머지 메뉴(즐겨찾기 별 포함). 휴대폰: 아래쪽 탭 6개(뉴스·시장·소비자·법령·가상자산·전체). 모든 기능과 즐겨찾기는 그대로입니다.")), ok: "확인", cancel: null })
     .then((ok) => ok && store.set("whatsnew.3.0", true));
 }
 import("./alerts-check.js").then((m) => m.checkInBackground()).catch(() => {});
