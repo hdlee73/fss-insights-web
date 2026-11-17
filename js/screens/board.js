@@ -56,46 +56,8 @@ function fmtDate(iso) {
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-async function promptAdmin(ctx) {
-  if (adminKey()) {
-    const out = await dialog({
-      title: "관리자 인증됨",
-      text: "현재 관리자(공지 작성·삭제) 상태입니다.",
-      ok: "로그아웃",
-      cancel: "닫기",
-    });
-    if (out) {
-      setAdminKey("");
-      toast("관리자 인증을 해제했습니다.");
-      ctx.go({}, { replace: true });
-    }
-    return false;
-  }
-  const out = await dialog({
-    title: "관리자 인증",
-    text: "FSS Insights 관리자(/admin)와 같은 관리자 토큰을 입력해 주세요.",
-    fields: [{ name: "key", label: "관리자 토큰", type: "password", placeholder: "ADMIN_TOKEN" }],
-    ok: "인증",
-  });
-  if (!out || !out.key) return false;
-  try {
-    setAdminKey(out.key.trim());
-    await req("/board/admin/verify", { method: "POST", admin: true });
-    toast("관리자로 인증되었습니다.");
-    ctx.go({}, { replace: true });
-    return true;
-  } catch (e) {
-    setAdminKey("");
-    toast(errorText(e));
-    return false;
-  }
-}
-
-async function openWriteDialog(ctx, isNotice = false) {
-  if (isNotice && !adminKey()) {
-    const ok = await promptAdmin(ctx);
-    if (!ok) return;
-  }
+async function openWriteDialog(ctx) {
+  const isNotice = false; // 게시판 공지는 서버 /admin/notices 화면에서만 작성한다.
   const titleEl = h("input", { type: "text", maxlength: 120, placeholder: isNotice ? "공지 제목을 입력하세요" : "제목을 입력하세요" });
   const authorEl = h("input", { type: "text", maxlength: 20, placeholder: isNotice ? "관리자" : "닉네임 (비우면 익명)" });
   const bodyEl = h("textarea", { maxlength: 5000, placeholder: "내용을 입력하세요 (최대 5,000자)" });
@@ -139,11 +101,8 @@ export async function render(root, params, ctx) {
 }
 
 async function renderList(root, params, ctx) {
-  const isAdmin = !!adminKey();
-  setHeader("익명게시판", "자유로운 의견·질문 · 공지사항은 관리자만 작성 가능", [
-    h("button", { class: "pill", type: "button", onclick: () => openWriteDialog(ctx, false) }, icon("pencil"), h("span", { class: "lbl" }, "글쓰기")),
-    h("button", { class: "pill", type: "button", onclick: () => openWriteDialog(ctx, true) }, icon("pin"), h("span", { class: "lbl" }, "공지 작성")),
-    h("button", { class: "pill" + (isAdmin ? " on" : ""), type: "button", title: "관리자 인증", onclick: () => promptAdmin(ctx) }, icon("lock"), h("span", { class: "lbl" }, isAdmin ? "관리자" : "인증")),
+  setHeader("익명게시판", "자유로운 의견·질문", [
+    h("button", { class: "pill", type: "button", onclick: () => openWriteDialog(ctx) }, icon("pencil"), h("span", { class: "lbl" }, "글쓰기")),
   ]);
 
   const q = (params.q || "").trim();
