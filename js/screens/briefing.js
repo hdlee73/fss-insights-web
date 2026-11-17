@@ -1,5 +1,5 @@
 // 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 최근 검사·공시조사·회계감리 결과, 이번 주 금융리포트.
-import { favoriteList, setHeader } from "../app.js";
+import { setHeader } from "../app.js";
 import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
@@ -39,18 +39,6 @@ export async function render(root, params, ctx) {
     h("div", { class: "br-sh" }, h("div", null, h("h3", null, title), h("small", null, sub)), target ? h("a", { class: "link-more", href: "#/" + target }, "더 보기", icon("chevron-right")) : null),
     body);
 
-  // ① 즐겨찾기: 전체 메뉴를 열지 않고 바로 가도록 맨 위에 둔다.
-  const favBox = h("div", { class: "hm-favs" });
-  const paintFavs = () => {
-    const fav = favoriteList();
-    favBox.replaceChildren(h("b", null, icon("star"), "즐겨찾기"),
-      ...(fav.length ? fav.map((f) => h("a", { class: "hm-fav", href: "#/" + f.id }, icon(f.icon), f.label))
-        : [h("span", { class: "note" }, "상단 ★ 단추나 전체 메뉴의 ★로 자주 쓰는 화면을 모아 두세요.")]));
-  };
-  paintFavs();
-  root.append(favBox);
-  const onFavs = () => (ctx.alive() ? paintFavs() : removeEventListener("favschange", onFavs));
-  addEventListener("favschange", onFavs);
 
   // ② 증시 지표(첫째 줄) + 주요 금융 통계·거시경제 지표(둘째 줄). 오른쪽 '더보기'는 금융시장 동향 및 거시경제 지표로 간다.
   root.append(h("div", { class: "hm-sh" }, h("h3", null, "증시 지표"), h("a", { class: "link-more", href: "#/market" }, "더보기", icon("chevron-right"))));
