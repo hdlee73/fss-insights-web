@@ -52,6 +52,7 @@ Object.assign(ROUTES, {
 // v3.0 내비: 어느 화면에서든 한 번에 열리는 3개 + 법령. 나머지는 '전체 메뉴'(PC 메가메뉴, 휴대폰 서랍).
 const PINNED = [["news", "뉴스검색", "newspaper"], ["market", "금융시장 동향", "trending-up"], ["consumer", "소비자 지킴이", "shield-check"], ["law", "스마트 법령검색", "scale"], ["crypto", "가상자산 시장 동향", "coins"]];
 const TABS = [["news", "뉴스검색", "newspaper"], ["market", "금융시장", "trending-up"], ["consumer", "소비자", "shield-check"], ["law", "법령", "scale"], ["crypto", "가상자산", "coins"]];
+const MAIN_IDS = ["news", "market", "consumer", "law", "crypto"];
 const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
@@ -126,6 +127,45 @@ const FAV_HEAD = "즐겨찾기";
 /** 오늘의 브리핑 즐겨찾기 줄에 쓰는 목록 [{id,label,icon}]. */
 export const favoriteList = () => favs().map((id) => ({ id, label: ROUTES[id].label, icon: ROUTES[id].icon }));
 
+// 즐겨찾기 팝업: 어느 화면에서나 상단 「홈」 옆 ★ 단추로 연다. 즐겨찾기 해제와 메인 메뉴 항목 추가도 여기서 한다.
+const favPop = h("div", { class: "favpop", id: "favpop", hidden: true, role: "dialog", "aria-label": "즐겨찾기" });
+document.body.append(favPop);
+function buildFavPop() {
+  const on = favs();
+  const row = (id, isOn) => h("div", { class: "fp-row" },
+    h("a", { class: "fp-i", href: `#/${id}`, onclick: closeFavPop }, icon(ROUTES[id].icon), h("span", null, ROUTES[id].label)),
+    h("button", { class: "fp-star" + (isOn ? " on" : ""), type: "button", "aria-pressed": String(isOn), title: isOn ? "즐겨찾기 해제" : "즐겨찾기에 추가", "aria-label": `${ROUTES[id].label} ${isOn ? "즐겨찾기 해제" : "즐겨찾기에 추가"}`, onclick: (e) => (e.stopPropagation(), toggleFav(id), buildFavPop()) }, icon("star")));
+  const rest = MAIN_IDS.filter((id) => !on.includes(id));
+  favPop.replaceChildren(
+    h("div", { class: "fp-h" }, icon("star"), h("b", null, "즐겨찾기"), h("button", { class: "ib fp-x", type: "button", "aria-label": "닫기", onclick: closeFavPop }, icon("x"))),
+    on.length ? on.map((id) => row(id, true)) : h("div", { class: "note fp-empty" }, "아직 즐겨찾기가 없습니다. 전체 메뉴 항목 오른쪽 ★을 누르거나 아래에서 추가하세요."),
+    rest.length ? h("div", { class: "fp-sub" }, "메인 메뉴에서 추가") : null,
+    rest.map((id) => row(id, false)));
+}
+function openFavPop(anchor) {
+  buildFavPop();
+  favPop.hidden = false;
+  if (mobile.matches) {
+    favPop.style.left = "12px";
+    favPop.style.top = (document.querySelector(".top")?.getBoundingClientRect().bottom || 56) + 6 + "px";
+  } else {
+    const r = anchor.getBoundingClientRect();
+    favPop.style.left = Math.max(12, Math.min(r.left, innerWidth - 332)) + "px";
+    favPop.style.top = r.bottom + 6 + "px";
+  }
+  anchor.setAttribute("aria-expanded", "true");
+}
+function closeFavPop() {
+  if (favPop.hidden) return;
+  favPop.hidden = true;
+  for (const b of document.querySelectorAll(".fav-open")) b.setAttribute("aria-expanded", "false");
+}
+function favBtn(cls) {
+  const b = h("button", { class: `${cls} fav-open`, type: "button", title: "즐겨찾기", "aria-label": "즐겨찾기 열기", "aria-expanded": "false", "aria-controls": "favpop" }, icon("star"));
+  b.addEventListener("click", (e) => (e.stopPropagation(), favPop.hidden ? openFavPop(b) : closeFavPop()));
+  return b;
+}
+
 function toggleFav(id) {
   const now = favs();
   const on = !now.includes(id);
@@ -136,6 +176,7 @@ function toggleFav(id) {
   applyBadges();
   markCurrent();
   side.scrollTop = top;
+  dispatchEvent(new Event("favschange"));
   toast(on ? `즐겨찾기에 추가했습니다: ${ROUTES[id].label}` : "즐겨찾기에서 뺐습니다");
 }
 
@@ -177,6 +218,7 @@ function buildTopNav() {
   tnav.replaceChildren(
     link("briefing", "tn-brand", h("img", { class: "logo", src: "icons/icon-192.png", alt: "" }), h("b", null, "FSS Insights")),
     link("briefing", "tn-link", "홈"),
+    favBtn("tn-link tn-fav"),
     ...PINNED.map(([id, label, ic]) => link(id, "tn-pill", icon(ic), label)),
     h("button", { class: "tn-link tn-all", id: "tn-all", type: "button", "aria-expanded": "false", "aria-controls": "mega", onclick: toggleMega }, "전체 메뉴", icon("chevron-down")),
     h("span", { class: "tn-sp" }),
@@ -372,6 +414,7 @@ async function render() {
   const { id, params } = currentRoute();
   markCurrent();
   closeMega();
+  closeFavPop();
   document.getElementById("board-btn")?.classList.toggle("on", id === "board");
   refreshFolds(id !== lastCountedId); // 다른 화면으로 옮겨 가면 그 화면이 든 묶음은 펼친다
   const route = ROUTES[id];
@@ -464,10 +507,12 @@ buildTabs();
 // 접속할 때는 항상 메뉴를 펼친 상태로 시작한다(접기는 그때그때만).
 document.body.classList.remove("collapsed");
 // 휴대폰 헤더 왼쪽 집 버튼 = 오늘의 브리핑(홈). 전체 메뉴(서랍)는 하단 '전체' 탭이나 왼쪽 가장자리 밀기로 연다.
+document.getElementById("hamb").after(favBtn("ib top-fav"));
 document.getElementById("hamb").addEventListener("click", () => (location.hash = "#/briefing"));
 document.getElementById("title").addEventListener("click", () => mobile.matches && (location.hash = "#/briefing"));
 document.addEventListener("click", (e) => !mega.hidden && !mega.contains(e.target) && !e.target.closest("#tn-all") && closeMega());
-addEventListener("resize", closeMega);
+document.addEventListener("click", (e) => !favPop.hidden && !favPop.contains(e.target) && closeFavPop());
+addEventListener("resize", () => (closeMega(), closeFavPop()));
 // 휴대폰에서 글자를 입력하는 동안에는 하단 탭을 숨겨 키보드 위에 떠 있지 않게 한다.
 addEventListener("focusin", (e) => {
   const t = e.target;
@@ -476,7 +521,7 @@ addEventListener("focusin", (e) => {
 addEventListener("focusout", () => document.body.classList.remove("typing"));
 document.getElementById("scrim").addEventListener("click", () => closeDrawer());
 addEventListener("hashchange", render);
-addEventListener("keydown", (e) => e.key === "Escape" && (closeMega(), closeDrawer()));
+addEventListener("keydown", (e) => e.key === "Escape" && (closeMega(), closeFavPop(), closeDrawer()));
 mobile.addEventListener("change", () => closeDrawer());
 // 휴대폰: 화면 왼쪽 가장자리에서 오른쪽으로 밀면 메뉴가 열린다(앱과 같은 동작).
 let touchX = null;
