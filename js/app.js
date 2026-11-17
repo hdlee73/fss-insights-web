@@ -57,7 +57,7 @@ const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
   ["금융관련 자료", ["press", "regulatory", "research", "library"]],
-  ["더보기", ["board", "vault", "sites", "info"]],
+  ["더보기", ["board", "vault", "alerts", "sites", "info"]],
 ];
 
 const loaders = {
@@ -223,7 +223,8 @@ function buildTopNav() {
     h("button", { class: "tn-link tn-all", id: "tn-all", type: "button", "aria-expanded": "false", "aria-controls": "mega", onclick: toggleMega }, "전체 메뉴", icon("chevron-down")),
     h("span", { class: "tn-sp" }),
     h("button", { class: "tn-search", id: "qs-btn", type: "button", title: "저장된 기사·보도자료 검색 (Ctrl K)", onclick: openQuickSearch }, icon("search"), h("span", null, "검색 · Ctrl K")),
-    h("a", { class: "ib tn-bell", href: "#/alerts", "data-id": "alerts", title: "알림", "aria-label": "알림" }, icon("bell"), h("em", { class: "badge", hidden: true })));
+    h("a", { class: "ib tn-vault", href: "#/vault", "data-id": "vault", title: "보관함(스크랩·메모)", "aria-label": "보관함" }, icon("bookmark-check")),
+    h("a", { class: "ib tn-bell", href: "#/alerts", "data-id": "alerts", title: "알림 · 알림 설정", "aria-label": "알림" }, icon("bell"), h("em", { class: "badge", hidden: true })));
 }
 
 function buildMega() {
@@ -508,6 +509,9 @@ buildTabs();
 document.body.classList.remove("collapsed");
 // 휴대폰 헤더 왼쪽 집 버튼 = 오늘의 브리핑(홈). 전체 메뉴(서랍)는 하단 '전체' 탭이나 왼쪽 가장자리 밀기로 연다.
 document.getElementById("hamb").after(favBtn("ib top-fav"));
+// 휴대폰은 상단 줄에도 알림 단추를 둔다(보관함은 하단 ‘전체’ 서랍의 더보기)(PC는 상단 내비 오른쪽에 있다).
+document.getElementById("fresh-btn")?.before(
+  h("a", { class: "ib top-quick top-bell", href: "#/alerts", "data-id": "alerts", title: "알림 · 알림 설정", "aria-label": "알림" }, icon("bell"), h("em", { class: "badge", hidden: true })));
 document.getElementById("hamb").addEventListener("click", () => (location.hash = "#/briefing"));
 document.getElementById("title").addEventListener("click", () => mobile.matches && (location.hash = "#/briefing"));
 document.addEventListener("click", (e) => !mega.hidden && !mega.contains(e.target) && !e.target.closest("#tn-all") && closeMega());
