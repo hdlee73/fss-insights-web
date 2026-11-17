@@ -5,7 +5,7 @@ import { checkNow, clearInbox, inbox, markAllRead, settings } from "../alerts-ch
 import { AGENCIES, GROUPS, customList } from "../lib/agencies.js";
 
 export async function render(root, params, ctx) {
-  setHeader("알림", "키워드·기관 새 글, 참고 자료실, 오늘의 브리핑");
+  setHeader("알림", "키워드·기관 새 글, 제재, 참고 자료실, 오늘의 브리핑");
   const view = params.view === "settings" ? 1 : 0;
   root.append(tabs(["새 소식", "알림 설정"], view, (i) => ctx.go(i ? { view: "settings" } : {}, { replace: true })));
   if (view) return settingsView(root, ctx);
@@ -25,7 +25,7 @@ function newsView(root, ctx) {
   const draw = () => {
     const items = inbox();
     const s = settings();
-    const anyOn = s.keywords.length || s.agencies.length || s.library || s.briefing;
+    const anyOn = s.keywords.length || s.agencies.length || s.sanction || s.disclosure || s.audit || s.library || s.briefing;
     label.replaceChildren(...[h("span", null, items.length ? `최근 ${items.length}건 · 안 읽음 ${items.filter((x) => !x.read).length}건` : "새 소식"),
       h("div", { class: "acts" },
         iconButton("refresh-cw", "지금 확인", async () => {
@@ -105,6 +105,13 @@ function settingsView(root, ctx) {
       h("div", { class: "al-list" }, rows.map(([id, label]) => h("label", { class: "lw-opt" }, h("input", { type: "checkbox", checked: on.has(id), onchange: (e) => toggle(id, e.target.checked) }), label))));
   };
 
+  const box = (key) => h("input", { type: "checkbox", checked: s[key], onchange: (e) => store.set("alerts." + key, e.target.checked) });
+  const sanctionCard = h("section", { class: "card" },
+    h("div", { class: "ch" }, icon("gavel"), h("h3", null, "제재 알림")),
+    h("label", { class: "lw-opt" }, box("sanction"), "금융회사 제재공시에 새 건이 올라오면"),
+    h("label", { class: "lw-opt" }, box("disclosure"), "공시조사결과 제재에 새 건이 올라오면"),
+    h("label", { class: "lw-opt" }, box("audit"), "회계감리결과 제재에 새 건이 올라오면"),
+    h("p", { class: "note", style: { marginTop: "6px" } }, "매일 갱신되는 자료에 새로 들어온 건을 알립니다. 금감원 게시 후 반영까지 하루 안팎 걸릴 수 있습니다."));
   const libBox = h("input", { type: "checkbox", checked: s.library, onchange: (e) => store.set("alerts.library", e.target.checked) });
   const brBox = h("input", { type: "checkbox", checked: s.briefing, onchange: (e) => store.set("alerts.briefing", e.target.checked) });
   const brTime = h("input", { type: "time", value: s.briefingTime, onchange: (e) => store.set("alerts.briefingTime", e.target.value || "08:30") });
@@ -116,6 +123,7 @@ function settingsView(root, ctx) {
   root.append(h("div", { class: "stack", style: { marginTop: "12px" } },
     permCard, kwCard,
     h("div", { class: "grid2 al-grid" }, agencyCard("PRESS", `새 ${GROUPS.PRESS.noun} 알림`), agencyCard("RESEARCH", "새 금융리포트 알림")),
+    sanctionCard,
     etc,
     h("p", { class: "note" }, "처음 켠 기관·키워드는 지금 있는 글을 ‘이미 본 것’으로 기록하고, 그다음부터 새로 올라온 글만 알립니다.")));
 }

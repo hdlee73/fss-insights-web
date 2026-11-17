@@ -2,6 +2,7 @@
 // 메뉴 배지와 브라우저 알림(허락한 경우)으로 알린다. 웹은 닫혀 있을 때 확인하지 못한다(앱과 다른 점).
 // - 키워드: 최근 24시간 뉴스(앱과 같은 검색), 금융감독원·금융위원회 보도자료 제목에 키워드가 들어 있으면
 // - 새 자료: 고른 기관의 보도자료·금융리포트가 새로 올라오면
+// - 제재: 금융회사 제재공시·공시조사결과제재·회계감리결과제재에 새 건이 올라오면(매일 갱신되는 자료 기준)
 // - 참고 자료실: 새 파일이 올라오면
 // - 오늘의 브리핑: 매일 정한 시각 이후 처음 확인할 때 한 번
 import { api, store } from "./core.js";
@@ -12,6 +13,9 @@ const MAX_INBOX = 200;
 export const settings = () => ({
   keywords: store.get("alerts.keywords", []),
   agencies: store.get("alerts.agencies", []),
+  sanction: store.get("alerts.sanction", false),
+  disclosure: store.get("alerts.disclosure", false),
+  audit: store.get("alerts.audit", false),
   library: store.get("alerts.library", false),
   briefing: store.get("alerts.briefing", false),
   briefingTime: store.get("alerts.briefingTime", "08:30"),
@@ -104,6 +108,40 @@ async function run(force) {
     const hits = pressHits;
     const ok = ["FSS", "FSC"].some((id) => lists.get(id));
     diff("k." + k, ok ? hits : null).forEach((x) => found.push({ ...x, kind: `키워드 ‘${k}’` }));
+  }
+
+  // 제재 3종: 자료(매일 갱신)에 새 건이 생기면. 처음 켤 때는 지금 있는 건을 '이미 본 것'으로만 기록한다.
+  const ymd = (v) => {
+    const t = String(v || "").replace(/\D/g, "");
+    return t.length >= 8 ? `${t.slice(0, 4)}.${t.slice(4, 6)}.${t.slice(6, 8)}` : "";
+  };
+  if (s.sanction) {
+    try {
+      const { loadSanctions, actionLine } = await import("./lib/sanctions.js");
+      const d = await loadSanctions();
+      diff("sanction", d.cases.map((c) => ({ title: `${c.company} · ${[c.sector, actionLine(c.inst || c.exec || c.staff)].filter(Boolean).join(" · ")}`, link: "#/sanction?n=" + encodeURIComponent(c.id), source: ymd(c.date) }))).forEach((x) => found.push({ ...x, kind: "제재공시" }));
+    } catch {
+      /* 다음에 다시 */
+    }
+  }
+  if (s.disclosure || s.audit) {
+    const { loadData } = await import("./lib/accdata.js");
+    if (s.disclosure) {
+      try {
+        const d = await loadData("disclosure_sanctions");
+        diff("disclosure", d.items.filter((c) => c.id).map((c) => ({ title: `${c.company} · ${[(c.actions || [])[0], (c.violations || []).find((v) => v.title)?.title].filter(Boolean).join(" · ")}`, link: "#/disclosure?id=" + encodeURIComponent(c.id), source: ymd(c.date || c.postDate) }))).forEach((x) => found.push({ ...x, kind: "공시조사결과 제재" }));
+      } catch {
+        /* 다음에 다시 */
+      }
+    }
+    if (s.audit) {
+      try {
+        const d = await loadData("audit_actions");
+        diff("audit", d.items.map((a) => ({ title: `${a.company} · ${[a.market, (a.actions || []).slice(0, 2).join(", ")].filter(Boolean).join(" · ")}`, link: "#/audit?id=" + encodeURIComponent(a.slno || `${a.company}|${a.actionDate}`), source: ymd(a.actionDate) }))).forEach((x) => found.push({ ...x, kind: "회계감리결과 제재" }));
+      } catch {
+        /* 다음에 다시 */
+      }
+    }
   }
 
   // 참고 자료실: 최상위부터 하위 폴더까지(최대 30곳)
