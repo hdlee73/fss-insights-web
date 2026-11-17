@@ -54,7 +54,7 @@ export async function render(root, params, ctx) {
   let chosen = INDEX_CHOICES.filter((x) => picked.includes(x.symbol));
   if (!chosen.length) chosen = ["^KS11", "^KQ11", "KRW=X"].map((sym) => INDEX_CHOICES.find((x) => x.symbol === sym)).filter(Boolean);
   for (const it of chosen) {
-    const t = indexTile(it);
+    const t = indexTile(it, { showInvestors: it.symbol === "^KS11" || it.symbol === "^KQ11" }); // 코스피·코스닥은 금융시장 동향처럼 투자자별 순매수도 보여 준다
     tiles.push(t);
     kpis.append(t.el);
   }

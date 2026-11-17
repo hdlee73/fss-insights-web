@@ -26,7 +26,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
   const inv = showInvestors ? h("div", { class: "inv" }) : null;
   const el = wide
     ? h("div", { class: "tile" }, h("div", { class: "tt" }, h("div", null, nm, px), chart), dl, inv)
-    : h("div", { class: "tile" }, nm, px, dl, chart);
+    : h("div", { class: "tile" }, nm, px, dl, chart, inv);
   let live = false;
   async function update() {
     let q;
