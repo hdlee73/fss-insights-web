@@ -56,8 +56,6 @@ function myUid() {
   }
 }
 
-const NOTICE_TEXT = "닉네임은 다른 이용자에게 익명으로 보이지만, 운영자는 작성자의 익명 접속자 ID(통계용 무작위 값)를 확인할 수 있습니다.";
-
 // 운영자 키 입력(세션 동안만 보관). 맞으면 글 상세에서 작성자 접속자 ID가 보인다.
 async function adminLogin(ctx) {
   const out = await dialog({
@@ -136,8 +134,7 @@ async function openWriteDialog(ctx) {
     h("label", null, "제목", titleEl),
     isNotice ? null : h("label", null, "작성자", authorEl),
     h("label", null, "내용", bodyEl),
-    pwEl ? h("label", null, "삭제·수정 비밀번호", pwEl) : null,
-    h("p", { class: "note" }, NOTICE_TEXT)
+    pwEl ? h("label", null, "삭제·수정 비밀번호", pwEl) : null
   );
   const ok = await dialog({
     title: isNotice ? "공지사항 작성 (관리자 전용)" : "익명 글쓰기",
@@ -185,8 +182,8 @@ async function renderList(root, params, ctx) {
 
   const box = h("div", null, loading("게시글을 불러오는 중…"));
   root.append(box);
-  root.append(h("p", { class: "note", style: { marginTop: "12px" } }, NOTICE_TEXT + " ",
-    h("button", { class: "btn ghost sm", type: "button", onclick: () => adminLogin(ctx) }, adminKey() ? "운영자 인증됨" : "운영자 인증")));
+  root.append(h("p", { class: "note", style: { marginTop: "12px", textAlign: "right" } },
+    h("button", { class: "btn ghost sm", type: "button", onclick: () => adminLogin(ctx) }, adminKey() ? "운영자 인증됨" : "운영자")));
 
   let data;
   try {
@@ -363,7 +360,7 @@ async function mountPost(box, id, ctx, opts = {}) {
       if (p.is_notice) setAdminKey(out.pw.trim());
       else password = out.pw;
     } else {
-      const ok = await dialog({ title: "게시글 삭제", text: "이 글을 삭제할까요?", ok: "삭제" });
+      const ok = await dialog({ title: "게시글 삭제 (운영자)", text: "이 글과 댓글·투표가 모두 삭제됩니다. 삭제할까요?", ok: "삭제", danger: true });
       if (!ok) return;
     }
     try {
@@ -383,7 +380,10 @@ async function mountPost(box, id, ctx, opts = {}) {
   const deleteComment = async (cid) => {
     const isAdmin = !!adminKey();
     let password = "";
-    if (!isAdmin) {
+    if (isAdmin) {
+      const okAdmin = await dialog({ title: "댓글 삭제 (운영자)", text: "이 댓글을 삭제할까요?", ok: "삭제", danger: true });
+      if (!okAdmin) return;
+    } else {
       const out = await dialog({
         title: "댓글 삭제",
         text: "댓글 작성 시 입력한 비밀번호를 입력하세요.",
@@ -527,7 +527,7 @@ async function mountPost(box, id, ctx, opts = {}) {
           h("span", null, fmtDate(p.created_at) + (p.edited_at ? " (수정됨)" : "")),
           h("span", { class: "bd-acts" },
             p.is_notice || p.has_pw ? h("button", { class: "btn ghost sm", type: "button", onclick: editPost }, icon("pencil"), "수정") : null,
-            h("button", { class: "btn ghost sm", type: "button", onclick: deletePost }, icon("trash-2"), "삭제")
+            h("button", { class: "btn ghost sm", type: "button", onclick: deletePost }, icon("trash-2"), adminKey() ? "운영자 삭제" : "삭제")
           )
         ),
         inline ? null : h("h2", { style: { margin: "10px 0 6px", fontSize: "18px" } }, p.title),
@@ -553,7 +553,6 @@ async function mountPost(box, id, ctx, opts = {}) {
         h("form", { class: "bd-form", style: { marginTop: "14px" }, onsubmit: submitComment },
           h("div", { class: "row-gap" }, cAuthor, cPw),
           cBody,
-          h("p", { class: "note" }, NOTICE_TEXT),
           h("div", { style: { display: "flex", justifyContent: "flex-end" } }, h("button", { class: "btn sm", type: "submit" }, "댓글 등록"))
         )
       )
