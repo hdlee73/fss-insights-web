@@ -1,7 +1,7 @@
 // 금융시장 동향 및 거시경제 지표: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행 ECOS), 거시경제 지표(한국은행 ECOS), 자본시장 통계(금투협).
 // 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 지수는 10초, 전체는 20초마다 새로 읽는다.
 import { setHeader } from "../app.js";
-import { dialog, errorText, forget, h, icon, iconButton, store, toast } from "../core.js";
+import { canPoll, dialog, errorText, forget, onResume, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
   loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
@@ -219,13 +219,16 @@ export async function render(root, params, ctx) {
   };
   await all();
   stamped();
-  let last = Date.now(), busy = false;
+  let last = Date.now(), busy = false, stale = false;
+  const off = onResume(() => { stale = true; }); // 숨었던 탭이 다시 보이거나 연결이 돌아오면 기다리지 않고 한 번 바로 갱신
   const timer = setInterval(async () => {
-    if (!ctx.alive()) return clearInterval(timer);
-    if (document.hidden || busy) return;
+    if (!ctx.alive()) return clearInterval(timer), off();
+    if (!canPoll()) return (stale = true); // 숨은 탭·오프라인에서는 서버를 읽지 않는다
+    if (busy) return;
     const live = anyLive();
     const now = Date.now();
-    if (now - last < (live ? 5000 : 30_000) - 200) return;
+    if (!stale && now - last < (live ? 5000 : 30_000) - 200) return;
+    stale = false;
     busy = true;
     last = now;
     try {
