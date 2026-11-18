@@ -17,6 +17,12 @@ function yearColor(closes, price) {
 const watchList = () => store.get("market.watch", DEFAULT_WATCH);
 const saveWatch = (l) => store.set("market.watch", l);
 
+// 숨었던 탭(절전·화면 꺼짐)이 다시 보이거나 연결이 돌아오면 번호를 올린다. 숨기 전에 보낸 요청의 늦은 응답(수 시간 전 시세)을 버리는 데 쓴다.
+let resumeGen = 0;
+const bumpGen = () => { if (canPoll()) resumeGen++; };
+document.addEventListener("visibilitychange", bumpGen);
+addEventListener("online", bumpGen);
+
 /** 지수 칸 하나(넓은 칸은 코스피·코스닥: 투자자별 순매수 포함). 반환한 update()로 값만 바꾼다. */
 export function indexTile(it, { wide = false, intradayMode = true, showInvestors = false } = {}) {
   const nm = h("div", { class: "nm" }, it.name);
@@ -29,6 +35,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     : h("div", { class: "tile" }, nm, px, dl, chart, inv);
   let live = false;
   async function update() {
+    const gen = resumeGen;
     let q;
     try {
       q = await quote(it.symbol);
@@ -37,6 +44,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
       return false;
     }
     if (!el.isConnected) return true;
+    if (gen !== resumeGen) return false; // 숨은 사이 도착한 오래된 응답은 버린다(바로 새로 읽는다)
     const ch = changeOf(q);
     px.textContent = priceText(it, q.price);
     dl.textContent = deltaText(it, q) || "전일 대비 —";
@@ -45,6 +53,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     try {
       if (intradayMode) {
         const d = await intraday(it.symbol, q.previous, q.price);
+        if (gen !== resumeGen) return false;
         // 앱처럼 전 거래일 흐름(회색)을 왼쪽에, 오늘 흐름을 오른쪽에 함께 그린다.
         chart.replaceChildren(sparkline(d.points, { height: 30, color, baseline: d.previous, prev: d.prevPoints, open: d.open, bars: d.live ? d.bars : 0 }));
         live = !!d.live;
