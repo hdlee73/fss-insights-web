@@ -35,6 +35,7 @@ export const MENU = [
     ["library", "기타 참고자료", "folder-open"],
   ]],
   ["더보기", "ellipsis-vertical", [
+    ["community", "커뮤니티 핫이슈(금융관련)", "flame"],
     ["board", "익명게시판", "message-square"],
     ["vault", "보관함(스크랩·메모)", "bookmark-check"],
     ["sites", "주요사이트", "globe"],
@@ -57,7 +58,7 @@ const MEGA = [
   ["금융회사 현황·검사", ["fisis", "sanction", "finsim"]],
   ["기업공시·회계", ["dart", "disclosure", "audit", "accsearch", "sim"]],
   ["금융관련 자료", ["press", "regulatory", "research", "library"]],
-  ["더보기", ["board", "vault", "alerts", "sites", "info"]],
+  ["더보기", ["community", "board", "vault", "alerts", "sites", "info"]],
 ];
 
 const loaders = {
@@ -77,6 +78,7 @@ const loaders = {
   law: () => import("./screens/law.js"),
   lawnews: () => import("./screens/lawnews.js"),
   lawdoc: () => import("./screens/lawdoc.js"),
+  community: () => import("./screens/community.js"),
   board: () => import("./screens/board.js"),
   vault: () => import("./screens/vault.js"),
   press: () => import("./screens/releases.js"),
