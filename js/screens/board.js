@@ -497,7 +497,7 @@ async function mountPost(box, id, ctx, opts = {}) {
   box.replaceChildren(
     h("div", { class: "stack" },
       h("section", { class: "card" + (p.is_notice ? " bd-notice" : ""), style: { padding: "18px" } },
-        h("div", { class: "bd-meta" },
+        h("div", { class: "bd-meta bd-post-head" },
           p.is_notice ? h("span", { class: "tag blue" }, "공지") : null,
           h("b", null, p.author || "익명"),
           h("span", null, fmtDate(p.created_at) + (p.edited_at ? " (수정됨)" : "")),
@@ -511,10 +511,10 @@ async function mountPost(box, id, ctx, opts = {}) {
         inline ? null : h("div", { class: "bd-votes" }, likeBtn, dislikeBtn)
       ),
       h("section", { class: "card", style: { padding: "16px" } },
-        h("div", { class: "section-label" }, `댓글 ${comments.length}`),
+        h("div", { class: "bd-cmt-title" }, "댓글 • ", h("b", null, String(comments.length))),
         comments.length
           ? h("div", null, comments.map((c) => h("div", { class: "bd-cmt" },
-              h("div", { class: "bd-meta" },
+              h("div", { class: "bd-meta bd-cmt-head" },
                 h("b", null, c.author || "익명"),
                 h("span", null, fmtDate(c.created_at) + (c.edited_at ? " (수정됨)" : "")),
                 h("span", { class: "bd-acts" },
@@ -525,7 +525,7 @@ async function mountPost(box, id, ctx, opts = {}) {
               h("div", { class: "bd-cmt-txt" }, c.body)
             )))
           : h("p", { class: "note" }, "첫 댓글을 남겨 보세요."),
-        h("form", { class: "bd-form", style: { marginTop: "14px" }, onsubmit: submitComment },
+        h("form", { class: "bd-form bd-cmt-form", onsubmit: submitComment },
           h("div", { class: "row-gap" }, cAuthor, cPw),
           cBody,
           h("div", { style: { display: "flex", justifyContent: "flex-end" } }, h("button", { class: "btn sm", type: "submit" }, "댓글 등록"))
