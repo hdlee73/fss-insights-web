@@ -182,7 +182,9 @@ async function renderList(root, params, ctx) {
 
   const box = h("div", null, loading("게시글을 불러오는 중…"));
   root.append(box);
-  root.append(h("p", { class: "note", style: { marginTop: "12px", textAlign: "right" } },
+  // 운영자 버튼은 이미 인증된 세션이거나 주소에 ?admin=1 이 있을 때만 보인다.
+  const showAdminBtn = !!adminKey() || /[?&]admin=1(&|$)/.test(location.search + location.hash);
+  if (showAdminBtn) root.append(h("p", { class: "note", style: { marginTop: "12px", textAlign: "right" } },
     h("button", { class: "btn ghost sm", type: "button", onclick: () => adminLogin(ctx) }, adminKey() ? "운영자 인증됨" : "운영자")));
 
   let data;
