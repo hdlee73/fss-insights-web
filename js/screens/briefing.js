@@ -1,6 +1,6 @@
 // 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 최근 검사·공시조사·회계감리 결과, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
-import { canPoll, onResume, cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
+import { canPoll, forget, onResume, cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
 import * as N from "../lib/news.js";
@@ -66,7 +66,8 @@ export async function render(root, params, ctx) {
   if (restIdx.length) root.append(kpis);
   tiles.forEach((t) => t.update());
   let idle = false;
-  const off = onResume(() => { if (idle && ctx.alive()) { idle = false; tiles.forEach((t) => t.update()); } });
+  // 화면이 얼었다 깨어난 경우(타이머가 한 번도 돌지 않아 idle이 아닐 수 있음)에도 항상 새로 읽는다.
+  const off = onResume(() => { if (ctx.alive()) { idle = false; forget("q:"); forget("i:"); tiles.forEach((t) => t.update()); } });
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer), off();
     if (canPoll()) { idle = false; tiles.forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
