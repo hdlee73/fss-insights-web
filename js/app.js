@@ -35,7 +35,7 @@ export const MENU = [
     ["library", "기타 참고자료", "folder-open"],
   ]],
   ["더보기", "ellipsis-vertical", [
-    ["community", "커뮤니티 핫이슈(금융관련)", "flame"],
+    ["community", "(베타) 커뮤니티 핫이슈(금융관련)", "flame"],
     ["board", "익명게시판", "message-square"],
     ["vault", "보관함(스크랩·메모)", "bookmark-check"],
     ["sites", "주요사이트", "globe"],
