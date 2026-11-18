@@ -2,6 +2,7 @@
 // 위반 조항을 누르면 스마트 법령검색이 그 조문으로 열린다. companyPane()은 금융회사 주요 현황의 '최근 제재내역' 탭에서 쓴다.
 import { go, setHeader } from "../app.js";
 import { dialog, download, errorText, h, icon, iconButton, loading, message, openUrl, tabs, toast } from "../core.js";
+import { dartQuery } from "../lib/accdata.js";
 import {
   FIELDS, PERIODS, SECTORS, NOTICE, actionLine, casesFromRows, casesOf, coverageNote, exportXlsx, filterRows, loadSanctions, periodLabel, periodRange, presetOf, scopeLabel, summarize, whyText, won,
 } from "../lib/sanctions.js";
@@ -10,8 +11,30 @@ const PAGE = 40;
 let filter = { from: null, to: null, sector: null, q: "", field: "all" };
 const dot = (d) => d.replace(/-/g, ".");
 
-/** 공시 한 건 카드. matched: 검색어에 걸린 지적사항(굵게). */
-function caseCard(c, matched = new Set()) {
+// 제재공시의 권역·회사명으로 금융회사 주요 현황(FISIS)의 권역 코드를 짐작한다(어느 권역인지 모호하면 null).
+function fisisSector(c) {
+  const n = c.company || "";
+  switch (c.sector) {
+    case "은행": return "A";
+    case "금융지주": return "L";
+    case "증권": return "F";
+    case "운용": return "G";
+    case "저축은행": return "E";
+    case "부신사": return "M";
+    case "자문일임": return "ADV";
+    case "보험": return /생명/.test(n) ? "H" : /손해|화재|해상/.test(n) ? "I" : null;
+    case "여신전문": return /카드/.test(n) ? "C" : null;
+    default: return null;
+  }
+}
+const fisisHref = (c) => {
+  const code = fisisSector(c);
+  const q = dartQuery(c.company);
+  return code && q ? `#/fisis?sector=${code}&q=${encodeURIComponent(q)}` : null;
+};
+
+/** 공시 한 건 카드. matched: 검색어에 걸린 지적사항(굵게). link: 금융회사 주요 현황 바로가기 표시 */
+function caseCard(c, matched = new Set(), link = true) {
   const acts = [];
   const inst = actionLine(c.inst);
   if (inst) acts.push(["기관", inst]);
@@ -23,7 +46,9 @@ function caseCard(c, matched = new Set()) {
   return h("article", { class: "card sx" },
     h("div", { class: "sx-head" },
       h("div", null, h("b", null, c.company), h("div", { class: "note" }, [c.sector, dot(c.date), c.dept].filter(Boolean).join(" · "))),
-      h("button", { class: "btn ghost sm", type: "button", onclick: () => openUrl(c.viewUrl) }, "원문보기")),
+      h("div", { class: "row-gap" },
+        link && fisisHref(c) ? h("a", { class: "btn ghost sm", href: fisisHref(c), title: "금융회사 주요 현황(FISIS)에서 이 회사 찾기" }, "금융회사 현황") : null,
+        h("button", { class: "btn ghost sm", type: "button", onclick: () => openUrl(c.viewUrl) }, "원문보기"))),
     h("div", { class: "sx-h" }, "[조치내용]"),
     acts.length ? acts.map(([l, t]) => h("div", { class: "sx-act" }, h("span", null, l), t)) : h("p", { class: "note" }, "표시할 조치내용이 없습니다. 원문보기로 확인해 주세요."),
     h("div", { class: "sx-h sx-h2" }, "[지적사항]"),
@@ -214,7 +239,7 @@ export async function companyPane(box, company) {
   const cases = casesOf(data, company);
   box.replaceChildren(
     cases.length
-      ? h("div", { class: "stack" }, h("div", { class: "section-label" }, `${data.fromYear}년 이후 제재공시 ${cases.length}건`), cases.map((c) => caseCard(c)))
+      ? h("div", { class: "stack" }, h("div", { class: "section-label" }, `${data.fromYear}년 이후 제재공시 ${cases.length}건`), cases.map((c) => caseCard(c, new Set(), false)))
       : message(`${data.fromYear}년 이후 금감원 제재공시에서 ‘${company}’ 이름으로 된 공시를 찾지 못했습니다.\n(회사명이 바뀌었으면 ‘금융회사 제재현황’에서 옛 이름으로 검색해 보세요.)`),
     h("p", { class: "note", style: { marginTop: "12px" } }, "금감원 ‘금융회사 제재공시’를 회사명으로 맞춰 보여 줍니다. 원문과 다를 수 있으니 업무에는 금감원 원문을 확인하세요."));
 }

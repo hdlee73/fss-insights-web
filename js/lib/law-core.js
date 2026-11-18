@@ -184,6 +184,7 @@ function findAll(n, pred, out = []) {
   return out;
 }
 const first = (n, tag) => findAll(n, tag)[0] || null;
+const cleanText = (t) => (t ? t.replace(/<br\s*\/?>/gi, "\n").replace(/\n{3,}/g, "\n\n").trim() : null) || null;
 const firstText = (n, ...tags) => {
   for (const t of tags) {
     const f = first(n, t);
@@ -266,7 +267,7 @@ export const DrfParsers = {
     return diagnose(
       findAll(r, "admrul").map((n) => {
         const name = childText(n, "행정규칙명");
-        return name ? { serialNo: childText(n, "행정규칙일련번호", "행정규칙ID") || "", name, kind: childText(n, "행정규칙종류"), agency: childText(n, "소관부처명", "발령기관명") } : null;
+        return name ? { serialNo: childText(n, "행정규칙일련번호", "행정규칙ID") || "", name, kind: childText(n, "행정규칙종류"), agency: childText(n, "소관부처명", "발령기관명"), promulgationDate: childText(n, "발령일자"), effectiveDate: childText(n, "시행일자"), revisionType: childText(n, "제개정구분명") } : null;
       }).filter(Boolean), r, xml);
   },
   adminRule(xml) {
@@ -276,8 +277,40 @@ export const DrfParsers = {
       serialNo: childText(info, "행정규칙일련번호") || "",
       name: childText(info, "행정규칙명") || "",
       agency: childText(info, "소관부처명", "발령기관명"),
+      reason: cleanText(firstText(r, "제개정이유내용")),
       articles: findAll(r, "조문내용").map(deepText).flatMap(splitAdminArticles),
     };
+  },
+  /** 법령 본문 응답의 제·개정이유와 개정문(없으면 null). */
+  lawMeta(xml) {
+    const r = root(xml);
+    return { reason: cleanText(firstText(r, "제개정이유내용")), amend: cleanText(firstText(r, "개정문내용")) };
+  },
+  /** 신·구조문 대비(oldAndNew) 응답: 바뀐 조문 쌍 [{old, nw}] (없으면 null). 바뀐 글자는 <P>…</P>로 표시되어 있다. */
+  oldNew(xml) {
+    const r = root(xml);
+    const list = (re) => {
+      const n = findAll(r, (x) => re.test(x.name) && x.children.some((c) => c.name === "조문"))[0];
+      return n ? n.children.filter((c) => c.name === "조문").map((c) => c.text || deepText(c)) : null;
+    };
+    const olds = list(/^구조문/), news = list(/^신조문/);
+    if (!olds || !news) return null;
+    const plain = (t) => (t || "").replace(/<\/?P>/g, "").replace(/\s+/g, "");
+    const same = /^\(?(현행과같음|생략)\)?$|^[0-9]+\.?[∼~·-]?[0-9]*\.?\(?(현행과같음|생략)\)?$/;
+    // 바뀐 항·호·목 쌍을 '제N조' 머리글 기준으로 묶는다(머리글은 조문 첫 줄이 '제N조(제목)'으로 시작하는 항목).
+    const headRe = /^\s*(제\s*\d+(?:-\d+)*\s*조(?:\s*의\s*\d+)?\s*\([^)]*\))/;
+    const headOf = (t) => ((headRe.exec((t || "").replace(/<\/?P>/g, "")) || [])[1] || "").replace(/\s+/g, "");
+    const groups = [];
+    let head = "", cur = null;
+    for (let i = 0; i < Math.max(olds.length, news.length); i++) {
+      const o = (olds[i] || "").trim(), n = (news[i] || "").trim();
+      const hd = headOf(n) || headOf(o);
+      if (hd && hd !== head) (head = hd), (cur = null); // 새 조가 시작되면 묶음을 새로 연다
+      if (plain(o) === plain(n) || /현행과\s*같음/.test(n) || same.test(plain(n))) continue;
+      if (!cur) groups.push((cur = { head, rows: [] }));
+      cur.rows.push({ old: o, nw: n });
+    }
+    return groups;
   },
   precedentSearch(xml) {
     const r = root(xml);
@@ -353,10 +386,31 @@ export function splitAdminArticles(block) {
 // ------------------------------------------------------------------ 저장소 (서버 /law 중계)
 
 const TTL = 30 * 60 * 1000;
+// 매일 새로 모아 올리는 금융 관련 법령 사전수집 자료(GitHub Actions law-data). 같은 요청이 있으면 서버 왕복 없이 이것을 쓰고, 없거나 오래됐으면 실시간 조회로 대신한다.
+const PRE = "https://raw.githubusercontent.com/hdlee73/FSS_insights/law-data/";
+const PRE_STALE = 5 * 86400e3;
+const preIndex = () => cached("law:pre:index", 6 * 3600e3, async () => {
+  const r = await fetch(PRE + "index.json");
+  if (!r.ok) throw new Error("사전수집 없음");
+  const d = await r.json();
+  const t = Date.parse(String(d.updated || "").replace(" KST", "+09:00").replace(" ", "T"));
+  if (!(Date.now() - t < PRE_STALE)) throw new Error("사전수집이 오래됨");
+  return d.keys || {};
+});
+const preKey = (endpoint, p) => endpoint + "?" + Object.entries(p).filter(([k, v]) => v != null && k !== "type" && k !== "JO").map(([k, v]) => `${k}=${v}`).sort().join("&"); // 서버의 build_law.mjs keyOf와 같은 규칙(JO는 빼고 전체 본문에서 번호로 고른다)
+const preText = async (endpoint, p) => {
+  const name = (await preIndex().catch(() => ({})))[preKey(endpoint, p)];
+  if (!name) return null;
+  return cached("law:pre:" + name, TTL, async () => {
+    const r = await fetch(PRE + name);
+    if (!r.ok) throw new Error("사전수집 파일 오류");
+    return r.text();
+  }).catch(() => null);
+};
 const drf = (endpoint, params) => {
   const p = { type: "XML", ...params };
   const key = "law:" + endpoint + "?" + new URLSearchParams(Object.entries(p).filter(([, v]) => v != null)).toString();
-  return cached(key, TTL, () => apiText("/law/DRF/" + endpoint, p));
+  return cached(key, TTL, async () => (await preText(endpoint, p)) ?? apiText("/law/DRF/" + endpoint, p));
 };
 const compact = (s) => (s || "").replace(/ /g, "");
 
@@ -366,6 +420,12 @@ export const repo = {
   },
   async lawArticles(law, no = null) {
     return DrfParsers.lawBody(await drf("lawService.do", { target: "law", MST: law.mst, JO: joParam(no) })).articles;
+  },
+  async lawMeta(law) {
+    return DrfParsers.lawMeta(await drf("lawService.do", { target: "law", MST: law.mst, JO: joParam(null) }));
+  },
+  async oldNew(law) {
+    return DrfParsers.oldNew(await drf("lawService.do", { target: "oldAndNew", MST: law.mst }));
   },
   async lawVersions(law) {
     const seen = new Set();

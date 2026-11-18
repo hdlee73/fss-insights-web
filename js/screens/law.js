@@ -4,6 +4,8 @@
 import { setHeader } from "../app.js";
 import { APP_NAME, APP_VERSION, dialog, download, errorText, h, icon, iconButton, loading, message, share, store, toast } from "../core.js";
 import * as L from "../lib/law-core.js";
+import { previewPrint } from "../lib/report.js";
+import { lawTabs } from "../lib/lawtabs.js";
 
 const results = new Map(); // "검색어|기준일" → { tree } | { kw }
 const views = new Map(); // 같은 키의 화면 상태(펼침·선택·찾기)
@@ -48,7 +50,7 @@ async function searchView(root, params, ctx) {
   setHeader("스마트 법령검색", "법조문 하나로 위임 규정(시행령·시행규칙·감독규정·세칙)과 판례를 한눈에");
   const q = (params.q || "").trim();
   const asOf = /^\d{8}$/.test(params.asOf || "") ? params.asOf : null;
-  root.append(searchBar(params, ctx));
+  root.append(lawTabs("law"), searchBar(params, ctx));
   if (!q) return root.append(idle(ctx));
 
   const key = `${q}|${asOf || ""}`;
@@ -477,37 +479,34 @@ function compareView(root, tree, ctx, params) {
   draw();
 }
 
-/** 비교표 표: 하위 규정 칸은 법률 칸에서 위임한 줄과 같은 높이에서 시작한다. */
+/**
+ * 비교표 표: 위임 근거가 되는 법률 항·호·목의 줄에서 하위 규정이 시작되도록,
+ * 한 행을 "근거 앞 법률 본문"과 "근거 줄 + 하위 규정" 두 줄(tr)로 나눈다.
+ * 줄바꿈 높이를 계산하지 않고 표 자체가 정렬하므로 화면·PDF·창 너비와 무관하게 맞는다.
+ */
 function compareTable(rootN, chosen) {
   const levels = L.compareColumns(chosen);
   const rows = L.compareRows(rootN, chosen);
+  const body = [];
+  for (const r of rows) {
+    const cut = r.cells.size ? Math.max(0, Math.min(r.anchorStart, r.lawText.length)) : 0;
+    const before = r.lawText.slice(0, cut).replace(/\s+$/, "");
+    const rest = before ? r.lawText.slice(cut) : r.lawText;
+    if (before) body.push(h("tr", { class: "pre" }, h("td", null, before), levels.slice(1).map(() => h("td", null))));
+    body.push(h("tr", { class: before ? "post" : "" }, h("td", null, rest), levels.slice(1).map((lv) => {
+      const nodes = r.cells.get(lv) || [];
+      const td = h("td", null);
+      nodes.forEach((n, i) => {
+        if (i) td.append(h("br"));
+        td.append(...[h("b", null, L.displayHeading(n) || n.sourceName), lv >= L.SUP ? h("small", null, n.sourceName) : null, h("div", null, n.article.body)].filter(Boolean));
+      });
+      return td;
+    })));
+  }
   return h("table", { class: "lw-cmp" },
     h("thead", null, h("tr", null, levels.map((lv) => h("th", { class: "l" + lv }, L.LEVELS[lv].label)))),
-    h("tbody", null, rows.map((r) => {
-      const lead = r.cells.size ? r.lawText.slice(0, r.anchorStart).split("\n").length - 1 : 0;
-      const law = h("td", null, r.lawText);
-      return h("tr", null, law, levels.slice(1).map((lv) => {
-        const nodes = r.cells.get(lv) || [];
-        const td = h("td", { "data-lead": lead });
-        nodes.forEach((n, i) => {
-          if (i) td.append(h("br"));
-          td.append(...[h("b", null, L.displayHeading(n) || n.sourceName), lv >= L.SUP ? h("small", null, n.sourceName) : null, h("div", null, n.article.body)].filter(Boolean));
-        });
-        return td;
-      }));
-    })));
+    h("tbody", null, body));
 }
-// 같은 줄 맞추기: 법률 칸에서 위임한 줄이 시작하는 높이만큼 하위 칸을 내린다(그린 뒤 실제 줄 높이로 계산).
-function alignCompare(table) {
-  for (const tr of table.querySelectorAll("tbody tr")) {
-    const law = tr.cells[0];
-    const lead = +(tr.cells[1]?.dataset.lead || 0);
-    if (!lead) continue;
-    const lh = parseFloat(getComputedStyle(law).lineHeight) || 18;
-    for (const td of [...tr.cells].slice(1)) if (td.childNodes.length) td.style.paddingTop = 8 + lead * lh + "px";
-  }
-}
-new MutationObserver(() => document.querySelectorAll(".lw-cmp:not([data-aligned])").forEach((t) => (t.dataset.aligned = "1", requestAnimationFrame(() => alignCompare(t))))).observe(document.body, { childList: true, subtree: true });
 
 // ------------------------------------------------------------------ 저장(PDF·한글)
 
@@ -624,19 +623,14 @@ function printDoc(tree, opt, extras) {
   p(footerLine(), "foot");
 
   const size = { A4: "210mm 297mm", B4: "257mm 364mm", Letter: "8.5in 11in" }[opt.paper || "A4"].split(" ");
-  const style = h("style", null, `@page { size: ${landscape ? size[1] + " " + size[0] : size.join(" ")}; margin: 17mm; }`);
-  document.head.append(style);
-  document.body.append(doc);
-  document.body.classList.add("printing");
-  const done = () => (doc.remove(), style.remove(), document.body.classList.remove("printing"));
-  addEventListener("afterprint", done, { once: true });
-  const prevTitle = document.title;
-  document.title = fileName(tree, "pdf").replace(/\.pdf$/, "");
-  setTimeout(() => {
-    window.print();
-    document.title = prevTitle;
-    setTimeout(() => document.body.contains(doc) && matchMedia("print").matches === false && done(), 1500);
-  }, 50);
+  doc.classList.add("rp-law");
+  if (landscape) doc.classList.add("land");
+  // 법령 문서도 fisis·dart 저장과 같은 미리보기 바(PDF로 저장·휴대폰 PDF 공유)로 연다.
+  previewPrint(doc, fileName(tree, "pdf").replace(/\.pdf$/, ""), {
+    title: `${tree.law.name} ${L.queryTarget(tree.query)}`,
+    pageCss: `@page { size: ${landscape ? size[1] + " " + size[0] : size.join(" ")}; margin: 17mm; }`,
+    landscape,
+  });
 }
 
 // ------------------------------------------------------------------ 판례·법령·행정규칙 본문

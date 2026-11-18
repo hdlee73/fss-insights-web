@@ -1,111 +1,159 @@
-// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 이번 주 금융리포트.
-import { setHeader } from "../app.js";
-import { cached, h, icon, skeleton, store } from "../core.js";
+// 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 최근 검사·공시조사·회계감리 결과, 이번 주 금융리포트.
+import { favoriteList, setHeader } from "../app.js";
+import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
 import * as N from "../lib/news.js";
-import { INDEX_CHOICES, KOREA_INDEXES, indexSelection, statSelection } from "../lib/market.js";
+import { INDEX_CHOICES, KOREA_INDEXES, MACRO_CATALOG, STAT_CATALOG, indexSelection, macroBriefingSelection, periodLabel, statSelection } from "../lib/market.js";
 import { AGENCIES, customList, latest, latestCustom } from "../lib/agencies.js";
-import { drawStats, indexTile } from "./market.js";
+import { indexTile } from "./market.js";
+import { loadStats, statDelta, statText, tint } from "../lib/market.js";
+import { docHref, loadLawNews } from "../lib/lawnews.js";
 import { releaseRow } from "./releases.js";
 import { articleRow, loadHome } from "./news.js";
 import { isMajor } from "../lib/news.js";
+import { DAYS as ACTION_DAYS, loadRecentActions } from "../lib/recentaction.js";
 
 const PRESS = ["FSS", "FSC"];
 const PRESS_COUNT = 5;
 const ARTICLE_COUNT = 5;
-const RESEARCH_PER_AGENCY = 3;
+const RESEARCH_COUNT = 10;
 
 export async function render(root, params, ctx) {
-  setHeader("오늘의 브리핑", "한눈에 보는 오늘 시장과 금융당국 소식"); // 새로고침은 헤더 우측 공통 버튼
-  const hero = h("section", { class: "br-hero" });
-  root.append(hero);
-  drawHero(hero, null);
+  const now0 = seoulNow();
+  const pad = (n) => String(n).padStart(2, "0");
+  const d0 = new Date();
+  setHeader("오늘의 브리핑", `${now0.y}년 ${now0.m}월 ${now0.d}일 ${KO_DAY[now0.wd]} · ${pad(d0.getHours())}:${pad(d0.getMinutes())} 갱신`); // 새로고침은 헤더 우측 공통 버튼
+  const hello = h("div", { class: "hm-hello" });
+  root.append(hello);
+  drawHello(hello, null);
+  cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHello(hello, w)).catch(() => {});
 
-  // 최신 주요 이슈 카드: 많이 나온 말, 원장·위원장 일정, (기기 AI가 있으면) 주요 기사 요약. 아래 기사·보도자료가 도착하는 대로 채워진다.
-  const digestBox = h("section", { class: "br-digest card", "aria-live": "polite" });
-  // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
+  const card = (title, ic, target, body, cls = "", links = null) => h("section", { class: "card hm-card " + cls },
+    h("div", { class: "hm-ch" }, icon(ic), h("h3", null, title),
+      links ? h("div", { class: "hm-links" }, links.map(([label, to]) => h("a", { class: "link-more", href: "#/" + to }, label, icon("chevron-right"))))
+        : target ? h("a", { class: "link-more", href: "#/" + target }, "전체", icon("chevron-right")) : null), body);
   const digestData = { articles: null, press: null, extra: [], ai: undefined };
-  const drawDigest = () => {};
-  drawDigest();
-  cached("weather", 30 * 60 * 1000, loadWeather).then((w) => ctx.alive() && drawHero(hero, w)).catch(() => {});
-
+  const drawDigest = () => {}; // 웹에서는 최신 주요 이슈 카드를 표시하지 않는다(앱에만 있음).
   const section = (title, sub, target, body) => h("section", { class: "br-sec" },
     h("div", { class: "br-sh" }, h("div", null, h("h3", null, title), h("small", null, sub)), target ? h("a", { class: "link-more", href: "#/" + target }, "더 보기", icon("chevron-right")) : null),
     body);
 
-  // 시장 지표(시장 동향의 '지표 선택'에서 브리핑에 고른 것)
-  const sel = indexSelection().briefing;
-  const chosen = INDEX_CHOICES.filter((x) => sel.includes(x.symbol));
-  const wide = chosen.filter((x) => KOREA_INDEXES.some((k) => k.symbol === x.symbol));
-  const small = chosen.filter((x) => !wide.includes(x));
+  // ① 즐겨찾기: 전체 메뉴를 열지 않고 바로 가도록 맨 위에 둔다.
+  const fav = favoriteList();
+  root.append(h("div", { class: "hm-favs" }, h("b", null, icon("star"), "즐겨찾기"),
+    fav.length ? fav.map((f) => h("a", { class: "hm-fav", href: "#/" + f.id }, icon(f.icon), f.label))
+      : h("span", { class: "note" }, "전체 메뉴에서 ★를 누르면 자주 쓰는 화면이 여기에 모입니다.")));
+
+  // ② 증시 지표(첫째 줄) + 주요 금융 통계·거시경제 지표(둘째 줄). 오른쪽 '더보기'는 금융시장 동향 및 거시경제 지표로 간다.
+  root.append(h("div", { class: "hm-sh" }, h("h3", null, "증시 지표"), h("a", { class: "link-more", href: "#/market" }, "더보기", icon("chevron-right"))));
   const tiles = [];
-  const mk = h("div");
-  if (wide.length) mk.append(h("div", { class: "tiles wide2" }, wide.map((it) => (tiles.push(indexTile(it, { wide: true, showInvestors: true })), tiles[tiles.length - 1].el))));
-  if (small.length) mk.append(h("div", { class: "tiles" }, small.map((it) => (tiles.push(indexTile(it)), tiles[tiles.length - 1].el))));
-  if (!chosen.length) mk.append(h("p", { class: "note card" }, "브리핑에 표시할 지표가 없습니다. 금융시장 동향 및 거시경제 지표의 ‘지표 선택’에서 고르세요."));
-  root.append(section("시장 지표", "한눈에 보는 오늘 시장", "market", mk));
+  const kpis = h("div", { class: "hm-kpis" });
+  // 시장 동향의 '지표 선택'에서 오늘의 브리핑에 고른 지표를 모두 보여 준다(고른 것이 없으면 기본 3개).
+  const picked = indexSelection().briefing;
+  let chosen = INDEX_CHOICES.filter((x) => picked.includes(x.symbol));
+  if (!chosen.length) chosen = ["^KS11", "^KQ11", "KRW=X"].map((sym) => INDEX_CHOICES.find((x) => x.symbol === sym)).filter(Boolean);
+  for (const it of chosen) {
+    const t = indexTile(it);
+    tiles.push(t);
+    kpis.append(t.el);
+  }
+  root.append(kpis);
   tiles.forEach((t) => t.update());
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer);
     if (document.visibilityState === "visible") tiles.forEach((t) => t.update());
   }, 20000);
 
-  // 주요 금융 통계
+  // 둘째 줄: 고른 금융 통계(한국은행 ECOS)와 거시경제 지표. 고르기 전에는 국고채 3년·회사채 3년 AA-·가계신용 잔액·소비자물가 상승률·실업률.
   const statIds = statSelection().briefing;
-  if (statIds.length) {
-    const box = h("div");
-    root.append(section("주요 금융 통계", "한국은행 ECOS", "market", box));
-    drawStats(box, statIds, { compact: true });
+  const macroIds = macroBriefingSelection();
+  const wanted = [...STAT_CATALOG.filter((d) => statIds.includes(d.id)), ...MACRO_CATALOG.filter((d) => macroIds.includes(d.id))].map((d) => d.id);
+  if (wanted.length) {
+    const statsBox = h("div", { class: "hm-stats" }, h("div", { class: "note" }, "통계를 불러오는 중…"));
+    root.append(h("div", { class: "hm-sh sm" }, h("small", null, "주요 금융 통계·거시경제 지표 (한국은행 ECOS)"), h("a", { class: "link-more", href: "#/market" }, "지표 선택", icon("chevron-right"))), statsBox);
+    loadStats(wanted).then((r) => {
+      if (!ctx.alive()) return;
+      const cells = wanted.map((id) => r.items.find((x) => x.id === id)).filter(Boolean).map((it) => {
+        const ch = it.previous != null ? it.value - it.previous : null;
+        return h("a", { class: "hm-sc", href: "#/market" }, h("div", { class: "nm" }, it.name), h("div", { class: "pd" }, periodLabel(it.period) + " 기준"),
+          h("b", null, statText(it, it.value)), h("div", { class: "dl", style: { color: tint(ch) } }, statDelta(it) || "직전 값 —"));
+      });
+      statsBox.replaceChildren(...(cells.length ? cells : [h("div", { class: "note" }, "통계를 받지 못했습니다. 잠시 뒤 새로고침해 보세요.")]));
+    }).catch(() => ctx.alive() && statsBox.replaceChildren(h("div", { class: "note" }, "통계를 받지 못했습니다. 잠시 뒤 새로고침해 보세요.")));
   }
 
-  // 최근 기사: 맞춤 뉴스 중 30대 언론 기사만, 가장 최근 순으로
-  const newsBox = h("div", { class: "card list" }, skeleton(ARTICLE_COUNT));
-  root.append(section("최근 기사", "30대 언론 · 최신순", "news", newsBox));
-  loadHome().then((page) => {
-    if (!ctx.alive()) return;
-    digestData.articles = page.articles;
-    drawDigest();
-    const top = page.articles.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, ARTICLE_COUNT);
-    newsBox.replaceChildren(...(top.length ? top.map((a) => articleRow(a, { compact: true })) : [h("div", { class: "note" }, "30대 언론의 최근 기사가 없습니다.")]));
-  }).catch(() => {
-    if (!ctx.alive()) return;
-    digestData.articles = [];
-    drawDigest();
-    newsBox.replaceChildren(h("div", { class: "note" }, "기사를 불러오지 못했습니다. 새로고침을 눌러 주세요."));
-  });
+  // ③ 최근 기사 | 최근 보도자료 (각 5건)
+  const articleBox = h("div", { class: "list" }, skeleton(ARTICLE_COUNT));
+  const pressBox = h("div", { class: "list" }, skeleton(PRESS_COUNT));
+  root.append(h("div", { class: "hm-grid" },
+    card("최근 기사", "newspaper", "news", articleBox),
+    card("최근 보도자료", "file-text", "press", pressBox, "hm-press")));
+  // ④ 최근 검사·공시조사·회계감리 제재 | 법령·하위 법규 개정 소식 (각 5건)
+  const actBox = h("div", { class: "list" }, skeleton(3));
+  const lawBox = h("div", { class: "hm-law" }, skeleton(2));
+  root.append(h("div", { class: "hm-grid" },
+    card("최근 검사·공시조사·회계감리 제재", "gavel", null, actBox, "", [["검사", "sanction"], ["공시조사", "disclosure"], ["회계감리", "audit"]]),
+    card("법령·하위 법규 개정 소식", "scale", "lawnews", lawBox)));
 
-  // 최근 금융당국 보도자료(금감원·금융위 + 직접 추가한 기관)
-  const pressBox = h("div", { class: "card list" }, skeleton(PRESS_COUNT));
-  const pressSec = section("최근 금융당국 보도자료", `금융감독원 · 금융위원회 · 최근 ${PRESS_COUNT}건`, "press", pressBox);
-  root.append(pressSec);
   const pressSources = [...PRESS.map((id) => [id, AGENCIES.find((a) => a.id === id)]), ...customList("PRESS").map((x) => ["c:" + x.url, null, x])];
   Promise.all(pressSources.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20))).then((items) => [key, items]).catch(() => [key, null]))).then((res) => {
     if (!ctx.alive()) return;
     const seen = new Map(res.map(([key]) => [key, new Set(store.get("seen." + key, []))]));
     const all = res.flatMap(([key, items]) => (items || []).map((x) => ({ ...x, _new: seen.get(key).size > 0 && !seen.get(key).has(x.link) })));
     all.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
-    digestData.press = all;
-    drawDigest();
     const top = all.slice(0, PRESS_COUNT);
-    const fresh = all.filter((x) => x._new).length;
-    if (fresh) pressSec.querySelector("small").replaceChildren(h("b", { class: "br-new" }, `새 자료 ${fresh}건`), ` · 최근 ${PRESS_COUNT}건`);
     pressBox.replaceChildren(...(top.length ? top.map((x) => releaseRow(x, { showAgency: true, isNew: x._new })) : [h("div", { class: "note" }, "보도자료를 불러오지 못했습니다. 새로고침을 눌러 주세요.")]));
   });
 
-  // 이번 주 금융리포트: 기본 연구기관마다 최근 7일 자료를 몇 건씩
-  const researchBox = h("div", { class: "card list" }, skeleton(3));
-  const researchSec = section("이번 주 금융리포트", "기본 연구기관 · 최근 7일 내 업데이트", "research", researchBox);
+  loadRecentActions().then(({ items, failed }) => {
+    if (!ctx.alive()) return;
+    if (!items.length) return actBox.replaceChildren(h("div", { class: "note" }, `최근 ${ACTION_DAYS}일 이내 새로 공시된 검사·공시조사·회계감리 결과가 없습니다.` + (failed.length ? ` (${failed.join("·")} 자료는 불러오지 못함)` : "")));
+    actBox.replaceChildren(...items.slice(0, 5).map((x) => h("a", { class: "item hm-act", href: x.href }, h("div", { class: "body" },
+      h("div", { class: "hm-act-r" }, h("span", { class: "tag " + (x.kind === "검사" ? "blue" : x.kind === "공시조사" ? "orange" : "red") }, x.kind), h("b", null, x.company), h("span", { class: "hm-d" }, x.date.slice(5).replace("-", "."))),
+      x.summary ? h("div", { class: "m" }, x.summary) : null))));
+  }).catch(() => ctx.alive() && actBox.replaceChildren(h("div", { class: "note" }, "결과를 불러오지 못했습니다. 새로고침을 눌러 주세요.")));
+
+  // 법률·시행령·시행규칙·감독규정·시행세칙의 최신 개정 5건(스마트 법령검색 '최근 개정 소식'과 같은 자료·같은 캐시)
+  const lawTag = { 법률: "blue", 시행령: "green", 시행규칙: "green", 감독규정: "orange", 시행세칙: "orange" };
+  const lawFail = () => ctx.alive() && lawBox.replaceChildren(h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요."));
+  cached("lawnews.all2", 6 * 3600 * 1000, () => loadLawNews({ per: 3, limit: 80, sub: true })).then((all) => {
+    if (!ctx.alive()) return;
+    const list = all.slice(0, 5);
+    lawBox.replaceChildren(...(list.length ? list.map((x) => h("a", { class: "hm-lawi", href: docHref(x) },
+      h("div", { class: "t" }, h("span", { class: "tag " + (lawTag[x.kind] || "") }, x.kind || "법률"), " ", x.name),
+      h("small", null, `${x.type || "개정"} · ${x.adm ? "발령" : "공포"} ${dotYmd(x.promulgationDate)} · 시행 ${dotYmd(x.effectiveDate)}`))) : [h("div", { class: "note" }, "법령 개정 정보를 불러오지 못했습니다. 스마트 법령검색에서 확인하세요.")]));
+  }).catch(lawFail);
+
+  loadHome().then((page) => {
+    if (!ctx.alive()) return;
+    digestData.articles = page.articles;
+    drawDigest();
+    const top = page.articles.filter((a) => isMajor(a.source, a.link)).sort((a, b) => b.at - a.at).slice(0, ARTICLE_COUNT);
+    articleBox.replaceChildren(...(top.length ? top.map((a) => articleRow(a, { compact: true })) : [h("div", { class: "note" }, "30대 언론의 최근 기사가 없습니다.")]));
+  }).catch(() => {
+    if (!ctx.alive()) return;
+    digestData.articles = [];
+    drawDigest();
+    articleBox.replaceChildren(h("div", { class: "note" }, "기사를 불러오지 못했습니다. 새로고침을 눌러 주세요."));
+  });
+
+  // ⑤ 최근 금융리포트: 기본 연구기관의 최신 자료 10건을 두 열로(왼쪽 5건, 오른쪽 5건)
+  const leftBox = h("div", { class: "card list" }, skeleton(5));
+  const rightBox = h("div", { class: "card list" }, skeleton(5));
+  const researchSec = section("최근 금융리포트", "기본 연구기관 · 최신순 10건", "research", h("div", { class: "hm-two" }, leftBox, rightBox));
   root.append(researchSec);
-  const weekAgo = new Date(Date.now() - 7 * 864e5).toISOString().slice(0, 10);
   const research = [...AGENCIES.filter((a) => a.group === "RESEARCH").map((a) => [a.id, a]), ...customList("RESEARCH").map((x) => ["c:" + x.url, null, x])];
   Promise.all(research.map(([key, a, inst]) => cachedOffline("rel:" + key, 10 * 60 * 1000, () => (a ? latest(a, 20) : latestCustom(inst, 20)))
-    .then((items) => items.filter((x) => (x.date || "") >= weekAgo).slice(0, RESEARCH_PER_AGENCY)).catch(() => []))).then((lists) => {
+    .then((items) => items.slice(0, RESEARCH_COUNT)).catch(() => []))).then((lists) => {
     if (!ctx.alive()) return;
     const seenLinks = new Set();
-    const items = lists.flat().filter((x) => !seenLinks.has(x.link) && seenLinks.add(x.link)).sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+    const items = lists.flat().filter((x) => !seenLinks.has(x.link) && seenLinks.add(x.link)).sort((a, b) => (b.date || "").localeCompare(a.date || "")).slice(0, RESEARCH_COUNT);
     if (!items.length) return researchSec.remove();
-    researchBox.replaceChildren(...items.map((x) => releaseRow(x, { showAgency: true })));
+    const rows = items.map((x) => releaseRow(x, { showAgency: true }));
+    leftBox.replaceChildren(...rows.slice(0, 5));
+    rightBox.replaceChildren(...rows.slice(5));
+    if (!rows.slice(5).length) rightBox.remove();
   });
 
   root.append(h("p", { class: "note", style: { margin: "14px 2px 0" } }, "알림을 켜 두면 새 보도자료·자료실 자료를 모아 알려 드려요. ", h("a", { class: "link-more", href: "#/alerts?view=settings" }, "알림 설정")));
@@ -166,6 +214,12 @@ function seoulNow() {
   return { y: +parts.year, m: +parts.month, d: +parts.day, hour: +parts.hour % 24, wd };
 }
 
+const dotYmd = (v) => (v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6)}` : v || "-");
+function drawHello(el, w) {
+  const now = seoulNow();
+  el.replaceChildren(w ? h("span", { class: "hm-w" }, `${w.emoji} ${w.temp}° ${w.summary} · ${w.min}°/${w.max}°`) : null, h("span", { class: "hm-g" }, greeting(now, w)));
+}
+
 function drawHero(hero, w) {
   const now = seoulNow();
   hero.replaceChildren(
@@ -176,10 +230,33 @@ function drawHero(hero, w) {
     h("p", { class: "br-greet" }, greeting(now, w)));
 }
 
+const WEATHER_URL = "https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1";
+
+// 직장 망처럼 외부 날씨 사이트(open-meteo)를 막는 곳이 있어, 직접 읽기가 안 되면 서버(/fetch)를 거쳐 읽는다.
+// 직접 읽기가 막힌 기기는 6시간 동안 곧바로 서버 경유로 읽어(6초 기다림 방지), 서버 경유까지 실패할 때만 오류로 남긴다.
+const DIRECT_RETRY_MS = 6 * 3600 * 1000;
+async function readWeather() {
+  const blockedAt = store.get("weather.directFail", 0);
+  if (!blockedAt || Date.now() - blockedAt > DIRECT_RETRY_MS) {
+    try {
+      const r = await fetch(WEATHER_URL, { signal: AbortSignal.timeout(6000) });
+      if (r.ok) {
+        if (blockedAt) store.set("weather.directFail", 0);
+        return await r.json();
+      }
+    } catch { /* 아래에서 서버 경유로 다시 시도 */ }
+    store.set("weather.directFail", Date.now());
+  }
+  try {
+    return JSON.parse((await fetchSite(WEATHER_URL)).text);
+  } catch (e) {
+    reportError("fetch:open-meteo");
+    throw e;
+  }
+}
+
 async function loadWeather() {
-  const r = await fetch("https://api.open-meteo.com/v1/forecast?latitude=37.5665&longitude=126.9780&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min,precipitation_probability_max&timezone=Asia%2FSeoul&forecast_days=1");
-  if (!r.ok) throw new Error("weather");
-  const j = await r.json();
+  const j = await readWeather();
   const [emoji, summary] = describe(j.current.weather_code);
   const rain = j.daily.precipitation_probability_max?.[0];
   return { emoji, summary, temp: Math.round(j.current.temperature_2m), min: Math.round(j.daily.temperature_2m_min[0]), max: Math.round(j.daily.temperature_2m_max[0]), rain: rain == null ? null : rain };
