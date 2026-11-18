@@ -56,27 +56,6 @@ function myUid() {
   }
 }
 
-// 운영자 키 입력(세션 동안만 보관). 맞으면 글 상세에서 작성자 접속자 ID가 보인다.
-async function adminLogin(ctx) {
-  const out = await dialog({
-    title: "운영자 인증",
-    text: "운영자 키를 입력하면 글·댓글 옆에 작성자 접속자 ID가 보입니다.",
-    fields: [{ name: "pw", label: "운영자 키", type: "password" }],
-    ok: "인증",
-  });
-  if (!out || !out.pw) return;
-  try {
-    await req("/board/admin/verify", { method: "POST", admin: false, body: {}, token: out.pw.trim() });
-    setAdminKey(out.pw.trim());
-    toast("운영자로 인증했습니다.");
-    ctx.go({}, { replace: true });
-  } catch (e) {
-    toast(errorText(e));
-  }
-}
-
-const uidTag = (u) => h("span", { class: "tag", title: "작성자 접속자 ID (운영자에게만 보임)" }, u ? `ID ${u}` : "ID 알 수 없음");
-
 function voterId() {
   try {
     let v = localStorage.getItem("fss.boardVoter");
@@ -91,11 +70,11 @@ function voterId() {
   }
 }
 
-async function req(path, { method = "GET", body, admin = false, token = "" } = {}) {
+async function req(path, { method = "GET", body, admin = false } = {}) {
   const headers = {};
   if (body !== undefined) headers["Content-Type"] = "application/json";
-  const key = token || adminKey();
-  if ((admin || token) && key) headers["X-Admin-Token"] = key;
+  const key = adminKey();
+  if (admin && key) headers["X-Admin-Token"] = key;
   let res;
   try {
     res = await fetch(BOARD_BASE + path, {
@@ -182,10 +161,6 @@ async function renderList(root, params, ctx) {
 
   const box = h("div", null, loading("게시글을 불러오는 중…"));
   root.append(box);
-  // 운영자 버튼은 이미 인증된 세션이거나 주소에 ?admin=1 이 있을 때만 보인다.
-  const showAdminBtn = !!adminKey() || /[?&]admin=1(&|$)/.test(location.search + location.hash);
-  if (showAdminBtn) root.append(h("p", { class: "note", style: { marginTop: "12px", textAlign: "right" } },
-    h("button", { class: "btn ghost sm", type: "button", onclick: () => adminLogin(ctx) }, adminKey() ? "운영자 인증됨" : "운영자")));
 
   let data;
   try {
@@ -336,7 +311,7 @@ async function mountPost(box, id, ctx, opts = {}) {
 
   let data;
   try {
-    data = await req(`/board/posts/${encodeURIComponent(id)}?voter=${encodeURIComponent(voterId())}`, { admin: true });
+    data = await req(`/board/posts/${encodeURIComponent(id)}?voter=${encodeURIComponent(voterId())}`);
   } catch (e) {
     if (!ctx.alive()) return;
     box.replaceChildren(message(errorText(e), { error: true, action: "목록으로", onAction: () => ctx.go({}) }));
@@ -525,11 +500,10 @@ async function mountPost(box, id, ctx, opts = {}) {
         h("div", { class: "bd-meta" },
           p.is_notice ? h("span", { class: "tag blue" }, "공지") : null,
           h("b", null, p.author || "익명"),
-          "author_uid" in p && !p.is_notice ? uidTag(p.author_uid) : null,
           h("span", null, fmtDate(p.created_at) + (p.edited_at ? " (수정됨)" : "")),
           h("span", { class: "bd-acts" },
             p.is_notice || p.has_pw ? h("button", { class: "btn ghost sm", type: "button", onclick: editPost }, icon("pencil"), "수정") : null,
-            h("button", { class: "btn ghost sm", type: "button", onclick: deletePost }, icon("trash-2"), adminKey() ? "운영자 삭제" : "삭제")
+            h("button", { class: "btn ghost sm", type: "button", onclick: deletePost }, icon("trash-2"), "삭제")
           )
         ),
         inline ? null : h("h2", { style: { margin: "10px 0 6px", fontSize: "18px" } }, p.title),
@@ -542,7 +516,6 @@ async function mountPost(box, id, ctx, opts = {}) {
           ? h("div", null, comments.map((c) => h("div", { class: "bd-cmt" },
               h("div", { class: "bd-meta" },
                 h("b", null, c.author || "익명"),
-                "author_uid" in c ? uidTag(c.author_uid) : null,
                 h("span", null, fmtDate(c.created_at) + (c.edited_at ? " (수정됨)" : "")),
                 h("span", { class: "bd-acts" },
                   c.has_pw ? h("button", { class: "ib", type: "button", title: "댓글 수정", onclick: () => editComment(c) }, icon("pencil")) : null,
