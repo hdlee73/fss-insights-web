@@ -396,12 +396,15 @@ svg.trend.small { height: auto; }
 .tile .tt > div:first-child { flex: 1; min-width: 0; }
 .tiles.wide2 .tile .ch { flex: 0 0 45%; }
 .tiles.wide2 .tile svg.spark { width: 100%; height: 40px; margin: 0; }
-.ych { position: relative; height: 66px; width: 100%; margin-top: 2px; }
-.tile .ych svg.spark, .tiles.wide2 .tile .ych svg.spark { position: absolute; left: 0; top: 12px; width: 100%; height: calc(100% - 24px); margin: 0; }
+.ych { position: relative; height: 86px; width: 100%; margin-top: 2px; }
+.tile .ych svg.spark, .tiles.wide2 .tile .ych svg.spark { position: absolute; left: 0; top: 22px; width: 100%; height: calc(100% - 44px); margin: 0; }
 .ych .yd { position: absolute; width: 6px; height: 6px; margin: -3px 0 0 -3px; border-radius: 50%; border: 1px solid var(--card, #fff); box-sizing: content-box; }
-.ych .yl { position: absolute; visibility: hidden; left: 0; top: 0; font-size: 9.5px; line-height: 12px; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.2px; }
+.ych .yl { position: absolute; visibility: hidden; left: 0; top: 0; font-size: 9.5px; line-height: 11px; white-space: nowrap; text-align: center; font-variant-numeric: tabular-nums; font-weight: 500; letter-spacing: -0.2px; }
 .ych .yl.short .ydt { display: none; }
+.ych .yl b, .ych .yl .ydt { display: block; }
 .ych .yl b { font-weight: 700; }
+.ych .yl .ydt { font-size: 8.5px; opacity: .85; }
+.watch .wc .ych { margin-top: 2px; }
 .inv { border-top: 1px solid var(--line); margin-top: 6px; padding-top: 6px; }
 .inv small { font-size: 10.5px; font-weight: 700; color: var(--acc-fg); }
 .inv .r { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; font-size: 11px; color: var(--muted); }
