@@ -4,7 +4,7 @@ import { setHeader } from "../app.js";
 import { dialog, errorText, forget, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
-  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, statDelta, statSelection, statText, tint,
+  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
   UP, DOWN, STALE_MS,
 } from "../lib/market.js";
 
@@ -56,7 +56,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
       } else {
         const hh = await history(it.symbol);
         // 1년 그래프는 1년 전 가격 대비(현재가 기준)로 색을 정한다: 올랐으면 빨강, 내렸으면 파랑.
-        chart.replaceChildren(sparkline(hh.closes, { height: 30, color: yearColor(hh.closes, q.price) }));
+        chart.replaceChildren(yearChart(it, hh.closes, hh.dates, { color: yearColor(hh.closes, q.price) }));
         nm.replaceChildren(it.name);
       }
     } catch {
