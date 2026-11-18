@@ -214,7 +214,7 @@ async function renderList(root, params, ctx) {
       try {
         const r = await req(`/board/posts/${encodeURIComponent(p.id)}/vote`, {
           method: "POST",
-          body: { voter: voterId(), vote: st.mine === v ? 0 : v },
+          body: { voter: voterId(), vote: st.mine === v ? 0 : v, uid: myUid() },
         });
         st.likes = r.likes;
         st.dislikes = r.dislikes;
@@ -459,7 +459,7 @@ async function mountPost(box, id, ctx, opts = {}) {
     try {
       const r = await req(`/board/posts/${encodeURIComponent(id)}/vote`, {
         method: "POST",
-        body: { voter: voterId(), vote: vote.mine === v ? 0 : v },
+        body: { voter: voterId(), vote: vote.mine === v ? 0 : v, uid: myUid() },
       });
       vote.likes = r.likes;
       vote.dislikes = r.dislikes;
