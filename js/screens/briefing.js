@@ -1,6 +1,6 @@
 // 오늘의 브리핑: 날짜·서울 날씨·인삿말, 시장 지표, 주요 금융 통계, 최근 기사(30대 언론), 최근 금융당국 보도자료, 최근 검사·공시조사·회계감리 결과, 이번 주 금융리포트.
 import { setHeader } from "../app.js";
-import { cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
+import { canPoll, onResume, cached, fetchSite, h, reportError, icon, skeleton, store } from "../core.js";
 import { cachedOffline } from "../lib/offline.js";
 import { aiAvailable, aiSummary, buildDigest, findSchedules } from "../lib/digest.js";
 import * as N from "../lib/news.js";
@@ -65,9 +65,11 @@ export async function render(root, params, ctx) {
   if (topIdx.length) root.append(topBox);
   if (restIdx.length) root.append(kpis);
   tiles.forEach((t) => t.update());
+  let idle = false;
+  const off = onResume(() => { if (idle && ctx.alive()) { idle = false; tiles.forEach((t) => t.update()); } });
   const timer = setInterval(() => {
-    if (!ctx.alive()) return clearInterval(timer);
-    if (document.visibilityState === "visible") tiles.forEach((t) => t.update());
+    if (!ctx.alive()) return clearInterval(timer), off();
+    if (canPoll()) { idle = false; tiles.forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
   }, 20000);
 
   // 둘째 줄: 고른 금융 통계(한국은행 ECOS)와 거시경제 지표. 고르기 전에는 국고채 3년·회사채 3년 AA-·가계신용 잔액·소비자물가 상승률·실업률.

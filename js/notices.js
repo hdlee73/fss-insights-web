@@ -1,6 +1,6 @@
 // 공지 회전 배너(맨 위). 관리자가 서버(/admin/notices)에서 쓴 공지를 5초마다 돌려 보여 주고, 누르면 본문을 펼친다.
 // '숨김'은 지금 보이는 공지를 하루 동안 숨긴다(새 공지는 다시 뜬다). 서버가 안 되면 아무것도 그리지 않는다.
-import { api, h, store } from "./core.js";
+import { api, canPoll, h, onResume, store } from "./core.js";
 
 const ROTATE_MS = 5000;
 const REFRESH_MS = 10 * 60 * 1000;
@@ -49,5 +49,8 @@ export function installNotices(host) {
     draw();
   }
   load();
-  setInterval(() => document.visibilityState === "visible" && load(), REFRESH_MS);
+  let loadedAt = Date.now();
+  const refresh = () => { if (canPoll() && Date.now() - loadedAt >= REFRESH_MS - 5000) { loadedAt = Date.now(); load(); } };
+  setInterval(refresh, 60 * 1000);
+  onResume(refresh); // 숨었던 탭이 돌아오면 주기가 지났을 때 한 번 바로 갱신
 }

@@ -5,7 +5,7 @@
 // - 제재: 금융회사 제재공시·공시조사결과제재·회계감리결과제재에 새 건이 올라오면(매일 갱신되는 자료 기준)
 // - 참고 자료실: 새 파일이 올라오면
 // - 오늘의 브리핑: 매일 정한 시각 이후 처음 확인할 때 한 번
-import { api, store } from "./core.js";
+import { api, canPoll, store } from "./core.js";
 
 const INTERVAL = 30 * 60 * 1000;
 const MAX_INBOX = 200;
@@ -200,8 +200,9 @@ export async function checkInBackground() {
     const s = settings();
     return s.keywords.length || s.agencies.length || s.library || s.briefing;
   };
-  const tick = () => any() && document.visibilityState === "visible" && checkNow().catch(() => {});
+  const tick = () => any() && canPoll() && checkNow().catch(() => {});
   setTimeout(tick, 4000);
   setInterval(tick, 5 * 60 * 1000);
   document.addEventListener("visibilitychange", tick);
+  addEventListener("online", tick);
 }
