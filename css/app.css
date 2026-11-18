@@ -1527,3 +1527,6 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .cm-disc { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
 .cm-disc .i { width: 14px; height: 14px; vertical-align: -2px; }
 @media (max-width: 720px) { .cm-grid { grid-template-columns: 1fr; } .cm-kpis .kpi { min-height: 0; } }
+.cm-q { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); }
+.cm-q b { color: var(--fg); }
+.cm .search { margin: 0; }
