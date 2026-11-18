@@ -6,8 +6,9 @@ const KR = /^[A-Z0-9]{6}\.(KS|KQ)$/;
 
 export const isKorean = (sym) => KR.test(sym) || sym === "^KS11" || sym === "^KQ11";
 
-async function json(url) {
-  const { text } = await fetchSite(url, { referer: NAVER_REF });
+// bust: 중간 저장소(브라우저·통신망·서버 가장자리)가 붙잡은 옛 응답을 피하려고 요청 주소를 매번 다르게 만든다(Referer 값은 시세 제공처가 보지 않는다).
+async function json(url, bust = false) {
+  const { text } = await fetchSite(url, { referer: NAVER_REF + (bust ? "?b=" + Date.now().toString(36) : "") });
   return JSON.parse(text);
 }
 const num = (t) => Number(String(t ?? "").replace(/,/g, "").trim());
@@ -25,11 +26,16 @@ function naverPath(sym) {
   return null;
 }
 
-async function yahooChart(sym, range, interval = "1d") {
+// 오래된 값이 내려온 종목은 잠시 동안 중간 저장소를 건너뛰고 받는다.
+const bustUntil = new Map();
+const bustTried = new Map();
+const bustOn = (sym) => (bustUntil.get(sym) || 0) > Date.now();
+
+async function yahooChart(sym, range, interval = "1d", bust = bustOn(sym)) {
   let last;
   for (const host of ["query1.finance.yahoo.com", "query2.finance.yahoo.com"]) {
     try {
-      const root = await json(`https://${host}/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=${interval}`);
+      const root = await json(`https://${host}/v8/finance/chart/${encodeURIComponent(sym)}?range=${range}&interval=${interval}`, bust);
       const r = root?.chart?.result?.[0];
       if (!r) throw new Error("해당 종목 시세가 없습니다");
       return r;
@@ -54,7 +60,21 @@ async function naverQuote(url) {
 }
 
 async function yahooQuote(sym) {
-  const chart = await yahooChart(sym, "5d");
+  let chart = await yahooChart(sym, "5d");
+  // 기준 시각이 너무 오래됐으면 한 번 더, 저장소를 건너뛰고 받아 본다(장이 닫힌 종목에서 반복하지 않도록 1분에 한 번만).
+  const at0 = (chart.meta?.regularMarketTime || 0) * 1000;
+  if (at0 && Date.now() - at0 > STALE_MS && !bustOn(sym) && Date.now() - (bustTried.get(sym) || 0) > 60_000) {
+    bustTried.set(sym, Date.now());
+    try {
+      const fresh = await yahooChart(sym, "5d", "1d", true);
+      if ((fresh.meta?.regularMarketTime || 0) * 1000 > at0 + 60_000) {
+        chart = fresh;
+        bustUntil.set(sym, Date.now() + 5 * 60_000);
+      }
+    } catch {
+      /* 원래 값을 그대로 쓴다 */
+    }
+  }
   const meta = chart.meta || {};
   const price = meta.regularMarketPrice;
   if (!(price > 0)) throw new Error("유효한 가격 없음");
