@@ -2,7 +2,27 @@
 // 자료는 FSS_insights 레포 community-data 브랜치(GitHub Actions community-data.yml이 평일 업무시간 30분·그 밖 2시간마다 갱신하는 hot.json). 별도 서버 없음.
 // 제목·출처·시간·조회/댓글 수와 원문 링크만 담으며 본문·닉네임은 수집하지 않는다. 출처가 서로 다른 지표를 가지므로 하나의 순위표에 섞지 않고, 각 칸 안에서만 순위를 매긴다.
 import { setHeader } from "../app.js";
-import { canPoll, errorText, h, icon, iconButton, loading, message, onResume, openUrl, safeHttpUrl, tabs } from "../core.js";
+import { errorText, h, icon, iconButton, loading, message, openUrl, tabs } from "../core.js";
+
+// 앱(WebView)에 내장된 core.js가 웹보다 오래된 경우에도 같은 파일이 동작하도록 작은 도우미는 여기서 정의한다.
+const canPoll = () => document.visibilityState === "visible" && navigator.onLine !== false;
+function onResume(cb) {
+  const f = () => canPoll() && cb();
+  document.addEventListener("visibilitychange", f);
+  addEventListener("online", f);
+  return () => {
+    document.removeEventListener("visibilitychange", f);
+    removeEventListener("online", f);
+  };
+}
+function safeHttpUrl(url) {
+  try {
+    const u = new URL(String(url));
+    return u.protocol === "https:" || u.protocol === "http:" ? u.href : "";
+  } catch {
+    return "";
+  }
+}
 
 const URL_HOT = "https://raw.githubusercontent.com/hdlee73/FSS_insights/community-data/hot.json";
 const GROUPS = [
