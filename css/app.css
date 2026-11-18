@@ -1479,3 +1479,51 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .top .top-quick.on { color: var(--acc); }
 @media (max-width: 860px) { .top .top-quick { display: inline-grid; } }
 @media (max-width: 1360px) { .tn-search span { display: none; } .tn-search { min-width: 0; width: 36px; padding: 0; justify-content: center; } }
+
+/* ---- 커뮤니티 핫이슈 ---- */
+.cm { display: flex; flex-direction: column; gap: 12px; }
+.cm-head { display: flex; align-items: center; }
+.cm-infobtn { display: inline-flex; align-items: center; gap: 4px; background: var(--acc-soft); color: var(--acc-fg); border: 0; border-radius: 14px; padding: 5px 12px; font-size: 12.5px; font-weight: 700; cursor: pointer; }
+.cm-infobtn .i { width: 15px; height: 15px; }
+.cm-info { background: var(--warn-soft); border: 1px solid #f3d9a8; border-left: 4px solid var(--warm); border-radius: var(--r); padding: 12px 16px; font-size: 13px; line-height: 1.6; }
+.cm-info[hidden] { display: none; }
+.cm-info ul { margin: 6px 0 0 18px; }
+.cm-chips { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.cm-chips > b { font-size: 12.5px; margin-right: 4px; }
+.cm-chips .pill { cursor: pointer; }
+.cm-note { color: var(--muted); font-size: 12px; margin-left: 6px; }
+.cm-up { color: var(--up); font-style: normal; font-weight: 700; }
+.cm-panel { display: flex; flex-direction: column; gap: 14px; }
+.cm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 420px), 1fr)); gap: 14px; align-items: start; }
+.cm-sub { color: var(--muted); font-size: 12px; margin: -2px 0 8px; }
+.cm-row { display: flex; gap: 10px; padding: 9px 0; border-top: 1px solid var(--line2); }
+.cm-row:first-of-type { border-top: 0; }
+.cm-rank { width: 18px; color: var(--acc); font-variant-numeric: tabular-nums; flex: none; }
+.cm-body { min-width: 0; flex: 1; }
+.cm-t { display: block; font-weight: 600; font-size: 14px; line-height: 1.4; color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
+.cm-t:hover { text-decoration: underline; color: var(--acc-fg); }
+.cm-m { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; color: var(--muted); font-size: 12px; margin-top: 4px; }
+.cm-b { color: var(--muted); }
+.cm-heat { display: inline-flex; align-items: center; gap: 4px; }
+.cm-heat { white-space: nowrap; }
+.cm-heat i { display: inline-block; height: 5px; border-radius: 3px; background: linear-gradient(90deg, #4c8dff, #e5484d); width: calc(var(--p, 50) * 0.6px); }
+.cm-heat em { font-style: normal; color: var(--up); font-weight: 700; }
+.cm-empty { color: var(--muted); font-size: 13px; padding: 14px 4px; }
+.cm-more { display: inline-block; margin-top: 6px; font-size: 12.5px; color: var(--acc-fg); text-decoration: none; font-weight: 600; }
+.cm-nv { border-top: 1px solid var(--line2); padding: 8px 0; }
+.cm-nv:first-of-type { border-top: 0; }
+.cm-nv summary { cursor: pointer; display: flex; justify-content: space-between; gap: 8px; font-size: 13.5px; }
+.cm-nvc { color: var(--muted); font-size: 12.5px; text-align: right; }
+.cm-nvd { margin: 6px 0 2px 4px; font-size: 12.5px; display: flex; flex-direction: column; gap: 5px; }
+.cm-nvd > div { display: flex; gap: 6px; align-items: baseline; }
+.cm-nvd a { color: var(--fg); text-decoration: none; overflow-wrap: anywhere; }
+.cm-nvd a:hover { text-decoration: underline; }
+.cm-foot { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.cm-sts { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; font-size: 12px; color: var(--muted); }
+.cm-st { padding: 2px 8px; border-radius: 10px; background: var(--chip); }
+.cm-st.ok { background: var(--ok-soft); color: var(--ok-fg); }
+.cm-st.bad { background: #fdeaea; color: var(--danger); }
+.cm-st.pend { background: var(--chip); color: var(--muted); }
+.cm-disc { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 9px 12px; font-size: 12px; color: var(--muted); line-height: 1.5; }
+.cm-disc .i { width: 14px; height: 14px; vertical-align: -2px; }
+@media (max-width: 720px) { .cm-grid { grid-template-columns: 1fr; } .cm-kpis .kpi { min-height: 0; } }
