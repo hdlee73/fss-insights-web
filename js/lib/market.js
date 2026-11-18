@@ -418,7 +418,97 @@ export function sparkline(values, { width = 300, height = 64, color, baseline, p
   const total = Math.max(bars || 0, values.length);
   const pts = values.map((v, i) => [(i / ((bars ? total : values.length) - 1)) * width, y(v)]);
   poly(pts, stroke, 1.8);
+  svg.pos = (i) => ({ x: pts[i][0] / width, y: pts[i][1] / height });
   return svg;
+}
+
+const yDate = (d) => (d && d.length >= 8 ? `${d.slice(2, 4)}.${+d.slice(4, 6)}.${+d.slice(6, 8)}` : "");
+
+/**
+ * 1년 그래프: 꺾은선 위에 시작·최고·최저 가격을 해당 일자에 표시한다(종가 기준).
+ * 선 위·아래 띠에 글자를 놓고, 서로 겹치면 반대쪽 띠나 옆으로 옮긴다. 화면에 붙은 뒤 실제 글자 폭을 재서 배치한다.
+ */
+export function yearChart(it, closes, dates, { color, price } = {}) {
+  const wrap = document.createElement("div");
+  wrap.className = "ych";
+  const svg = sparkline(closes, { height: 40, color });
+  wrap.append(svg);
+  const n = closes.length;
+  if (n < 2 || !svg.pos) return svg;
+  let hi = 0;
+  let lo = 0;
+  closes.forEach((v, i) => {
+    if (v > closes[hi]) hi = i;
+    if (v < closes[lo]) lo = i;
+  });
+  const groups = new Map();
+  const add = (i, name) => groups.set(i, [...(groups.get(i) || []), name]);
+  if (closes[hi] !== closes[lo]) {
+    add(hi, "최고");
+    add(lo, "최저");
+  }
+  add(0, "시작");
+  const items = [];
+  for (const [i, names] of groups) {
+    const p = svg.pos(i);
+    const up = names.includes("최고");
+    const down = names.includes("최저");
+    const c = up ? UP : down ? DOWN : "var(--muted)";
+    const dot = document.createElement("i");
+    dot.className = "yd";
+    dot.style.cssText = `left:${(p.x * 100).toFixed(2)}%;top:calc(12px + (100% - 24px) * ${p.y.toFixed(4)});background:${c}`;
+    const lab = document.createElement("span");
+    lab.className = "yl";
+    lab.style.color = c;
+    const b = document.createElement("b");
+    const pv = closes[i] >= 1000 && it.type !== "RATE" && it.type !== "FX" ? Math.round(closes[i]).toLocaleString("ko-KR") : priceText(it, closes[i]).replace(/원$/, "");
+    b.textContent = names.join("·") + " " + pv;
+    const dt = document.createElement("span");
+    dt.className = "ydt";
+    dt.textContent = " " + yDate(dates?.[i]);
+    lab.append(b, dt);
+    wrap.append(dot, lab);
+    items.push({ lab, x: p.x, y: p.y, band: up ? "top" : down ? "bot" : p.y < 0.5 ? "top" : "bot", fixed: up || down });
+  }
+  requestAnimationFrame(() => {
+    const W = wrap.clientWidth;
+    const H = wrap.clientHeight;
+    if (!W) {
+      for (const t of items) t.lab.style.visibility = "visible";
+      return;
+    }
+    const placed = { top: [], bot: [] };
+    const clash = (band, l, w) => placed[band].find((r) => l < r.r + 3 && l + w + 3 > r.l);
+    const place = (t) => {
+      const w = t.lab.offsetWidth;
+      let l = Math.min(Math.max(t.x * W - w / 2, 0), W - w);
+      let band = t.band;
+      if (clash(band, l, w)) {
+        const other = band === "top" ? "bot" : "top";
+        if (!clash(other, l, w)) band = other;
+        else {
+          const c = clash(band, l, w);
+          const right = c.r + 3;
+          if (right + w <= W) l = right;
+          else if (c.l - 3 - w >= 0) l = c.l - 3 - w;
+          else return false;
+        }
+      }
+      placed[band].push({ l, r: l + w });
+      t.lab.style.left = l + "px";
+      t.lab.style.top = band === "top" ? "0px" : H - 12 + "px";
+      t.lab.style.visibility = "visible";
+      return true;
+    };
+    items.sort((a, b) => Number(b.fixed) - Number(a.fixed)).forEach((t) => {
+      // 자리가 모자라면 날짜를 빼고 가격만 보여 준다.
+      if (!place(t)) {
+        t.lab.classList.add("short");
+        place(t);
+      }
+    });
+  });
+  return wrap;
 }
 
 export const UP = "var(--up)";
