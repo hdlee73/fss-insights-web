@@ -456,7 +456,7 @@ export function yearChart(it, closes, dates, { color, price } = {}) {
     const c = up ? UP : down ? DOWN : "var(--muted)";
     const dot = document.createElement("i");
     dot.className = "yd";
-    dot.style.cssText = `left:${(p.x * 100).toFixed(2)}%;top:calc(12px + (100% - 24px) * ${p.y.toFixed(4)});background:${c}`;
+    dot.style.cssText = `left:${(p.x * 100).toFixed(2)}%;top:calc(22px + (100% - 44px) * ${p.y.toFixed(4)});background:${c}`;
     const lab = document.createElement("span");
     lab.className = "yl";
     lab.style.color = c;
@@ -465,7 +465,7 @@ export function yearChart(it, closes, dates, { color, price } = {}) {
     b.textContent = names.join("·") + " " + pv;
     const dt = document.createElement("span");
     dt.className = "ydt";
-    dt.textContent = " " + yDate(dates?.[i]);
+    dt.textContent = "(" + yDate(dates?.[i]) + ")";
     lab.append(b, dt);
     wrap.append(dot, lab);
     items.push({ lab, x: p.x, y: p.y, band: up ? "top" : down ? "bot" : p.y < 0.5 ? "top" : "bot", fixed: up || down });
@@ -496,7 +496,7 @@ export function yearChart(it, closes, dates, { color, price } = {}) {
       }
       placed[band].push({ l, r: l + w });
       t.lab.style.left = l + "px";
-      t.lab.style.top = band === "top" ? "0px" : H - 12 + "px";
+      t.lab.style.top = band === "top" ? "0px" : H - 22 + "px";
       t.lab.style.visibility = "visible";
       return true;
     };

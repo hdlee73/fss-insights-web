@@ -176,7 +176,7 @@ export async function render(root, params, ctx) {
           chart.replaceChildren(sparkline(d.points, { height: 26, color, baseline: d.previous, bars: d.live ? d.bars : 0 }));
         } else {
           const hh = await history(it.symbol);
-          chart.replaceChildren(sparkline(hh.closes, { height: 26, color: yearColor(hh.closes, q.price) }));
+          chart.replaceChildren(yearChart(it, hh.closes, hh.dates, { color: yearColor(hh.closes, q.price) }));
         }
       } catch {
         if (px.textContent === "—") dl.textContent = "시세 없음";
