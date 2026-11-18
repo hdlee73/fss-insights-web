@@ -147,6 +147,14 @@ export function history(raw) {
 
 const kstDay = (d = new Date()) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }).replace(/-/g, "");
 
+// 아시아 거래소 점심 휴장(현지시각 hhmm)과 하루 분봉 수. 도쿄 11:30~12:30, 홍콩 12:00~13:00, 상하이 11:30~13:00.
+const ASIA_SESSIONS = {
+  "Asia/Tokyo": { lunch: [1130, 1230], bars: 300 },
+  "Asia/Hong_Kong": { lunch: [1200, 1300], bars: 330 },
+  "Asia/Shanghai": { lunch: [1130, 1300], bars: 240 },
+  "Asia/Taipei": { lunch: null, bars: 270 },
+};
+
 /**
  * 당일(장이 끝났으면 가장 최근 거래일) 흐름: { points, previous, prevPoints, status, bars, live }.
  * 국내는 NAVER 1분봉, 해외는 Yahoo 1분봉(24시간 지표는 5분봉)으로 마지막 두 거래일을 묶는다.
@@ -161,6 +169,7 @@ export function intraday(raw, fallbackPrevious, price) {
     let bars;
     let kr = false;
     let tz = "Asia/Seoul";
+    let session = null; // Yahoo 정규장 시작·종료(초). 아시아 지수 장중 판정에 쓴다.
     if (path) {
       kr = true;
       bars = 391;
@@ -191,7 +200,9 @@ export function intraday(raw, fallbackPrevious, price) {
       kr = false;
       const chart = await yahooChart(sym, h24 ? "3d" : "5d", h24 ? "5m" : "1m");
       tz = chart.meta?.exchangeTimezoneName || "UTC";
-      bars = h24 ? 288 : 390;
+      bars = h24 ? 288 : ASIA_SESSIONS[tz]?.bars || 390;
+      const reg = chart.meta?.currentTradingPeriod?.regular;
+      if (reg?.start && reg?.end) session = { start: reg.start, end: reg.end };
       const ts = chart.timestamp || [];
       const q = chart.indicators?.quote?.[0] || {};
       const byDay = new Map();
@@ -210,14 +221,27 @@ export function intraday(raw, fallbackPrevious, price) {
     const prev = days[days.length - 2];
     const now = Date.now() / 1000;
     const today = new Date().toLocaleDateString("en-CA", { timeZone: tz }).replace(/-/g, "");
-    const live = h24 || (last.date === today && now - lastEpoch <= 15 * 60);
+    const local = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
+    const hhmm = local.getHours() * 100 + local.getMinutes();
+    const weekday = local.getDay() >= 1 && local.getDay() <= 5;
+    const lunch = ASIA_SESSIONS[tz]?.lunch;
+    // 아시아·유럽 지수: Yahoo가 15~20분 지연되므로 "마지막 분봉이 15분 이내"로 보면 장중에도 마감으로 나온다. 거래소 정규장 시간(오늘 날짜 자료가 있을 때)으로 판정한다.
+    const inSession = !!session && last.date === today && now >= session.start && now <= session.end + 600;
+    const onLunch = !!lunch && inSession && hhmm >= lunch[0] && hhmm < lunch[1];
+    const live = h24 || (session && !kr ? inSession : last.date === today && now - lastEpoch <= 15 * 60);
     const points = last.closes.slice();
     if (live && price > 0) points[points.length - 1] = price;
     const md = (d) => `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}`;
-    const local = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
-    const weekday = local.getDay() >= 1 && local.getDay() <= 5;
-    const early = local.getHours() * 100 + local.getMinutes() < 910;
-    const status = h24 ? null : live ? "장중" : last.date === today ? "마감" : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감` : `마감 ${md(last.date)}(미국)`;
+    const early = hhmm < 910;
+    let beforeOpen = false; // 아직 오늘 장이 열리지 않았거나 막 열려 첫 분봉이 없음(어제 자료)
+    if (session && weekday) {
+      const sl = new Date(new Date(session.start * 1000).toLocaleString("en-US", { timeZone: tz }));
+      beforeOpen = hhmm < sl.getHours() * 100 + sl.getMinutes() + 20;
+    }
+    const status = h24 ? null : onLunch ? "점심 휴장" : live ? "장중" : last.date === today ? "마감" : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감`
+      : !session ? `마감 ${md(last.date)}(미국)`
+      : beforeOpen ? "개장 전"
+      : tz.startsWith("America/") ? `마감 ${md(last.date)}(미국)` : `휴장 · ${md(last.date)} 마감`;
     const previous = last.date === today || live ? fallbackPrevious ?? prev.closes[prev.closes.length - 1] : prev.closes[prev.closes.length - 1];
     return { points, previous, prevPoints: prev.closes, open: last.open ?? points[0], status, bars, live };
   });
