@@ -862,9 +862,16 @@ body.collapsed .menu .sec .mr .mi { padding-right: 0; }
 .bd-votes { display: flex; gap: 8px; justify-content: center; padding-top: 14px; }
 .bd-vote { min-width: 112px; justify-content: center; }
 .bd-vote.on { background: var(--acc-soft); border-color: var(--accent); font-weight: 700; }
-.bd-cmt { padding: 10px 0; border-top: 1px solid var(--line2); }
-.bd-cmt:first-child { border-top: 0; }
-.bd-cmt-txt { white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.55; margin-top: 4px; }
+/* 글 본문과 댓글 구분: 본문은 머리띠(제목·작성자) + 본문 + 구분선, 댓글은 "댓글 • N" 머리글 아래 댓글마다 회색 머리띠 */
+.bd-post-head { background: var(--bg); margin: -18px -18px 0; padding: 10px 18px; border-bottom: 1px solid var(--line2); border-radius: 12px 12px 0 0; }
+.bd-body { padding-bottom: 16px !important; }
+.bd-cmt-title { font-size: 14px; font-weight: 600; margin: 0 0 10px; padding-bottom: 8px; border-bottom: 2px solid var(--acc); }
+.bd-cmt-title b { color: var(--acc); }
+.bd-cmt { margin: 0 0 10px; border: 1px solid var(--line2); border-radius: 10px; overflow: hidden; }
+.bd-cmt-head { background: var(--bg); padding: 6px 12px; border-bottom: 1px solid var(--line2); }
+.bd-cmt-head b { color: var(--fg); }
+.bd-cmt-txt { white-space: pre-wrap; word-break: break-word; font-size: 13.5px; line-height: 1.55; padding: 10px 12px; }
+.bd-cmt-form { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line2); }
 .bd-form { display: flex; flex-direction: column; gap: 10px; }
 .bd-form input, .bd-form textarea { width: 100%; box-sizing: border-box; font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
 .bd-form textarea { min-height: 120px; resize: vertical; }
