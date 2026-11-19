@@ -197,6 +197,7 @@ export function intraday(raw, fallbackPrevious, price) {
     let bars;
     let kr = false;
     let tz = "Asia/Seoul";
+    let dayShift = 0; // 거래일 경계를 달력 날짜에서 밀어 주는 초(선물용)
     let session = null; // Yahoo 정규장 시작·종료(초). 아시아 지수 장중 판정에 쓴다.
     if (path) {
       kr = true;
@@ -231,13 +232,15 @@ export function intraday(raw, fallbackPrevious, price) {
       bars = h24 ? 288 : ASIA_SESSIONS[tz]?.bars || 390;
       const reg = chart.meta?.currentTradingPeriod?.regular;
       if (reg?.start && reg?.end) session = { start: reg.start, end: reg.end };
+      // 선물(=F)은 미국 동부 18:00에 새 거래일이 시작한다(한국 아침 8시). 달력 날짜(자정)로 나누면 한국 저녁에도 오늘 선이 하루의 일부만 채워져 늦게 반영되는 것처럼 보이므로, 18:00 기준으로 거래일을 나눈다.
+      if (sym.endsWith("=F") && tz.startsWith("America/")) dayShift = 6 * 3600;
       const ts = chart.timestamp || [];
       const q = chart.indicators?.quote?.[0] || {};
       const byDay = new Map();
       ts.forEach((t, i) => {
         const c = q.close?.[i];
         if (!(c > 0)) return;
-        const k = new Date(t * 1000).toLocaleDateString("en-CA", { timeZone: tz }).replace(/-/g, "");
+        const k = new Date((t + dayShift) * 1000).toLocaleDateString("en-CA", { timeZone: tz }).replace(/-/g, "");
         if (!byDay.has(k)) byDay.set(k, { date: k, closes: [], open: q.open?.[i] > 0 ? q.open[i] : null });
         byDay.get(k).closes.push(c);
         lastEpoch = t;
@@ -248,7 +251,7 @@ export function intraday(raw, fallbackPrevious, price) {
     const last = days[days.length - 1];
     const prev = days[days.length - 2];
     const now = Date.now() / 1000;
-    const today = new Date().toLocaleDateString("en-CA", { timeZone: tz }).replace(/-/g, "");
+    const today = new Date(Date.now() + dayShift * 1000).toLocaleDateString("en-CA", { timeZone: tz }).replace(/-/g, "");
     const local = new Date(new Date().toLocaleString("en-US", { timeZone: tz }));
     const hhmm = local.getHours() * 100 + local.getMinutes();
     const weekday = local.getDay() >= 1 && local.getDay() <= 5;
