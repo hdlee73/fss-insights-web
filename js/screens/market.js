@@ -58,7 +58,8 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
         chart.replaceChildren(sparkline(d.points, { height: 30, color, baseline: d.previous, prev: d.prevPoints, open: d.open, bars: d.live ? d.bars : 0 }));
         live = !!d.live;
         const age = Date.now() - (q.at || 0);
-        const stale = d.live && q.at && age > STALE_MS;
+        // CME 선물(=F)은 거래소가 무료 시세를 약 10분 늦춰 내보내므로(Yahoo·NAVER 모두 10분 지연) 3분만 넘어도 지연 분을 표시한다.
+        const stale = d.live && q.at && age > (/=F$/.test(it.symbol) ? 3 * 60_000 : STALE_MS);
         nm.replaceChildren(it.name, d.status ? h("span", { class: "stag" + (d.status === "장중" ? " live" : "") }, d.status) : "",
           stale ? h("span", { class: "stag" }, "지연 " + Math.round(age / 60000) + "분") : "");
         el.title = `${q.source || ""} · 시세 기준 ${q.at ? new Date(q.at).toLocaleString("ko-KR", { hour12: false, month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", second: "2-digit" }) : "—"}`;
@@ -214,7 +215,7 @@ export async function render(root, params, ctx) {
   })), kofia, h("p", { class: "note", style: { marginTop: "6px" } }, "금융투자협회 종합통계 포털 기준. 직전 영업일(신규펀드는 직전 조회일) 대비 증감."));
   drawKofia(kofia);
 
-  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER(실시간), 해외·환율은 Yahoo Finance(종목에 따라 지연될 수 있음). 각 칸에 마우스를 올리면 시세 기준 시각이 보입니다."));
+  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER(실시간), 해외·환율은 Yahoo Finance(종목에 따라 지연될 수 있음). 나스닥100선물 등 CME 선물은 거래소 규정상 무료 시세가 약 10분 지연됩니다. 각 칸에 마우스를 올리면 시세 기준 시각이 보입니다."));
   const stamp = h("p", { class: "note", style: { margin: "0 0 4px" } }, "");
   root.append(stamp);
 
