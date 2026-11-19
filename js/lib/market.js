@@ -553,7 +553,7 @@ export const signed = (v, digits = 0) => (v > 0 ? "▲" : v < 0 ? "▼" : "") + 
 const ins = (symbol, name, currency, type) => ({ symbol, name, currency, type });
 export const KOREA_INDEXES = [ins("^KS11", "KOSPI", "KRW", "INDEX"), ins("^KQ11", "KOSDAQ", "KRW", "INDEX")];
 export const PANEL_CATALOG = [
-  ins("^GSPC", "S&P 500", "USD", "INDEX"), ins("^IXIC", "Nasdaq", "USD", "INDEX"), ins("NQ=F", "Nasdaq 100 Futures (나스닥100선물)", "USD", "INDEX"), ins("KRW=X", "USD/KRW", "KRW", "FX"), ins("CL=F", "WTI", "USD", "EQUITY"),
+  ins("^GSPC", "S&P 500", "USD", "INDEX"), ins("^IXIC", "Nasdaq", "USD", "INDEX"), ins("NQ=F", "Nasdaq 100 Futures", "USD", "INDEX"), ins("KRW=X", "USD/KRW", "KRW", "FX"), ins("CL=F", "WTI", "USD", "EQUITY"),
   ins("^TNX", "US 10Y", "USD", "RATE"), ins("GC=F", "Gold", "USD", "EQUITY"),
   ins("^DJI", "Dow Jones", "USD", "INDEX"), ins("^SOX", "Philadelphia Semiconductor", "USD", "INDEX"), ins("^NDX", "Nasdaq 100", "USD", "INDEX"),
   ins("^RUT", "Russell 2000", "USD", "INDEX"), ins("^VIX", "VIX", "USD", "INDEX"),
