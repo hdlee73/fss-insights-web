@@ -165,6 +165,10 @@ export function history(raw) {
     }));
 }
 
+// 한국거래소가 평소(09:00)보다 늦게 여는 날(수능일, 매년 첫 거래일 등). 날짜(yyyymmdd) → 개장 시각(hhmm).
+// 휴장일은 따로 목록이 없고 "오늘 분봉이 없음"으로 추정하므로, 지연개장일은 여기 등록해야 휴장으로 오판하지 않는다. 해마다 확인해 추가한다.
+export const KRX_LATE_OPEN = { "20261119": 1000, "20270104": 1000, "20271118": 1000 };
+
 const kstDay = (d = new Date()) => d.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }).replace(/-/g, "");
 
 // 아시아 거래소 점심 휴장(현지시각 hhmm)과 하루 분봉 수. 도쿄 11:30~12:30, 홍콩 12:00~13:00, 상하이 11:30~13:00.
@@ -258,7 +262,9 @@ export function intraday(raw, fallbackPrevious, price) {
       const sl = new Date(new Date(session.start * 1000).toLocaleString("en-US", { timeZone: tz }));
       beforeOpen = hhmm < sl.getHours() * 100 + sl.getMinutes() + 20;
     }
-    const status = h24 ? null : onLunch ? "점심 휴장" : live ? "장중" : last.date === today ? "마감" : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감`
+    const lateOpen = kr && weekday ? KRX_LATE_OPEN[today] : 0; // 오늘이 지연개장일이면 개장 시각(hhmm)
+    const lateWait = lateOpen && last.date !== today && hhmm < lateOpen + 10; // 개장 10분 뒤까지 첫 분봉을 기다린다
+    const status = h24 ? null : onLunch ? "점심 휴장" : live ? "장중" : last.date === today ? "마감" : lateWait ? `지연개장 · ${String(Math.floor(lateOpen / 100)).padStart(2, "0")}:${String(lateOpen % 100).padStart(2, "0")} 개장` : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감`
       : !session ? `마감 ${md(last.date)}(미국)`
       : beforeOpen ? "개장 전"
       : tz.startsWith("America/") ? `마감 ${md(last.date)}(미국)` : `휴장 · ${md(last.date)} 마감`;
