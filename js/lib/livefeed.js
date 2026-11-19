@@ -7,11 +7,28 @@ const POLL_MS = 3000;
 
 const text = (d) => (typeof d === "string" ? d : new TextDecoder().decode(d));
 
+// 업비트 REST는 Origin 기준 10초에 1회로 제한되므로, 원화 전 종목을 한 번에 받는 /ticker/all 하나만 쓴다.
+// (종목별 조회는 없는 종목이 섞이면 전체가 실패하고, 상장 목록 조회가 한도를 먼저 써 버리기 때문)
+// 진행 중인 요청은 공유하고, 받은 지 6초 안이면 그 값을 다시 쓴다.
+let upSnap = null, upSnapAt = 0, upSnapP = null;
+async function upbitAll() {
+  if (upSnap && Date.now() - upSnapAt < 6000) return upSnap;
+  if (!upSnapP) {
+    upSnapP = (async () => {
+      const r = await fetch("https://api.upbit.com/v1/ticker/all?quote_currencies=KRW");
+      if (!r.ok) throw new Error("upbit " + r.status);
+      const out = {};
+      for (const t of await r.json()) out[String(t.market).replace("KRW-", "")] = { price: t.trade_price, rate: t.signed_change_rate };
+      upSnap = out; upSnapAt = Date.now();
+      return out;
+    })().finally(() => { upSnapP = null; });
+  }
+  return upSnapP;
+}
 async function pollUpbit(syms) {
-  const r = await fetch("https://api.upbit.com/v1/ticker?markets=" + syms.map((x) => "KRW-" + x).join(","));
-  if (!r.ok) throw new Error("upbit " + r.status);
+  const all = await upbitAll();
   const out = {};
-  for (const t of await r.json()) out[String(t.market).replace("KRW-", "")] = { price: t.trade_price, rate: t.signed_change_rate };
+  for (const x of syms) if (all[x]) out[x] = all[x];
   return out;
 }
 async function pollBithumb(syms) {
@@ -22,13 +39,23 @@ async function pollBithumb(syms) {
   for (const x of syms) if (data[x]) out[x] = { price: Number(data[x].closing_price), rate: Number(data[x].fluctate_rate_24H) / 100 };
   return out;
 }
+// Coinbase는 종목별 조회를 한꺼번에 여러 개 보내면 초당 한도에 걸려 일부(뒤쪽 코인)가 비므로,
+// 전 종목의 최근 체결가를 한 번에 주는 /products/stats 하나로 받는다. 빠진 코인만 종목별로 보충한다.
 async function pollUsd(syms) {
-  const rs = await Promise.allSettled(syms.map(async (x) => {
+  const out = {};
+  try {
+    const r = await fetch("https://api.exchange.coinbase.com/products/stats");
+    if (r.ok) {
+      const d = await r.json();
+      for (const x of syms) { const v = Number(d[x + "-USD"]?.stats_24hour?.last); if (Number.isFinite(v) && v > 0) out[x] = v; }
+    }
+  } catch { /* 아래에서 종목별로 보충 */ }
+  const miss = syms.filter((x) => !(x in out)).slice(0, 6);
+  const rs = await Promise.allSettled(miss.map(async (x) => {
     const r = await fetch(`https://api.exchange.coinbase.com/products/${x}-USD/ticker`);
     if (!r.ok) throw new Error("cb " + r.status);
     return [x, Number((await r.json()).price)];
   }));
-  const out = {};
   for (const r of rs) if (r.status === "fulfilled" && Number.isFinite(r.value[1])) out[r.value[0]] = r.value[1];
   return out;
 }
@@ -144,10 +171,12 @@ function makeHub() {
     for (const x of [...h.subs]) if (!x.ctx.alive()) h.subs.delete(x);
     if (!h.subs.size) return stopHub();
     if (!dirty) return;
-    dirty = false;
+    dirty = false; lastFlush = Date.now();
     for (const x of h.subs) { try { x.cb(st); } catch { /* 한 화면의 오류가 다른 화면을 막지 않게 */ } }
   };
-  const touch = () => { st.at = Date.now(); dirty = true; if (!h.flushTimer) h.flushTimer = setTimeout(flush, 800); };
+  let lastFlush = 0;
+  // 첫 값은 바로 보여 주고, 이후에는 0.8초 안에 몰린 변경을 묶어 한 번만 그린다.
+  const touch = () => { st.at = Date.now(); dirty = true; if (!h.flushTimer) h.flushTimer = setTimeout(flush, Date.now() - lastFlush > 800 ? 0 : 800); };
   const onMode = (k, m) => { st.mode[k] = m; touch(); };
   const fillMissing = (target, d) => { for (const [k, v] of Object.entries(d)) if (!target[k]) target[k] = v; };
   /** 지금 살아 있는 구독이 원하는 코인의 합집합(닫힌 화면의 코인은 빠진다). */
@@ -186,20 +215,23 @@ function makeHub() {
     if (!all.length) return;
     // 같은 출처에서 웹소켓을 닫자마자 다시 열면 업비트가 거절하는 일이 있어, 다시 연결할 때는 잠깐 쉰다.
     if (hadFeeds) await new Promise((r) => setTimeout(r, 900));
-    const mk = await loadMarkets().catch(() => ({}));
-    if (h.dead || gen !== h.gen || !ctx.alive()) return;
-    // 상장되지 않은 코인은 해당 거래소 요청에서 뺀다(하나만 섞여도 요청 전체가 거절되기 때문).
-    const upSyms = mk.upbit ? all.filter((x) => mk.upbit.has(x)) : all;
-    const biSyms = mk.bithumb ? all.filter((x) => mk.bithumb.has(x)) : all;
-    const usdSyms = cbSet ? all.filter((x) => cbSet.has(x)) : all; // 검색으로 목록을 읽어 둔 경우에만 거른다(없으면 개별 조회가 404여도 건너뜀)
+    // 업비트 웹소켓은 상장되지 않은 코드를 그냥 무시하므로 상장 목록을 기다리지 않고 바로 연결한다.
+    const upSyms = all;
     // 업비트 REST는 Origin 기준 10초에 1회 제한이라 폴링 간격을 11초로 둔다.
     if (upSyms.length) h.stops.push(exchangeFeed(ctx, {
-      name: "upbit", syms: upSyms, wsUrl: UPBIT_WS, poll: pollUpbit, onMode, pollMs: 11000, minRetryMs: 5000,
+      name: "upbit", syms: upSyms, wsUrl: UPBIT_WS, poll: pollUpbit, onMode, pollMs: 11000, minRetryMs: 2000,
       hello: (s) => JSON.stringify([{ ticket: "fss-" + Math.random().toString(36).slice(2) }, { type: "ticker", codes: s.map((x) => "KRW-" + x) }, { format: "DEFAULT" }]),
       parse: (m) => (m?.type === "ticker" && m.code ? { [String(m.code).replace("KRW-", "")]: { price: m.trade_price, rate: m.signed_change_rate } } : null),
       onData: (d) => { Object.assign(st.up, d); touch(); },
     }));
     else onMode("upbit", "none");
+    // 빗썸은 목록을 한 번 읽어(이 요청이 곧 첫 시세) 상장 종목만 구독하고 화면에 바로 채운다.
+    let bdata = null;
+    try { const r = await fetch("https://api.bithumb.com/public/ticker/ALL_KRW", { signal: AbortSignal.timeout(5000) }); bdata = r.ok ? (await r.json()).data || null : null; } catch { /* 목록 없이 시도 */ }
+    if (h.dead || gen !== h.gen || !ctx.alive()) return;
+    const biSyms = bdata ? all.filter((x) => bdata[x]) : all;
+    if (bdata) { for (const x of biSyms) st.bi[x] = { price: Number(bdata[x].closing_price), rate: Number(bdata[x].fluctate_rate_24H) / 100 }; touch(); }
+    const usdSyms = cbSet ? all.filter((x) => cbSet.has(x)) : all; // 검색으로 목록을 읽어 둔 경우에만 거른다(없으면 개별 조회가 404여도 건너뜀)
     if (biSyms.length) h.stops.push(exchangeFeed(ctx, {
       name: "bithumb", syms: biSyms, wsUrl: BITHUMB_WS, poll: pollBithumb, onMode, pollMs: POLL_MS,
       hello: (s) => JSON.stringify({ type: "ticker", symbols: s.map((x) => x + "_KRW"), tickTypes: ["24H"] }),
@@ -208,7 +240,7 @@ function makeHub() {
     }));
     else onMode("bithumb", "none");
     // 웹소켓이 코인 일부만 보내거나 거래가 뜸한 코인은 오래 비어 있을 수 있어, 비어 있는 칸만 REST로 채운다.
-    // 빗썸은 시작할 때와 30초마다, 업비트는 비는 코인이 있을 때만 1.5초 뒤부터 15초 간격(Origin당 10초 1회 제한 안)으로 시도한다.
+    // 빗썸은 시작할 때와 30초마다, 업비트는 시작하자마자 한 번, 이후 비는 코인이 있을 때만 15초 간격(Origin당 10초 1회 제한 안)으로 시도한다.
     const fillBithumb = async () => {
       if (h.dead || gen !== h.gen || !ctx.alive()) return;
       if (!document.hidden && biSyms.length) { try { fillMissing(st.bi, await pollBithumb(biSyms)); touch(); } catch { /* 다음 주기 */ } }
@@ -223,7 +255,7 @@ function makeHub() {
       if (!document.hidden) { try { fillMissing(st.up, await pollUpbit(miss)); touch(); } catch { /* 다음 주기 */ } }
       if (!h.dead && gen === h.gen && ctx.alive()) h.fillUpTimer = setTimeout(fillUpbit, 15000);
     };
-    if (upSyms.length) h.fillUpTimer = setTimeout(fillUpbit, 1500);
+    if (upSyms.length) h.fillUpTimer = setTimeout(fillUpbit, 0); // 웹소켓과 동시에 스냅샷을 받아 첫 화면을 바로 채운다.
     // 해외 달러가는 웹소켓 없이 5초마다 읽는다.
     const usdTick = async () => {
       h.usdTimer = 0;
