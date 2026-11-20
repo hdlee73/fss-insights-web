@@ -280,11 +280,27 @@ export function intraday(raw, fallbackPrevious, price) {
   });
 }
 
-/** 코스피·코스닥 투자자별 순매수(억원). */
+/** 코스피·코스닥 투자자별 순매수(억원). 한 번 실패하면 잠시 뒤 한 번 더 읽고, 그래도 안 되면 마지막으로 읽은 값(같은 날 것)을 쓴다. */
+const lastInv = new Map();
 export function investors(sym) {
   return cached("inv:" + sym, 30_000, async () => {
-    const o = await json(`https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/trend`);
-    return { bizdate: o.bizdate || "", personal: num(o.personalValue), foreign: num(o.foreignValue), institutional: num(o.institutionalValue) };
+    const url = `https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/trend`;
+    let o;
+    try {
+      try {
+        o = await json(url);
+      } catch {
+        await new Promise((r) => setTimeout(r, 1500));
+        o = await json(url, true);
+      }
+    } catch (e) {
+      const prev = lastInv.get(sym);
+      if (prev) return prev;
+      throw e;
+    }
+    const v = { bizdate: o.bizdate || "", personal: num(o.personalValue), foreign: num(o.foreignValue), institutional: num(o.institutionalValue) };
+    lastInv.set(sym, v);
+    return v;
   });
 }
 
