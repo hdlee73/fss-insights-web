@@ -184,6 +184,24 @@ const ASIA_SESSIONS = {
 };
 
 /**
+ * 24시간 지표 중 주말·정비 시간에 거래가 멈추는 것(CME 선물 =F, 외환 =X)의 휴장 여부(미국 동부시간 기준).
+ * 선물: 금 17:00 ~ 일 18:00 주말 마감, 월~목 17:00~18:00 정비 휴장. 외환: 금 17:00 ~ 일 17:00 주말 마감.
+ * 반환: "weekend"(마감) | "break"(정비 휴장) | null(거래 중). 휴일 단축거래는 반영하지 않는다.
+ */
+export function marketClosure(sym, nowMs = Date.now()) {
+  const fut = sym.endsWith("=F");
+  if (!fut && !sym.endsWith("=X")) return null;
+  const et = new Date(new Date(nowMs).toLocaleString("en-US", { timeZone: "America/New_York" }));
+  const day = et.getDay(); // 0=일
+  const hm = et.getHours() * 60 + et.getMinutes();
+  const close = 17 * 60;
+  const reopen = (fut ? 18 : 17) * 60;
+  if (day === 6 || (day === 5 && hm >= close) || (day === 0 && hm < reopen)) return "weekend";
+  if (fut && day >= 1 && day <= 4 && hm >= close && hm < reopen) return "break";
+  return null;
+}
+
+/**
  * 당일(장이 끝났으면 가장 최근 거래일) 흐름: { points, previous, prevPoints, status, bars, live }.
  * 국내는 NAVER 1분봉, 해외는 Yahoo 1분봉(24시간 지표는 5분봉)으로 마지막 두 거래일을 묶는다.
  */
@@ -259,7 +277,8 @@ export function intraday(raw, fallbackPrevious, price) {
     // 아시아·유럽 지수: Yahoo가 15~20분 지연되므로 "마지막 분봉이 15분 이내"로 보면 장중에도 마감으로 나온다. 거래소 정규장 시간(오늘 날짜 자료가 있을 때)으로 판정한다.
     const inSession = !!session && last.date === today && now >= session.start && now <= session.end + 600;
     const onLunch = !!lunch && inSession && hhmm >= lunch[0] && hhmm < lunch[1];
-    const live = h24 || (session && !kr ? inSession : last.date === today && now - lastEpoch <= 15 * 60);
+    const closure = h24 ? marketClosure(sym) : null; // 주말·정비 휴장이면 지연이 아니라 마감으로 표시한다
+    const live = (h24 && !closure) || (session && !kr ? inSession : last.date === today && now - lastEpoch <= 15 * 60);
     const points = last.closes.slice();
     if (live && price > 0) points[points.length - 1] = price;
     const md = (d) => `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}`;
@@ -271,7 +290,7 @@ export function intraday(raw, fallbackPrevious, price) {
     }
     const lateOpen = kr && weekday ? KRX_LATE_OPEN[today]?.open ?? 0 : 0; // 오늘이 지연개장일이면 개장 시각(hhmm)
     const lateWait = lateOpen && last.date !== today && hhmm < lateOpen + 10; // 개장 10분 뒤까지 첫 분봉을 기다린다
-    const status = h24 ? null : onLunch ? "점심 휴장" : live ? "장중" : last.date === today ? "마감" : lateWait ? `지연개장 · ${String(Math.floor(lateOpen / 100)).padStart(2, "0")}:${String(lateOpen % 100).padStart(2, "0")} 개장` : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감`
+    const status = closure === "weekend" ? `마감 ${md(last.date)}` : closure === "break" ? "휴장" : h24 ? null : onLunch ? "점심 휴장" : live ? "장중" : last.date === today ? "마감" : lateWait ? `지연개장 · ${String(Math.floor(lateOpen / 100)).padStart(2, "0")}:${String(lateOpen % 100).padStart(2, "0")} 개장` : kr && weekday && early ? "개장 전" : kr ? `휴장 · ${md(last.date)} 마감`
       : !session ? `마감 ${md(last.date)}(미국)`
       : beforeOpen ? "개장 전"
       : tz.startsWith("America/") ? `마감 ${md(last.date)}(미국)` : `휴장 · ${md(last.date)} 마감`;
