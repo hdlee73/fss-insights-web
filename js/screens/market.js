@@ -78,7 +78,8 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
       try {
         const f = await investors(it.symbol);
         const cell = (label, v) => h("div", null, label, h("b", { style: { color: tint(v) } }, Number.isFinite(v) ? (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") : "—"));
-        inv.replaceChildren(h("small", null, "투자자별 순매수(억원·NAVER 기준)"), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
+        inv.title = "코스피·코스닥 각각 KRX(한국거래소)와 NXT(넥스트레이드)의 투자자별 순매수액을 NAVER 증권 자료로 합산한 값입니다." + (f.partial ? " 현재 " + f.partial + "." : "");
+        inv.replaceChildren(h("small", null, "투자자별 순매수(억원·KRX+NXT 합산)" + (f.partial ? " ※" + f.partial : "")), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
       } catch {
         /* 이번에 못 읽어도 화면에 있던 값은 지우지 않는다(다음 갱신 때 다시 시도) */
       }
@@ -219,7 +220,7 @@ export async function render(root, params, ctx) {
   })), kofia, h("p", { class: "note", style: { marginTop: "6px" } }, "금융투자협회 종합통계 포털 기준. 직전 영업일(신규펀드는 직전 조회일) 대비 증감."));
   drawKofia(kofia);
 
-  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER(실시간), 해외·환율은 Yahoo Finance(종목에 따라 지연될 수 있음). 나스닥100선물 등 CME 선물은 거래소 규정상 무료 시세가 약 10분 지연됩니다. 각 칸에 마우스를 올리면 시세 기준 시각이 보입니다."));
+  root.append(h("p", { class: "note", style: { margin: "18px 0 4px" } }, "공개 시세 기반이라 지연되거나 중단될 수 있습니다. 국내는 NAVER(실시간), 해외·환율은 Yahoo Finance(종목에 따라 지연될 수 있음). 나스닥100선물 등 CME 선물은 거래소 규정상 무료 시세가 약 10분 지연됩니다. 투자자별 순매수는 코스피·코스닥 각각 KRX와 NXT(넥스트레이드) 값을 NAVER 증권에서 받아 합산한 금액입니다(한쪽만 집계되면 그 사실을 표시). 각 칸에 마우스를 올리면 시세 기준 시각이 보입니다."));
   const stamp = h("p", { class: "note", style: { margin: "0 0 4px" } }, "");
   root.append(stamp);
 
