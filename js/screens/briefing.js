@@ -22,8 +22,8 @@ const RESEARCH_COUNT = 10;
 export async function render(root, params, ctx) {
   const now0 = seoulNow();
   const pad = (n) => String(n).padStart(2, "0");
-  const d0 = new Date();
-  setHeader("오늘의 브리핑", `${now0.y}년 ${now0.m}월 ${now0.d}일 ${KO_DAY[now0.wd]} · ${pad(d0.getHours())}:${pad(d0.getMinutes())} 갱신`); // 새로고침은 헤더 우측 공통 버튼
+  const stamp = () => { const d = new Date(); return `${now0.y}년 ${now0.m}월 ${now0.d}일 ${KO_DAY[now0.wd]} · ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())} 갱신`; };
+  setHeader("오늘의 브리핑", stamp()); // 새로고침은 헤더 우측 공통 버튼
   const hello = h("div", { class: "hm-hello" });
   root.append(hello);
   drawHello(hello, null);
@@ -73,7 +73,7 @@ export async function render(root, params, ctx) {
   let beat = 0;
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer), off();
-    if (canPoll()) { idle = false; beat++; (beat % 2 ? topTiles : tiles).forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
+    if (canPoll()) { idle = false; beat++; setHeader("오늘의 브리핑", stamp()); (beat % 2 ? topTiles : tiles).forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
   }, 10000);
 
   // 둘째 줄: 고른 금융 통계(한국은행 ECOS)와 거시경제 지표. 고르기 전에는 국고채 3년·회사채 3년 AA-·가계신용 잔액·소비자물가 상승률·실업률.
