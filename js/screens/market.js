@@ -1,10 +1,10 @@
 // 금융시장 동향 및 거시경제 지표: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행 ECOS), 거시경제 지표(한국은행 ECOS), 자본시장 통계(금투협).
-// 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 지수는 10초, 전체는 20초마다 새로 읽는다.
+// 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 장중·24시간 지표가 있으면 현재가를 3초마다(장 밖이면 30초마다) 새로 읽고, 그래프(분봉)는 20초마다 읽는다.
 import { setHeader } from "../app.js";
 import { canPoll, dialog, errorText, forget, onResume, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
-  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
+  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, quoteTimeText, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
   UP, DOWN, STALE_MS,
 } from "../lib/market.js";
 
@@ -28,11 +28,12 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
   const nm = h("div", { class: "nm" }, it.name);
   const px = h("div", { class: "px" }, "—");
   const dl = h("div", { class: "dl" }, "전일 대비 —");
+  const ts = h("div", { class: "qts" });
   const chart = h("div", { class: "ch" });
   const inv = showInvestors ? h("div", { class: "inv" }) : null;
   const el = wide
-    ? h("div", { class: "tile" }, h("div", { class: "tt" }, h("div", null, nm, px), chart), dl, inv)
-    : h("div", { class: "tile" }, nm, px, dl, chart, inv);
+    ? h("div", { class: "tile" }, h("div", { class: "tt" }, h("div", null, nm, px), chart), dl, ts, inv)
+    : h("div", { class: "tile" }, nm, px, dl, ts, chart, inv);
   let live = false;
   async function update() {
     const gen = resumeGen;
@@ -48,6 +49,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     const ch = changeOf(q);
     px.textContent = priceText(it, q.price);
     dl.textContent = deltaText(it, q) || "전일 대비 —";
+    ts.textContent = quoteTimeText(q) ? "시세 기준 " + quoteTimeText(q) : "";
     dl.style.color = tint(ch);
     const color = ch > 0 ? UP : ch < 0 ? DOWN : "var(--muted)";
     try {
@@ -154,8 +156,9 @@ export async function render(root, params, ctx) {
     const nm = h("div", { class: "nm" }, it.name);
     const px = h("div", { class: "px" }, "—");
     const dl = h("div", { class: "dl" }, "—");
+    const ts = h("div", { class: "qts" });
     const chart = h("div");
-    const cell = h("div", { class: "wc" }, nm, px, dl, chart,
+    const cell = h("div", { class: "wc" }, nm, px, dl, ts, chart,
       editing ? h("div", { class: "ed" },
         i > 0 ? iconButton("arrow-up", "앞으로", () => {
           const l = watchList();
@@ -178,6 +181,7 @@ export async function render(root, params, ctx) {
         const ch = changeOf(q);
         px.textContent = priceText(it, q.price);
         dl.textContent = deltaText(it, q) || "—";
+        ts.textContent = quoteTimeText(q) ? "시세 기준 " + quoteTimeText(q) : "";
         dl.style.color = tint(ch);
         const color = ch > 0 ? UP : ch < 0 ? DOWN : "var(--muted)";
         if (watchMode) {
@@ -220,12 +224,12 @@ export async function render(root, params, ctx) {
   root.append(stamp);
 
   // 첫 표시 뒤 주기적으로 새로 읽는다(화면을 떠나면 멈춘다).
-  // 장중이거나 24시간 거래 지표가 있으면 현재가를 5초마다(그래프는 20초마다) 읽고, 모두 장 밖이면 30초마다만 읽는다.
+  // 장중이거나 24시간 거래 지표가 있으면 현재가를 3초마다(그래프는 20초마다) 읽고, 모두 장 밖이면 30초마다만 읽는다.
   const all = () => Promise.all([...tiles.map((t) => t.update()), ...cells.map((f) => f())]);
   const anyLive = () => tiles.some((t) => t.live) || watchLive.some((w) => w.v);
   const stamped = () => {
     const live = anyLive();
-    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 5초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
+    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 3초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
   };
   await all();
   stamped();
@@ -237,7 +241,7 @@ export async function render(root, params, ctx) {
     if (busy) return;
     const live = anyLive();
     const now = Date.now();
-    if (!stale && now - last < (live ? 5000 : 30_000) - 200) return;
+    if (!stale && now - last < (live ? 3000 : 30_000) - 200) return;
     stale = false;
     busy = true;
     last = now;
