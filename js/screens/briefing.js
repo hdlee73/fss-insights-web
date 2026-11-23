@@ -68,10 +68,13 @@ export async function render(root, params, ctx) {
   let idle = false;
   // 화면이 얼었다 깨어난 경우(타이머가 한 번도 돌지 않아 idle이 아닐 수 있음)에도 항상 새로 읽는다.
   const off = onResume(() => { if (ctx.alive()) { idle = false; forget("q:"); forget("i:"); tiles.forEach((t) => t.update()); } });
+  // 코스피·코스닥(큰 칸)은 10초마다, 나머지 지표는 20초마다 읽는다(그래프는 20초 캐시라 어차피 그 간격으로만 바뀐다).
+  const topTiles = tiles.slice(0, topIdx.length);
+  let beat = 0;
   const timer = setInterval(() => {
     if (!ctx.alive()) return clearInterval(timer), off();
-    if (canPoll()) { idle = false; tiles.forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
-  }, 20000);
+    if (canPoll()) { idle = false; beat++; (beat % 2 ? topTiles : tiles).forEach((t) => t.update()); } else idle = true; // 숨은 탭·오프라인이면 멈추고, 돌아오면 바로 한 번 갱신
+  }, 10000);
 
   // 둘째 줄: 고른 금융 통계(한국은행 ECOS)와 거시경제 지표. 고르기 전에는 국고채 3년·회사채 3년 AA-·가계신용 잔액·소비자물가 상승률·실업률.
   const statIds = statSelection().briefing;
