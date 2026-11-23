@@ -322,25 +322,51 @@ export function intraday(raw, fallbackPrevious, price) {
   });
 }
 
-/** 코스피·코스닥 투자자별 순매수(억원). 한 번 실패하면 잠시 뒤 한 번 더 읽고, 그래도 안 되면 마지막으로 읽은 값(같은 날 것)을 쓴다. */
+/**
+ * 코스피·코스닥 투자자별 순매수(억원) = KRX + NXT 합산.
+ * NAVER 모바일 '투자자 동향'(KRX/NXT 탭)과 같은 자료(front-api/market/investorTrend)를 시장(marketType)·거래소(tradeType)별로 읽어 더한다.
+ * 한쪽만 읽히거나 날짜가 다르면(개장 직후 KRX는 아직 전일 값 등) 같은 날짜 값만 합치고 `partial`에 빠진 쪽을 적는다.
+ * 한 번 실패하면 잠시 뒤 한 번 더 읽고, 그래도 안 되면 마지막으로 읽은 값(같은 날 것)을 쓴다.
+ */
 const lastInv = new Map();
+const INV_KEYS = { individual: "personal", foreigner: "foreign", organization: "institutional" };
+
+async function exchangeFlow(market, exchange) {
+  const url = `https://m.stock.naver.com/front-api/market/investorTrend?marketType=${market}&tradeType=${exchange}&periodType=DAILY`;
+  let o;
+  try {
+    o = await json(url);
+  } catch {
+    await new Promise((r) => setTimeout(r, 1500));
+    o = await json(url, true);
+  }
+  const res = o && o.result;
+  if (!o || o.isSuccess === false || !res || !Array.isArray(res.items)) throw new Error("투자자 동향 응답 오류");
+  const v = { date: String(res.toDate || res.fromDate || ""), personal: NaN, foreign: NaN, institutional: NaN };
+  for (const it of res.items) {
+    const k = INV_KEYS[it.investorType];
+    const n = Number(it.netBuyAmount);
+    if (k && Number.isFinite(n)) v[k] = n / 1e8; // 원 → 억원
+  }
+  if (![v.personal, v.foreign, v.institutional].every(Number.isFinite)) throw new Error("투자자 동향 값 없음");
+  return v;
+}
+
 export function investors(sym) {
   return cached("inv:" + sym, 30_000, async () => {
-    const url = `https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/trend`;
-    let o;
-    try {
-      try {
-        o = await json(url);
-      } catch {
-        await new Promise((r) => setTimeout(r, 1500));
-        o = await json(url, true);
-      }
-    } catch (e) {
+    const market = sym === "^KS11" ? "KOSPI" : "KOSDAQ";
+    const [krx, nxt] = await Promise.allSettled([exchangeFlow(market, "KRX"), exchangeFlow(market, "NXT")]);
+    const parts = [["KRX", krx], ["NXT", nxt]].filter(([, r]) => r.status === "fulfilled").map(([name, r]) => [name, r.value]);
+    if (!parts.length) {
       const prev = lastInv.get(sym);
       if (prev) return prev;
-      throw e;
+      throw krx.reason || nxt.reason || new Error("투자자 동향 조회 실패");
     }
-    const v = { bizdate: o.bizdate || "", personal: num(o.personalValue), foreign: num(o.foreignValue), institutional: num(o.institutionalValue) };
+    const date = parts.map(([, p]) => p.date).sort().pop(); // 가장 최근 날짜의 값만 합친다
+    const used = parts.filter(([, p]) => p.date === date);
+    const sum = (k) => used.reduce((t, [, p]) => t + p[k], 0);
+    const missing = ["KRX", "NXT"].filter((n) => !used.some(([name]) => name === n));
+    const v = { bizdate: date, personal: sum("personal"), foreign: sum("foreign"), institutional: sum("institutional"), sources: used.map(([n]) => n), partial: missing.length ? missing.join("·") + " 미반영(" + used.map(([n]) => n).join("+") + "만 합산)" : "" };
     lastInv.set(sym, v);
     return v;
   });
