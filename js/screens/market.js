@@ -78,7 +78,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
       try {
         const f = await investors(it.symbol);
         const cell = (label, v) => h("div", null, label, h("b", { style: { color: tint(v) } }, Number.isFinite(v) ? (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") : "—"));
-        inv.replaceChildren(h("small", null, "투자자별 순매수(억원)"), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
+        inv.replaceChildren(h("small", null, "투자자별 순매수(억원·NAVER 기준)"), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
       } catch {
         /* 이번에 못 읽어도 화면에 있던 값은 지우지 않는다(다음 갱신 때 다시 시도) */
       }
