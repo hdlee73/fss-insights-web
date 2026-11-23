@@ -129,7 +129,7 @@ function keepNewest(sym, q) {
 export function quoteTimeText(q) {
   if (!q?.at) return "";
   const d = new Date(q.at);
-  const hm = d.toLocaleTimeString("ko-KR", { hour12: false, hour: "2-digit", minute: "2-digit" });
+  const hm = d.toLocaleTimeString("ko-KR", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
   return d.toDateString() === new Date().toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
 }
 
