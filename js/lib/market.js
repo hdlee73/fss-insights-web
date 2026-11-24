@@ -98,6 +98,15 @@ async function yahooQuote(sym) {
   return { price, previous: Number.isFinite(previous) ? previous : null, market: meta.exchangeName || "", time: "", at: (meta.regularMarketTime || 0) * 1000, source: "Yahoo Finance" };
 }
 
+/** 증시동향 현재가 갱신 주기(초) 선택지와 기본값. 사용자가 고른 값은 이 브라우저에 저장한다. */
+export const POLL_CHOICES = [3, 5, 10];
+export const POLL_DEFAULT = 5;
+export function pollSec() {
+  const v = Number(store.get("market.pollSec", POLL_DEFAULT));
+  return POLL_CHOICES.includes(v) ? v : POLL_DEFAULT;
+}
+export const savePollSec = (v) => store.set("market.pollSec", POLL_CHOICES.includes(v) ? v : POLL_DEFAULT);
+
 /** 현재가 재사용 시간(서버 캐시도 3초라 이보다 짧게 두어도 더 새로워지지 않는다). */
 const QUOTE_TTL = 3_000;
 /** 시세 기준 시각이 이 시간보다 오래되면 ‘지연’으로 표시한다(장중·24시간 지표에서만 쓴다). */
