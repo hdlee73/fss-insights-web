@@ -60,13 +60,16 @@ async function naverQuote(url) {
 }
 
 async function yahooQuote(sym) {
-  let chart = await yahooChart(sym, "5d");
+  // 선물(=F)은 일봉에 진행 중인 오늘 봉이 비어 와서 전일 종가를 엉뚱하게(이틀 전 종가로) 잡는다. 5분봉 응답은 직전 거래일 정산가(previousClose)를 함께 주므로 그것을 쓴다.
+  const fut = sym.endsWith("=F");
+  const iv = fut ? "5m" : "1d";
+  let chart = await yahooChart(sym, "5d", iv);
   // 기준 시각이 너무 오래됐으면 한 번 더, 저장소를 건너뛰고 받아 본다(장이 닫힌 종목에서 반복하지 않도록 1분에 한 번만).
   const at0 = (chart.meta?.regularMarketTime || 0) * 1000;
   if (at0 && Date.now() - at0 > STALE_MS && !bustOn(sym) && Date.now() - (bustTried.get(sym) || 0) > 60_000) {
     bustTried.set(sym, Date.now());
     try {
-      const fresh = await yahooChart(sym, "5d", "1d", true);
+      const fresh = await yahooChart(sym, "5d", iv, true);
       if ((fresh.meta?.regularMarketTime || 0) * 1000 > at0 + 60_000) {
         chart = fresh;
         bustUntil.set(sym, Date.now() + 5 * 60_000);
@@ -83,11 +86,13 @@ async function yahooQuote(sym) {
     // 지수·환율은 일봉에서 전일 종가를 찾는다(5일 전 기준이 되지 않도록).
     const tz = meta.exchangeTimezoneName || "America/New_York";
     const day = (t) => new Date(t * 1000).toLocaleDateString("en-CA", { timeZone: tz });
-    const latest = day(meta.regularMarketTime || 0);
+    // 선물은 미국 동부 18:00(한국 08:00)에 새 거래일이 시작하므로 그 기준으로 "전 거래일"을 가린다.
+    const shift = fut ? 6 * 3600 : 0;
+    const latest = day((meta.regularMarketTime || 0) + shift);
     const ts = chart.timestamp || [];
     const closes = chart.indicators?.quote?.[0]?.close || [];
     ts.forEach((t, i) => {
-      if (day(t) < latest && closes[i] > 0) previous = closes[i];
+      if (day(t + shift) < latest && closes[i] > 0) previous = closes[i];
     });
   }
   return { price, previous: Number.isFinite(previous) ? previous : null, market: meta.exchangeName || "", time: "", at: (meta.regularMarketTime || 0) * 1000, source: "Yahoo Finance" };
