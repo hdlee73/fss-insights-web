@@ -111,7 +111,14 @@ export function quote(raw) {
 
 function rawQuote(sym) {
   if (sym === "^KS11" || sym === "^KQ11") {
-    return naverQuote(`https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/basic`).catch(() => yahooQuote(sym));
+    // 야후의 코스피·코스닥은 약 20분 늦은 값이라, NAVER가 한 번 실패해도 바로 야후로 바꾸지 않는다: 한 번 더 시도하고,
+    // 그래도 안 되면 직전에 받은 NAVER 값을 그대로 둔다(‘지연’은 시각으로 정직하게 표시). NAVER 값이 한 번도 없을 때만 야후를 쓴다.
+    const url = `https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/basic`;
+    return naverQuote(url).catch(() => naverQuote(url)).catch((e) => {
+      const prev = newest.get(sym);
+      if (prev && prev.source === "NAVER") return prev;
+      return yahooQuote(sym);
+    });
   }
   if (KR.test(sym)) return naverQuote(`https://m.stock.naver.com/api/stock/${sym.slice(0, 6)}/basic`).catch(() => yahooQuote(sym));
   return yahooQuote(sym);
