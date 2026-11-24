@@ -1,10 +1,10 @@
 // 금융시장 동향 및 거시경제 지표: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행 ECOS), 거시경제 지표(한국은행 ECOS), 자본시장 통계(금투협).
-// 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 장중·24시간 지표가 있으면 현재가를 3초마다(장 밖이면 30초마다) 새로 읽고, 그래프(분봉)는 20초마다 읽는다.
+// 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 장중·24시간 지표가 있으면 현재가를 사용자가 고른 주기(기본 5초, 3·5·10초 중 선택)로(장 밖이면 30초마다) 새로 읽고, 그래프(분봉)는 20초마다 읽는다.
 import { setHeader } from "../app.js";
 import { canPoll, dialog, errorText, forget, onResume, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
-  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, priceText, quote, quoteTimeText, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
+  loadKofia, loadStats, macroBriefingSelection, macroSelection, saveMacroBriefing, saveMacroSelection, periodLabel, POLL_CHOICES, pollSec, savePollSec, priceText, quote, quoteTimeText, saveIndexSelection, saveStatSelection, search, sparkline, yearChart, statDelta, statSelection, statText, tint,
   UP, DOWN, STALE_MS,
 } from "../lib/market.js";
 
@@ -105,9 +105,18 @@ export async function render(root, params, ctx) {
   setHeader("금융시장 동향 및 거시경제 지표", "지수·환율·금리·거시경제 지표를 한눈에", [refreshBtn]);
 
   // ---- 증시동향 ----
+  // 현재가 갱신 주기(3·5·10초). 누를 때마다 다음 값으로 바뀌고, 바로 다음 갱신부터 적용된다.
+  const pollBtn = soft("갱신: " + pollSec() + "초", () => {
+    const next = POLL_CHOICES[(POLL_CHOICES.indexOf(pollSec()) + 1) % POLL_CHOICES.length];
+    savePollSec(next);
+    pollBtn.textContent = "갱신: " + next + "초";
+    toast(`장중 시세를 ${next}초마다 새로 읽습니다.`);
+    stamped();
+  });
   const indexMode = store.get("market.indexIntraday", true);
   root.append(subhead("증시동향",
     soft(indexMode ? "그래프: 당일" : "그래프: 1년", () => (store.set("market.indexIntraday", !indexMode), ctx.go({}, { replace: true }))),
+    pollBtn,
     soft("지표 선택", async () => {
       if (await pickIndexes()) ctx.go({}, { replace: true });
     })));
@@ -225,12 +234,12 @@ export async function render(root, params, ctx) {
   root.append(stamp);
 
   // 첫 표시 뒤 주기적으로 새로 읽는다(화면을 떠나면 멈춘다).
-  // 장중이거나 24시간 거래 지표가 있으면 현재가를 3초마다(그래프는 20초마다) 읽고, 모두 장 밖이면 30초마다만 읽는다.
+  // 장중이거나 24시간 거래 지표가 있으면 현재가를 고른 주기(기본 5초)마다(그래프는 20초마다) 읽고, 모두 장 밖이면 30초마다만 읽는다.
   const all = () => Promise.all([...tiles.map((t) => t.update()), ...cells.map((f) => f())]);
   const anyLive = () => tiles.some((t) => t.live) || watchLive.some((w) => w.v);
   const stamped = () => {
     const live = anyLive();
-    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 3초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
+    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 ${pollSec()}초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
   };
   await all();
   stamped();
@@ -242,7 +251,7 @@ export async function render(root, params, ctx) {
     if (busy) return;
     const live = anyLive();
     const now = Date.now();
-    if (!stale && now - last < (live ? 3000 : 30_000) - 200) return;
+    if (!stale && now - last < (live ? pollSec() * 1000 : 30_000) - 200) return;
     stale = false;
     busy = true;
     last = now;
