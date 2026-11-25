@@ -1,6 +1,7 @@
 // 금융시장 동향 및 거시경제 지표: 증시동향(지수·환율·금리·원자재), 관심종목, 국내 금융 통계(한국은행 ECOS), 거시경제 지표(한국은행 ECOS), 자본시장 통계(금투협).
 // 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 장중·24시간 지표가 있으면 현재가를 사용자가 고른 주기(기본 5초, 3·5·10초 중 선택)로(장 밖이면 30초마다) 새로 읽고, 그래프(분봉)는 20초마다 읽는다.
 import { setHeader } from "../app.js";
+import { heatmapPanel } from "../lib/heatmap.js";
 import { canPoll, dialog, errorText, forget, onResume, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
@@ -100,6 +101,7 @@ export async function render(root, params, ctx) {
     forget("i:");
     forget("stats:");
     forget("kofia");
+    forget("hm:");
     ctx.go({}, { replace: true });
   });
   setHeader("금융시장 동향 및 거시경제 지표", "지수·환율·금리·거시경제 지표를 한눈에", [refreshBtn]);
@@ -131,7 +133,12 @@ export async function render(root, params, ctx) {
     for (const it of wide) {
       const t = indexTile(it, { wide: true, intradayMode: indexMode, showInvestors: true });
       tiles.push(t);
-      row.append(t.el);
+      // 코스피·코스닥 칸 바로 아래에 시가총액 히트맵(기본 펼침, 숨기기 가능)을 붙인다.
+      const market = it.symbol === "^KS11" ? "KOSPI" : it.symbol === "^KQ11" ? "KOSDAQ" : null;
+      if (market) {
+        row.classList.add("hm-cols");
+        row.append(h("div", { class: "hm-col" }, t.el, heatmapPanel(market, { alive: () => ctx.alive() }).el));
+      } else row.append(t.el);
     }
     root.append(row);
   }
