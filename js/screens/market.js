@@ -2,6 +2,7 @@
 // 앱의 MarketScreen.kt를 옮겼다. 화면이 열려 있는 동안 장중·24시간 지표가 있으면 현재가를 사용자가 고른 주기(기본 5초, 3·5·10초 중 선택)로(장 밖이면 30초마다) 새로 읽고, 그래프(분봉)는 20초마다 읽는다.
 import { setHeader } from "../app.js";
 import { heatmapPanel } from "../lib/heatmap.js";
+import { etfHeatmapPanel } from "../lib/heatmap-etf.js";
 import { canPoll, dialog, errorText, forget, onResume, h, icon, iconButton, store, toast } from "../core.js";
 import {
   INDEX_CHOICES, KOREA_INDEXES, DEFAULT_WATCH, MACRO_CATALOG, STAT_CATALOG, changeOf, deltaText, history, indexSelection, intraday, investors,
@@ -148,6 +149,8 @@ export async function render(root, params, ctx) {
       } else row.append(t.el);
     }
     root.append(row);
+    // 코스피·코스닥 히트맵 아래에 두 칸을 합친 전체 폭으로 ETF 히트맵(분류별·브랜드 배지)을 붙인다.
+    if (row.classList.contains("hm-cols")) root.append(h("div", { class: "hm-etfwrap" }, etfHeatmapPanel({ alive: () => ctx.alive() }).el));
   }
   if (small.length) {
     const row = h("div", { class: "tiles" });

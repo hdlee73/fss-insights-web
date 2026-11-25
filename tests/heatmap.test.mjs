@@ -1,6 +1,6 @@
 // node tests/heatmap.test.mjs — 시총 히트맵 계산 검증
 import assert from "node:assert/strict";
-import { buildFromNaver, capText, pctText, squarify, tileColor } from "../js/lib/heatmap-core.js";
+import { buildFromNaver, capText, pctText, squarify, tileColor, splitBrand, brandColor, layoutEtf, ETF_CATS } from "../js/lib/heatmap-core.js";
 
 // 칸 배치: 면적 합 = 전체, 칸이 서로 겹치지 않고 상자를 벗어나지 않음, 면적은 값에 비례
 const items = Array.from({ length: 150 }, (_, i) => ({ v: Math.round(1e6 / (i + 1)) }));
@@ -49,4 +49,35 @@ const st = (c, n, raw, p, t = "stock") => ({ itemCode: c, stockName: n, marketVa
 const d = buildFromNaver([{ marketStatus: "OPEN", stocks: [st("1", "a", 5e11, 1.2), st("2", "e", 9e14, 0, "etf"), st("3", "b", 1.5e14, -7.29), st("1", "a", 5e11, 1.2), st("4", "x", "bad", 1)] }], "KOSPI", 1);
 assert.deepEqual(d.rows, [["3", "b", 1500000, -7.29], ["1", "a", 5000, 1.2]]);
 assert.equal(d.status, "OPEN");
+
+// ETF: 브랜드 분리(공백으로 끊길 때만, 합성 표기 제거), 알 수 없는 브랜드는 그대로
+assert.deepEqual(splitBrand("KODEX 미국S&P500"), { brand: "KODEX", short: "미국S&P500" });
+assert.deepEqual(splitBrand("TIGER CD금리투자KIS(합성)"), { brand: "TIGER", short: "CD금리투자KIS" });
+assert.deepEqual(splitBrand("TIME 글로벌AI인공지능액티브"), { brand: "TIME", short: "글로벌AI인공지능액티브" });
+assert.deepEqual(splitBrand("KODEX200"), { brand: "", short: "KODEX200" });
+assert.deepEqual(splitBrand("처음보는 상품"), { brand: "", short: "처음보는 상품" });
+assert.equal(splitBrand("KODEX").brand, "");
+assert.equal(brandColor("KODEX") === brandColor("TIGER"), false);
+assert.equal(brandColor("없는브랜드"), "#5c6372");
+
+// ETF 배치: 분류 묶음이 상자를 채우고 겹치지 않으며, 칸은 묶음 안쪽에 들어간다. 순자산 합 큰 분류가 먼저
+const erows = Array.from({ length: 100 }, (_, i) => ["C" + i, "KODEX 상품" + i, Math.round(2e6 / (i + 1)), (i % 7) - 3, (i % 7) + 1]);
+for (const [W, H] of [[1600, 544], [360, 468]]) {
+  const gs = layoutEtf(erows, W, H, 17);
+  assert.equal(gs.length, 7);
+  const area = gs.reduce((s, g) => s + g.w * g.h, 0);
+  assert.ok(Math.abs(area - W * H) < 5, "묶음 면적 합 = 전체");
+  for (const g of gs) {
+    assert.ok(g.x >= -0.5 && g.y >= -0.5 && g.x + g.w <= W + 0.5 && g.y + g.h <= H + 0.5);
+    assert.ok(g.name === ETF_CATS[g.cat]);
+    for (const c of g.cells) {
+      assert.ok(c.x >= -0.5 && c.y >= -0.5 && c.x + c.w <= g.iw + 0.5 && c.y + c.h <= g.ih + 0.5, "칸은 묶음 안쪽");
+      assert.equal(c.r[4], g.cat);
+    }
+    assert.equal(g.cells.length, erows.filter((r) => r[4] === g.cat).length);
+  }
+  for (let i = 1; i < gs.length; i++) assert.ok(gs[i - 1].sum >= gs[i].sum);
+}
+assert.deepEqual(layoutEtf([], 800, 400), []);
+assert.deepEqual(layoutEtf([["a", "x", 0, 0, 1]], 800, 400), []);
 console.log("heatmap tests OK");
