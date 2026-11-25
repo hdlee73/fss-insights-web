@@ -44,9 +44,20 @@ export async function render(root, params, ctx) {
   tagRow.hidden = !tags.length;
   tagRow.append(...tags.slice(0, 30).map((t) => h("a", { class: "pill sm" + (q.toLowerCase() === "#" + t.toLowerCase() ? " on" : ""), href: "#/library?q=" + encodeURIComponent("#" + t) }, "#" + t)));
 
-  const items = data.items || [];
+  const items = sortItems(data.items || []);
   if (!items.length) return list.replaceChildren(message(q ? "검색 결과가 없습니다." : "이 폴더에는 자료가 없습니다."));
   list.replaceChildren(...items.map((it) => row(it, ctx)));
+}
+
+// 폴더는 위(이름순), 파일은 최근 날짜가 위, 같은 날짜는 이름순으로 안정 정렬한다.
+function sortItems(list) {
+  const day = (it) => (it.modified || "").slice(0, 10);
+  const byName = (a, b) => (a.name || "").localeCompare(b.name || "", "ko");
+  return list.slice().sort((a, b) => {
+    if (!!a.folder !== !!b.folder) return a.folder ? -1 : 1;
+    if (a.folder) return byName(a, b);
+    return day(a) < day(b) ? 1 : day(a) > day(b) ? -1 : byName(a, b);
+  });
 }
 
 function row(it, ctx) {
