@@ -84,3 +84,39 @@ export function buildFromNaver(pages, market, now = Date.now()) {
   return { market, at: now, time, status, rows: rows.filter((r) => !seen.has(r[0]) && seen.add(r[0])).slice(0, 150) };
 }
 
+
+// ---- ETF 순자산 히트맵(분류별 묶음 + 브랜드 배지) ----
+
+export const ETF_CATS = { 1: "국내 시장지수", 2: "국내 업종·테마", 3: "레버리지·인버스", 4: "해외주식", 5: "원자재", 6: "채권", 7: "혼합·기타" };
+
+const BRANDS = ["KODEX", "TIGER", "RISE", "ACE", "SOL", "PLUS", "KIWOOM", "HANARO", "ARIRANG", "TIME", "KOSEF", "1Q", "KoAct", "WON", "마이티", "BNK", "히어로즈", "파워", "TRUSTON", "VITA", "DAISHIN343", "UNICORN", "KCGI", "ITF", "HK", "에셋플러스", "TIMEFOLIO"];
+// 브랜드(운용사 상품명) 배지 색. 목록에 없는 브랜드는 회색.
+export const BRAND_COLORS = { KODEX: "#1b4fd8", TIGER: "#e8590c", RISE: "#0b7285", ACE: "#7048e8", SOL: "#2b8a3e", PLUS: "#c2255c", KIWOOM: "#862e9c", HANARO: "#5c940d", ARIRANG: "#d9480f", "1Q": "#364fc7", KoAct: "#087f5b", TIME: "#a61e4d" };
+export const brandColor = (b) => BRAND_COLORS[b] || "#5c6372";
+
+/** "KODEX 미국S&P500" → { brand: "KODEX", short: "미국S&P500" }. 브랜드가 목록에 없거나 떼면 이름이 비면 brand 는 "". */
+export function splitBrand(name) {
+  const n = String(name || "").trim();
+  for (const b of BRANDS) {
+    if (n.length > b.length && n.slice(0, b.length).toLowerCase() === b.toLowerCase() && /\s/.test(n[b.length])) {
+      const short = n.slice(b.length).trim().replace(/\(합성\)/g, "");
+      if (short) return { brand: b, short };
+    }
+  }
+  return { brand: "", short: n.replace(/\(합성\)/g, "") };
+}
+
+/**
+ * ETF 칸 배치: 분류별 묶음(분류는 순자산 합 큰 순) 안에 칸을 정사각형에 가깝게 나눈다.
+ * rows: [코드, 이름, 순자산(억원), 등락률, 분류]. 반환: [{cat, name, sum, x,y,w,h, cells:[{r,v,x,y,w,h}]}] — cells 좌표는 묶음 안쪽(머리글 아래) 기준.
+ */
+export function layoutEtf(rows, W, H, headH = 17) {
+  const groups = Object.keys(ETF_CATS).map((c) => {
+    const list = rows.filter((r) => r[4] === Number(c) && r[2] > 0);
+    return { cat: Number(c), name: ETF_CATS[c], sum: list.reduce((s, r) => s + r[2], 0), list };
+  }).filter((g) => g.sum > 0).sort((a, b) => b.sum - a.sum);
+  return squarify(groups.map((g) => ({ ...g, v: g.sum })), W, H).map((g) => {
+    const iw = Math.max(0, g.w - 2), ih = Math.max(0, g.h - headH - 2);
+    return { cat: g.cat, name: g.name, sum: g.sum, x: g.x, y: g.y, w: g.w, h: g.h, iw, ih, cells: squarify(g.list.map((r) => ({ v: r[2], r })), iw, ih) };
+  });
+}

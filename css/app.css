@@ -1571,3 +1571,14 @@ a.lawlink { color: var(--acc-fg, inherit); text-decoration: underline dotted; te
 .hm-bar { width: 34px; height: 9px; display: inline-block; background: linear-gradient(90deg, rgb(31,111,235), rgb(96,108,130), rgb(229,72,77)); }
 .hm.hm-big { position: fixed; inset: 12px; z-index: 60; overflow: auto; box-shadow: 0 8px 40px #0006; }
 @media (max-width: 700px) { .tiles.wide2.hm-cols { grid-template-columns: 1fr; } }
+
+/* ETF 순자산 히트맵(코스피·코스닥 히트맵 아래 전체 폭): 분류별 묶음 + 운용사 브랜드 배지 */
+.hm-etfwrap { margin-top: 12px; }
+.hm-g { position: absolute; background: #0f1b33; border: 1px solid #fff; overflow: hidden; }
+.hm-gh { color: #fff; font-size: 11px; font-weight: 700; height: 17px; line-height: 15px; padding: 1px 6px; white-space: nowrap; overflow: hidden; }
+.hm-gh span { opacity: .65; font-weight: 400; }
+.hm-gi { position: absolute; left: 0; }
+.hm-nm { font-weight: 700; max-width: 100%; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; word-break: break-all; }
+.hm-bd { display: inline-block; color: #fff; border-radius: 4px; padding: 0 4px; font-weight: 700; line-height: 1.5; border: 1px solid rgba(255,255,255,.55); margin-bottom: 2px; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hm-bd.static { font-size: 11px; margin: 0 6px 0 0; }
+.hm-dot { display: inline-block; width: .45em; height: .45em; border-radius: 50%; margin-right: .2em; border: 1px solid rgba(255,255,255,.6); }
