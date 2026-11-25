@@ -228,7 +228,7 @@ function seoulNow() {
 const dotYmd = (v) => (v && /^\d{8}$/.test(v) ? `${v.slice(0, 4)}.${v.slice(4, 6)}.${v.slice(6)}` : v || "-");
 function drawHello(el, w) {
   const now = seoulNow();
-  el.replaceChildren(w ? h("span", { class: "hm-w" }, `${w.emoji} ${w.temp}° ${w.summary} · ${w.min}°/${w.max}°`) : null, h("span", { class: "hm-g" }, greeting(now, w)));
+  el.replaceChildren(w ? h("span", { class: "hm-w" }, `${w.emoji} ${w.temp}° ${w.summary} · ${w.min}°/${w.max}°`) : null, h("span", { class: "hm-greet" }, greeting(now, w)));
 }
 
 function drawHero(hero, w) {
