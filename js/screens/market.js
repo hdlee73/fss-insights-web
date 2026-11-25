@@ -36,6 +36,22 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     ? h("div", { class: "tile" }, h("div", { class: "tt" }, h("div", null, nm, px), chart), dl, ts, inv)
     : h("div", { class: "tile" }, nm, px, dl, ts, chart, inv);
   let live = false;
+  let invBusy = false;
+  async function updateInv() {
+    if (!inv || invBusy) return;
+    invBusy = true;
+    try {
+      const f = await investors(it.symbol);
+      if (!el.isConnected) return;
+      const cell = (label, v) => h("div", null, label, h("b", { style: { color: tint(v) } }, Number.isFinite(v) ? (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") : "—"));
+      inv.title = "코스피·코스닥 각각 KRX(한국거래소)와 NXT(넥스트레이드)의 투자자별 순매수액을 NAVER 증권 자료로 합산한 값입니다." + (f.partial ? " 현재 " + f.partial + "." : f.note ? " 현재 " + f.note + "." : "");
+      inv.replaceChildren(h("small", null, "투자자별 순매수(억원·KRX+NXT 합산)" + (f.partial ? " ※" + f.partial : f.note ? " ※" + f.note : "")), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
+    } catch {
+      /* 이번에 못 읽어도 화면에 있던 값은 지우지 않는다(다음 갱신 때 다시 시도) */
+    } finally {
+      invBusy = false;
+    }
+  }
   async function update() {
     const gen = resumeGen;
     let q;
@@ -75,16 +91,7 @@ export function indexTile(it, { wide = false, intradayMode = true, showInvestors
     } catch {
       chart.replaceChildren();
     }
-    if (inv) {
-      try {
-        const f = await investors(it.symbol);
-        const cell = (label, v) => h("div", null, label, h("b", { style: { color: tint(v) } }, Number.isFinite(v) ? (v > 0 ? "+" : "") + Math.round(v).toLocaleString("ko-KR") : "—"));
-        inv.title = "코스피·코스닥 각각 KRX(한국거래소)와 NXT(넥스트레이드)의 투자자별 순매수액을 NAVER 증권 자료로 합산한 값입니다." + (f.partial ? " 현재 " + f.partial + "." : "");
-        inv.replaceChildren(h("small", null, "투자자별 순매수(억원·KRX+NXT 합산)" + (f.partial ? " ※" + f.partial : "")), h("div", { class: "r" }, cell("개인", f.personal), cell("외국인", f.foreign), cell("기관계", f.institutional)));
-      } catch {
-        /* 이번에 못 읽어도 화면에 있던 값은 지우지 않는다(다음 갱신 때 다시 시도) */
-      }
-    }
+    updateInv(); // 투자자 순매수는 NAVER 응답이 늦어도 다른 값 갱신을 막지 않도록 기다리지 않고 따로 읽는다.
     return true;
   }
   return { el, update, get live() { return live; } };

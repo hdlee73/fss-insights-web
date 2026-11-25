@@ -1,5 +1,5 @@
 // 공개 시세 조회(키 없음): 국내 종목·지수는 NAVER, 해외·환율·원자재는 Yahoo Finance. 서버의 /fetch 중계를 거친다.
-import { api, cached, fetchSite, store } from "../core.js";
+import { api, cached, fetchSite, forget, store } from "../core.js";
 
 const NAVER_REF = "https://m.stock.naver.com/";
 const KR = /^[A-Z0-9]{6}\.(KS|KQ)$/;
@@ -350,16 +350,26 @@ export function intraday(raw, fallbackPrevious, price) {
  * 한 번 실패하면 잠시 뒤 한 번 더 읽고, 그래도 안 되면 마지막으로 읽은 값(같은 날 것)을 쓴다.
  */
 const lastInv = new Map();
+const lastFlow = new Map(); // "시장:거래소" → { v, at }: 거래소별로 마지막에 정상으로 읽은 값(한쪽이 가끔 응답하지 않을 때 대신 쓴다)
+const FLOW_KEEP_MS = 6 * 3600_000;
+const FLOW_TIMEOUT_MS = 6000; // NAVER가 가끔 응답하지 않고 끊기므로 오래 기다리지 않고 바로 다시 읽는다
 const INV_KEYS = { individual: "personal", foreigner: "foreign", organization: "institutional" };
+
+/** promise 를 ms 안에 못 받으면 오류로 끝낸다(요청 자체는 뒤에서 마저 끝난다). */
+function within(promise, ms) {
+  let t;
+  const timeout = new Promise((_, reject) => (t = setTimeout(() => reject(new Error("시간 초과")), ms)));
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(t));
+}
 
 async function exchangeFlow(market, exchange) {
   const url = `https://m.stock.naver.com/front-api/market/investorTrend?marketType=${market}&tradeType=${exchange}&periodType=DAILY`;
   let o;
   try {
-    o = await json(url);
+    o = await within(json(url), FLOW_TIMEOUT_MS);
   } catch {
-    await new Promise((r) => setTimeout(r, 1500));
-    o = await json(url, true);
+    await new Promise((r) => setTimeout(r, 1000));
+    o = await within(json(url, true), FLOW_TIMEOUT_MS);
   }
   const res = o && o.result;
   if (!o || o.isSuccess === false || !res || !Array.isArray(res.items)) throw new Error("투자자 동향 응답 오류");
@@ -373,11 +383,25 @@ async function exchangeFlow(market, exchange) {
   return v;
 }
 
+/** 거래소 한 쪽을 읽는다. 실패하면 같은 거래소의 직전 정상값(6시간 이내)을 쓰고 읽은 시각(at)을 함께 돌려준다. */
+async function flowOrLast(market, exchange) {
+  const key = market + ":" + exchange;
+  try {
+    const v = await exchangeFlow(market, exchange);
+    lastFlow.set(key, { v, at: Date.now() });
+    return { v, at: 0 };
+  } catch (e) {
+    const old = lastFlow.get(key);
+    if (old && Date.now() - old.at < FLOW_KEEP_MS) return { v: old.v, at: old.at };
+    throw e;
+  }
+}
+
 export function investors(sym) {
   return cached("inv:" + sym, 30_000, async () => {
     const market = sym === "^KS11" ? "KOSPI" : "KOSDAQ";
-    const [krx, nxt] = await Promise.allSettled([exchangeFlow(market, "KRX"), exchangeFlow(market, "NXT")]);
-    const parts = [["KRX", krx], ["NXT", nxt]].filter(([, r]) => r.status === "fulfilled").map(([name, r]) => [name, r.value]);
+    const [krx, nxt] = await Promise.allSettled([flowOrLast(market, "KRX"), flowOrLast(market, "NXT")]);
+    const parts = [["KRX", krx], ["NXT", nxt]].filter(([, r]) => r.status === "fulfilled").map(([name, r]) => [name, r.value.v, r.value.at]);
     if (!parts.length) {
       const prev = lastInv.get(sym);
       if (prev) return prev;
@@ -387,8 +411,12 @@ export function investors(sym) {
     const used = parts.filter(([, p]) => p.date === date);
     const sum = (k) => used.reduce((t, [, p]) => t + p[k], 0);
     const missing = ["KRX", "NXT"].filter((n) => !used.some(([name]) => name === n));
-    const v = { bizdate: date, personal: sum("personal"), foreign: sum("foreign"), institutional: sum("institutional"), sources: used.map(([n]) => n), partial: missing.length ? missing.join("·") + " 미반영(" + used.map(([n]) => n).join("+") + "만 합산)" : "" };
+    // 이번에 못 읽어 직전 값을 쓴 쪽은 그 값을 읽은 시각을 알린다(예: "NXT 10:41 기준 값 사용").
+    const old = used.filter(([, , at]) => at).map(([n, , at]) => `${n} ${new Date(at).toTimeString().slice(0, 5)} 기준 값 사용`);
+    const v = { bizdate: date, personal: sum("personal"), foreign: sum("foreign"), institutional: sum("institutional"), sources: used.map(([n]) => n), partial: missing.length ? missing.join("·") + " 미반영(" + used.map(([n]) => n).join("+") + "만 합산)" : "", note: old.join(" · ") };
     lastInv.set(sym, v);
+    // 한쪽을 못 읽었거나 직전 값을 썼으면 30초를 기다리지 않고 곧(5초 뒤) 다시 읽는다.
+    if (v.partial || v.note) setTimeout(() => forget("inv:" + sym), 5000);
     return v;
   });
 }
