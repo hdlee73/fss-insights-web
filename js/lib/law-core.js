@@ -614,7 +614,8 @@ function delegatesAt(article, p) {
   return hasPhrase(article.content);
 }
 
-export const LAW_PREFIX = "(?<![가-힣])법";
+// "법"으로 줄여 부르는 정의 직후(`(이하 "법"이라 한다) 제2조제2호다목…`)의 인용도 법 조문 인용으로 본다.
+export const LAW_PREFIX = "(?:(?<![가-힣])법|[\"“]법[\"”]이?라고?\\s*(?:한다|함)\\s*\\)?)";
 export const DECREE_PREFIX = "(?:(?<![가-힣])영|시행령)";
 export const RULE_PREFIX = "(?:(?<![가-힣])규칙|시행규칙)";
 export const SUP_PREFIX = "(?:(?<![가-힣])규정|감독규정)";
