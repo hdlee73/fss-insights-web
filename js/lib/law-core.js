@@ -1097,6 +1097,46 @@ const looksLikeLawName = (s) => {
 const asLaw = (v) => ({ id: v.mst, mst: v.mst, name: v.name, abbreviation: null, kind: null, effectiveDate: v.effectiveDate });
 const isSub = (n) => n.endsWith("시행령") || n.endsWith("시행규칙");
 
+const SUB_SUFFIX = /^(시행령|시행규칙|시행세칙)$/;
+/** "자본시장법", "자본시장법 시행령"처럼 법령명(약칭 포함)만 입력했으면 정식 명칭으로 바꾼 검색어를, 아니면 null */
+function nameQuery(k) {
+  const tokens = k.split(/\s+/).filter(Boolean);
+  if (LawAliases.isKnown(k) || LawAliases.isKnown(compact(k))) return LawAliases.resolve(k);
+  if (tokens.length === 2 && SUB_SUFFIX.test(tokens[1]) && looksLikeLawName(tokens[0])) return LawAliases.resolve(tokens[0]) + " " + tokens[1];
+  return null;
+}
+const subRank = (name, base) => {
+  const rest = compact(name).slice(compact(base).length);
+  return rest === "" ? 0 : rest.startsWith("시행령") ? 1 : rest.startsWith("시행규칙") ? 2 : 3;
+};
+/**
+ * 법령명(약칭 포함)과 일치하는 법령을 찾아 그 법·시행령·시행규칙·감독규정·시행세칙을 한 묶음으로 만든다.
+ * 일치하는 법령이 없으면 null.
+ */
+async function lawFamily(k) {
+  const c = compact(k);
+  if (c.length < 2) return null;
+  const found = (await settle(repo.searchLaws(k))).value || [];
+  const exact = found.find((l) => compact(l.name) === c) || found.find((l) => l.abbreviation && compact(l.abbreviation) === c);
+  if (!exact) {
+    const part = found.filter((l) => compact(l.name).includes(c) || (l.abbreviation && compact(l.abbreviation).includes(c)));
+    return part.length && looksLikeLawName(k) ? { base: null, laws: part.sort((a, b) => compact(a.name).length - compact(b.name).length), adminRules: [] } : null;
+  }
+  const base = exact.name;
+  const laws = found.filter((l) => compact(l.name).startsWith(compact(base)) && subRank(l.name, base) < 3 || l.id === exact.id);
+  // 시행령·시행규칙이 이름 검색에 안 잡히면 따로 찾는다
+  for (const suffix of ["시행령", "시행규칙"]) {
+    if (laws.some((l) => compact(l.name).startsWith(compact(base) + suffix))) continue;
+    const hit = ((await settle(repo.searchLaws(`${base} ${suffix}`))).value || []).find((l) => compact(l.name) === compact(base) + suffix);
+    if (hit) laws.push(hit);
+  }
+  const seen = new Set();
+  const uniq = laws.filter((l) => !seen.has(l.mst) && seen.add(l.mst)).sort((a, b) => subRank(a.name, base) - subRank(b.name, base) || compact(a.name).length - compact(b.name).length);
+  const [sup, det] = await adminRuleNames(exact).catch(() => [[], []]);
+  const rules = (await pool([...sup, ...det], 4, async (name) => ((await settle(repo.searchAdminRules(name))).value || []).find((r) => compact(r.name) === compact(name)))).filter(Boolean);
+  return { base, laws: uniq, adminRules: rules };
+}
+
 function snippet(a, words) {
   const line = a.content.split("\n").find((l) => words.some((w) => l.includes(w)));
   if (!line) return "";
@@ -1127,16 +1167,20 @@ export async function searchKeyword(keyword, { asOf = null, onStep = () => {} } 
   const k = keyword.trim();
   if (k.length < 2) throw new LawError("검색어를 두 글자 이상 입력해 주세요.");
   onStep(`'${k}' 찾는 중`);
-  const scopedR = await scoped(k, asOf);
+  const nameQ = nameQuery(k);
+  const scopedR = nameQ ? null : await scoped(k, asOf);
   if (scopedR) return scopedR;
+  const familyP = asOf ? Promise.resolve(null) : lawFamily((nameQ || k).replace(/\s+(시행령|시행규칙|시행세칙)$/, "")).catch(() => null);
   const [lawsR, rulesR, precsR] = await Promise.all([settle(repo.searchLaws(k, true)), settle(repo.searchAdminRules(k)), settle(repo.searchPrecedents(k))]);
   const failures = [["법령", lawsR], ["행정규칙", rulesR], ["판례", precsR]].filter(([, r]) => !r.ok).map(([l, r]) => `${l} 검색 실패 · ${describe(r.error)}`);
   if (failures.length === 3) throw new LawError(failures.join("\n"));
   const lawList = lawsR.ok ? lawsR.value : [];
   onStep("조문 제목·내용을 훑는 중");
-  const scan = asOf ? await scanAsOf(k, asOf, lawList) : await scanUnscoped(k, lawList);
+  const family = await familyP;
+  const scan = asOf ? await scanAsOf(k, asOf, lawList) : await scanUnscoped(nameQ || k, lawList, family);
   return {
     keyword: k,
+    family,
     laws: asOf ? [] : lawList,
     adminRules: asOf || !rulesR.ok ? [] : rulesR.value,
     precedents: precsR.ok ? precsR.value : [],
@@ -1146,10 +1190,10 @@ export async function searchKeyword(keyword, { asOf = null, onStep = () => {} } 
     scopeLaw: null,
   };
 }
-async function scanUnscoped(k, found) {
+async function scanUnscoped(k, found, family = null) {
   const scan = async (laws) => (await pool(laws, 4, async (l) => (await withTimeout(articleHits(l, [k], 8).catch(() => []), 30000)) || [])).flat();
   const major = new Set(LawAliases.majorLaws().map(compact));
-  const byName = ((await settle(repo.searchLaws(k))).value || []).filter((l) => compact(l.name).includes(compact(k)));
+  const byName = family ? family.laws : ((await settle(repo.searchLaws(k))).value || []).filter((l) => compact(l.name).includes(compact(k)));
   const nameIds = new Set(byName.map((l) => l.id));
   const ordered = [...byName, ...found.filter((l) => !nameIds.has(l.id))]
     .map((l, i) => [l, i])
