@@ -256,7 +256,7 @@ export async function render(root, params, ctx) {
   const anyLive = () => tiles.some((t) => t.live) || watchLive.some((w) => w.v);
   const stamped = () => {
     const live = anyLive();
-    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? "장중·24시간 지표가 있어 ${pollSec()}초마다 갱신 중" : "모두 장 밖이라 30초마다 확인 중"}`;
+    stamp.textContent = `마지막 갱신 ${new Date().toTimeString().slice(0, 8)} · ${live ? `장중·24시간 지표가 있어 ${pollSec()}초마다 갱신 중` : "모두 장 밖이라 30초마다 확인 중"}`;
   };
   await all();
   stamped();

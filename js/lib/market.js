@@ -46,8 +46,9 @@ async function yahooChart(sym, range, interval = "1d", bust = bustOn(sym)) {
   throw last || new Error("시세 연결 실패");
 }
 
-async function naverQuote(url) {
-  const o = await json(url);
+async function naverQuote(url, polling = false) {
+  let o = await json(url);
+  if (polling) o = o?.datas?.[0] || {}; // polling 응답은 { datas: [ {...} ] } 모양
   const price = num(o.closePrice);
   const code = o.compareToPreviousPrice?.code || "";
   let change = num(o.compareToPreviousClosePrice);
@@ -122,8 +123,11 @@ function rawQuote(sym) {
   if (sym === "^KS11" || sym === "^KQ11") {
     // 야후의 코스피·코스닥은 약 20분 늦은 값이라, NAVER가 한 번 실패해도 바로 야후로 바꾸지 않는다: 한 번 더 시도하고,
     // 그래도 안 되면 직전에 받은 NAVER 값을 그대로 둔다(‘지연’은 시각으로 정직하게 표시). NAVER 값이 한 번도 없을 때만 야후를 쓴다.
-    const url = `https://m.stock.naver.com/api/index/${sym === "^KS11" ? "KOSPI" : "KOSDAQ"}/basic`;
-    return naverQuote(url).catch(() => naverQuote(url)).catch((e) => {
+    const name = sym === "^KS11" ? "KOSPI" : "KOSDAQ";
+    const url = `https://m.stock.naver.com/api/index/${name}/basic`;
+    // basic 은 1분 단위로만 갱신되므로, 초 단위로 갱신되는 NAVER 실시간(polling) 주소를 먼저 쓰고 안 되면 basic 으로 되돌아간다.
+    const live = () => naverQuote(`https://polling.finance.naver.com/api/realtime/domestic/index/${name}`, true);
+    return live().catch(() => naverQuote(url)).catch(() => naverQuote(url)).catch((e) => {
       const prev = newest.get(sym);
       if (prev && prev.source === "NAVER") return prev;
       return yahooQuote(sym);
