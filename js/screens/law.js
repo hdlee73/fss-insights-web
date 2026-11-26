@@ -124,14 +124,25 @@ function keywordResults(r, ctx) {
   const out = h("div", { class: "stack" });
   if (r.scopeLaw) out.append(h("div", { class: "infobox" }, `‘${r.scopeLaw.name}’ 안에서 ‘${r.keyword.split(/\s+/).slice(1).join(" ") || r.keyword}’을(를) 조문 제목·내용으로 찾았습니다.`));
   if (r.warnings.length) out.append(h("div", { class: "lw-warn" }, r.warnings.map((w) => h("div", null, "※ " + w))));
+  const fam = r.family;
+  const famIds = new Set(fam ? fam.laws.map((l) => l.mst) : []);
+  const famAdm = new Set(fam ? fam.adminRules.map((a) => a.serialNo) : []);
+  if (fam && (fam.laws.length || fam.adminRules.length)) {
+    const rows = [
+      ...fam.laws.map((law) => row(law.name, [law.kind, law.abbreviation, law.effectiveDate ? "시행 " + L.formatYmd(law.effectiveDate) : null].filter(Boolean).join(" · "), () => ctx.go({ mst: law.mst, name: law.name }))),
+      ...fam.adminRules.map((a) => row(a.name, [a.kind || "행정규칙", a.agency].filter(Boolean).join(" · "), () => ctx.go({ adm: a.serialNo, name: a.name })))];
+    out.append(sec(fam.base ? `‘${fam.base}’과 하위 법령` : `‘${r.keyword}’ 관련 법령`, "landmark", rows.length, rows, ""));
+  }
   out.append(
     sec("조문 (제목·내용)", "book-open", r.articleHits.length, r.articleHits.map((hit) =>
       row(`${hit.law.name} ${hit.article.heading}`, (hit.inTitle ? "제목에 포함 · " : "내용에 포함 · ") + hit.snippet, () => ctx.go({ q: `${hit.law.name} ${L.noDisplay(hit.article.number)}` }))),
     "조문 제목·내용에서 찾지 못했습니다."));
   if (r.scanNote) out.append(h("p", { class: "note" }, r.scanNote));
-  if (!r.scopeLaw) out.append(sec("법령", "landmark", r.laws.length, r.laws.map((law) =>
+  const otherLaws = r.laws.filter((l) => !famIds.has(l.mst));
+  const otherAdm = r.adminRules.filter((a) => !famAdm.has(a.serialNo));
+  if (!r.scopeLaw) out.append(sec(fam && famIds.size ? "본문에서 언급한 법령" : "법령", "landmark", otherLaws.length, otherLaws.map((law) =>
     row(law.name, [law.kind, law.abbreviation, law.effectiveDate ? "시행 " + L.formatYmd(law.effectiveDate) : null].filter(Boolean).join(" · "), () => ctx.go({ mst: law.mst, name: law.name }))), "찾은 법령이 없습니다."));
-  if (r.adminRules.length) out.append(sec("행정규칙 (감독규정·세칙 등)", "file-text", r.adminRules.length, r.adminRules.map((a) =>
+  if (otherAdm.length) out.append(sec("행정규칙 (감독규정·세칙 등)", "file-text", otherAdm.length, otherAdm.map((a) =>
     row(a.name, [a.kind, a.agency].filter(Boolean).join(" · "), () => ctx.go({ adm: a.serialNo, name: a.name }))), ""));
   out.append(sec("판례", "gavel", r.precedents.length, r.precedents.map((p) => precRow(p, ctx)), "찾은 판례가 없습니다."));
   return out;
