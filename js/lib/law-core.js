@@ -644,7 +644,7 @@ function buildTree(input) {
   rootN.children.push(...decrees);
   decrees.forEach((d) => (d.anchor = lawNo ? delegationAnchor(d.article.content, lawNo) || EMPTY : EMPTY));
   for (const r of rules) {
-    const parent = decrees.find((d) => d.article.number && refersTo(r.article.content, DECREE_PREFIX, d.article.number)) || decrees[0] || rootN;
+    const parent = decrees.find((d) => d.article.number && refersTo(r.article.content, DECREE_PREFIX, d.article.number)) || (lawNo && refersTo(r.article.content, LAW_PREFIX, lawNo) ? rootN : decrees[0] || rootN); // 시행령 조문을 인용하지 않고 법 조문을 직접 인용한 시행규칙은 시행령 밑에 붙이지 않고 법 조문 바로 아래에 둔다
     parent.children.push(r);
     if (parent === rootN) r.anchor = lawNo ? anchorOf(r.article.content, LAW_PREFIX, lawNo) || EMPTY : EMPTY;
   }
@@ -713,7 +713,7 @@ function cmpPath(a, b) {
 export function sortByAnchor(nodes) {
   return nodes.map((n, i) => [n, i]).sort((x, y) => cmpPath(x[0].anchor || EMPTY, y[0].anchor || EMPTY) || x[1] - y[1]).map((x) => x[0]);
 }
-function buildSplit(input) {
+export function buildSplit(input) {
   const tree = buildTree(input);
   const lawNo = input.lawArticle.number;
   if (!lawNo) return { root: tree, cited: [] };
