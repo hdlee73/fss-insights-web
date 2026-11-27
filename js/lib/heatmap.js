@@ -1,12 +1,12 @@
 // 코스피·코스닥 시가총액 히트맵(트리맵): 칸 크기 = 시가총액, 색 = 전일 대비 등락률. 상위 150개(또는 50개) 일반 종목만 그린다.
-// 자료는 서버의 /heatmap(NAVER 시총순 목록을 정리한 작은 JSON, 서버에서 1분 캐시)을 읽는다. 서버가 아직 새 주소를 모르면(404) NAVER 목록을 /fetch 로 직접 읽어 같은 모양으로 만든다.
+// 자료는 서버의 /heatmap(NAVER 시총순 목록을 정리한 작은 JSON, 서버에서 10초 캐시)을 읽는다. 서버가 아직 새 주소를 모르면(404) NAVER 목록을 /fetch 로 직접 읽어 같은 모양으로 만든다.
 // 화면에 보이는 동안(숨기기·접기 포함)만 60초(장 밖 5분)마다 새로 읽고, 숨은 탭·오프라인·접힌 상태에서는 서버를 읽지 않는다.
 import { ApiError, api, cached, canPoll, fetchSite, forget, h, onResume, openUrl, store } from "../core.js";
 
 import { buildFromNaver, capText, pctText, squarify, tileColor } from "./heatmap-core.js";
 
 export const TOP_CHOICES = [150, 50];
-const POLL_OPEN_MS = 60_000;
+const POLL_OPEN_MS = 15_000; // 장중에는 15초마다(서버 자료가 10초 캐시라 자료 나이는 최대 약 25초). 숨은 탭에서는 읽지 않는다.
 const POLL_CLOSED_MS = 300_000;
 const NAVER_ROOT = "https://m.stock.naver.com/api/stocks/marketValue/";
 const NAVER_REF = "https://m.stock.naver.com/";
@@ -25,7 +25,7 @@ async function viaFetch(market) {
 }
 
 export async function loadHeatmap(market) {
-  return cached("hm:" + market, 50_000, async () => {
+  return cached("hm:" + market, 10_000, async () => {
     let data;
     if (serverHasHeatmap) {
       try {
