@@ -6,7 +6,7 @@ import { ApiError, api, cached, canPoll, fetchSite, forget, h, onResume, openUrl
 import { buildFromNaver, capText, pctText, squarify, tileColor } from "./heatmap-core.js";
 
 export const TOP_CHOICES = [150, 50];
-const POLL_OPEN_MS = 15_000; // 장중에는 15초마다(서버 자료가 10초 캐시라 자료 나이는 최대 약 25초). 숨은 탭에서는 읽지 않는다.
+const POLL_OPEN_MS = 30_000; // 장중에는 30초마다(서버 호출량 부담을 줄이려 15초 대신 30초). 숨은 탭에서는 읽지 않는다.
 const POLL_CLOSED_MS = 300_000;
 const NAVER_ROOT = "https://m.stock.naver.com/api/stocks/marketValue/";
 const NAVER_REF = "https://m.stock.naver.com/";
@@ -25,7 +25,7 @@ async function viaFetch(market) {
 }
 
 export async function loadHeatmap(market) {
-  return cached("hm:" + market, 10_000, async () => {
+  return cached("hm:" + market, 20_000, async () => {
     let data;
     if (serverHasHeatmap) {
       try {
@@ -119,7 +119,7 @@ export function heatmapPanel(market, { alive = () => true } = {}) {
     for (const b of [...seg, bigBtn]) b.hidden = hidden;
     el.classList.toggle("hm-big", big && !hidden);
     bigBtn.textContent = big ? "✕ 닫기" : "⤢ 크게";
-    sub.textContent = hidden ? "숨김" : err ? err : data ? `${data.status === "OPEN" ? "장중" : "장 밖"} · ${hhmm(data)} 기준${data.partial ? " · 일부만 표시" : ""}` : "불러오는 중…";
+    sub.textContent = hidden ? "숨김" : err ? err : data ? `${data.status === "OPEN" ? "장중" : "장 밖"} · ${hhmm(data)} 기준${data.partial ? " · 일부만 표시" : ""}${data.status === "OPEN" ? " · 약 30초마다 갱신" : ""}` : "불러오는 중…";
     infoLine();
     paint();
   }

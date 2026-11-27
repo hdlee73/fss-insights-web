@@ -5,14 +5,14 @@ import { ApiError, api, cached, canPoll, forget, h, onResume, openUrl, store } f
 import { brandColor, capText, layoutEtf, pctText, splitBrand, tileColor } from "./heatmap-core.js";
 
 export const ETF_TOP_CHOICES = [100, 50];
-const POLL_OPEN_MS = 15_000; // 장중에는 15초마다(서버 자료가 10초 캐시라 자료 나이는 최대 약 25초). 숨은 탭에서는 읽지 않는다.
+const POLL_OPEN_MS = 30_000; // 장중에는 30초마다(서버 호출량 부담을 줄이려 15초 대신 30초). 숨은 탭에서는 읽지 않는다.
 const POLL_CLOSED_MS = 300_000;
 const HEAD_H = 17;
 
 let serverHasEtf = true; // 서버가 모르면(404) 이 세션에서는 다시 묻지 않는다.
 
 export async function loadEtfHeatmap() {
-  return cached("hm:ETF", 10_000, async () => {
+  return cached("hm:ETF", 20_000, async () => {
     if (!serverHasEtf) throw new ApiError("서버가 ETF 자료를 아직 지원하지 않습니다", 404);
     let data;
     try {
@@ -26,7 +26,7 @@ export async function loadEtfHeatmap() {
   });
 }
 
-/** 한국 정규장(평일 09:00~15:30 한국시간) 안인지. 휴장일은 모르므로 그날도 15초마다 읽는다. */
+/** 한국 정규장(평일 09:00~15:30 한국시간) 안인지. 휴장일은 모르므로 그날도 30초마다 읽는다. */
 export function krOpen(now = Date.now()) {
   const k = new Date(now + 9 * 3600_000); // UTC 필드로 한국시간을 읽는다
   const d = k.getUTCDay(), m = k.getUTCHours() * 60 + k.getUTCMinutes();
@@ -127,7 +127,7 @@ export function etfHeatmapPanel({ alive = () => true } = {}) {
     el.classList.toggle("hm-big", big && !hidden);
     bigBtn.textContent = big ? "✕ 닫기" : "⤢ 크게";
     const cnt = data && data.count ? ` · 전체 ${data.count.toLocaleString("ko-KR")}개 중 상위 ${eff}개` : "";
-    sub.textContent = hidden ? "숨김" : err ? err : data ? `분류별 · ${hhmm(data)} 기준${cnt}` : "불러오는 중…";
+    sub.textContent = hidden ? "숨김" : err ? err : data ? `분류별 · ${hhmm(data)} 기준${cnt}${krOpen() ? " · 약 30초마다 갱신" : ""}` : "불러오는 중…";
     infoLine();
     paint();
   }
